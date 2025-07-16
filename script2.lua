@@ -9,10 +9,9 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local baseWidth, baseHeight = 220, 280
-local scaleOptions = {0.8, 1.0, 1.2}
-local currentScaleIndex = 2 -- começa com 1.0
-
+local baseWidth, baseHeight = 180, 230
+local scaleOptions = {0.7, 0.85, 1.0}
+local currentScaleIndex = 1 -- começa menor
 
 -- Variáveis Globais padrão
 _G.aimbotAutoEnabled = _G.aimbotAutoEnabled or false
@@ -245,6 +244,7 @@ end
 local function updateMenuSize()
     local scale = scaleOptions[currentScaleIndex]
     mainFrame.Size = UDim2.new(0, baseWidth * scale, 0, baseHeight * scale)
+    mainFrame.Position = UDim2.new(0.5, -(baseWidth * scale)/2, 0.5, -(baseHeight * scale)/2)
 end
 
 local mainFrame = Instance.new("Frame")
