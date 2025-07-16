@@ -9,6 +9,10 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local baseWidth, baseHeight = 220, 280
+local scaleOptions = {0.8, 1.0, 1.2}
+local currentScaleIndex = 2 -- começa com 1.0
+
 
 -- Variáveis Globais padrão
 _G.aimbotAutoEnabled = _G.aimbotAutoEnabled or false
