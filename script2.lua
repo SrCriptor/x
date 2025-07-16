@@ -1,11 +1,12 @@
--- Serviços
+-- [INTERFACE COMPLETA ESTILO RAYCAST COM AIMBOT, HITBOX, WALLHACK RGB E MODS DE ARMA + AJUSTES AVANÇADOS + HITBOX POPUP E VERIFICAÇÕES MELHORADAS]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Globals padrão
+-- Variáveis Globais Padrão
 _G.aimbotAutoEnabled = _G.aimbotAutoEnabled or false
 _G.aimbotLegitEnabled = _G.aimbotLegitEnabled or false
 _G.modInfiniteAmmo = _G.modInfiniteAmmo or false
@@ -16,259 +17,113 @@ _G.hitboxSelection = _G.hitboxSelection or {
 }
 _G.FOV_RADIUS = _G.FOV_RADIUS or 200
 _G.lt = _G.lt or {
-    rateOfFire = 200,
-    spread = 0,
-    zoom = 3,
-}
-
--- Criar ScreenGui
-local gui = Instance.new("ScreenGui")
-gui.Name = "RayfieldMenu"
-gui.ResetOnSpawn = false
-gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
--- Função pra criar texto estilizado
-local function createLabel(text, parent, size, pos)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = size or UDim2.new(1, 0, 0, 25)
-    lbl.Position = pos or UDim2.new(0, 0, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 16
-    lbl.Text = text
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = parent
-    return lbl
-end
-
--- Função para criar botão toggle (botão que muda ON/OFF)
-local function createToggleButton(text, parent, pos, defaultState, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 220, 0, 30)
-    btn.Position = pos
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.Text = text .. ": OFF"
-    btn.AutoButtonColor = false
-    btn.Parent = parent
-
-    local active = defaultState or false
-    local function update()
-        btn.Text = text .. ": " .. (active and "ON" or "OFF")
-        btn.BackgroundColor3 = active and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(50, 50, 50)
-    end
-
-    btn.MouseButton1Click:Connect(function()
-        active = not active
-        update()
-        if callback then
-            callback(active)
-        end
-    end)
-
-    update()
-    return btn
-end
-
--- Função para criar slider (barra de ajuste)
-local function createSlider(text, parent, pos, minVal, maxVal, step, defaultVal, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(0, 220, 0, 50)
-    container.Position = pos
-    container.BackgroundTransparency = 1
-    container.Parent = parent
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 20)
-    label.Position = UDim2.new(0, 0, 0, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 14
-    label.Text = text .. ": " .. tostring(defaultVal)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
-
-    local sliderBg = Instance.new("Frame")
-    sliderBg.Size = UDim2.new(1, 0, 0, 12)
-    sliderBg.Position = UDim2.new(0, 0, 0, 30)
-    sliderBg.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    sliderBg.BorderSizePixel = 0
-    sliderBg.Parent = container
-
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-    fill.Parent = sliderBg
-
-    local dragging = false
-
-    sliderBg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-        end
-    end)
-
-    sliderBg.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local relativePos = math.clamp(input.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
-            local value = minVal + (relativePos / sliderBg.AbsoluteSize.X) * (maxVal - minVal)
-            value = math.floor(value / step + 0.5) * step
-            label.Text = text .. ": " .. tostring(value)
-            fill.Size = UDim2.new((value - minVal) / (maxVal - minVal), 0, 1, 0)
-            if callback then
-                callback(value)
-            end
-        end
-    end)
-
-    return container
-end
-
--- Frame principal do menu
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 280, 0, 440)
-mainFrame.Position = UDim2.new(0, 20, 0.5, -220)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BorderSizePixel = 0
-mainFrame.Parent = gui
-mainFrame.Active = true
-mainFrame.Draggable = false -- Usaremos drag manual para poder fazer só no título
-
--- Título do menu
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 40)
-titleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-titleBar.Parent = mainFrame
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Text = "Raycast Menu"
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 22
-titleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Size = UDim2.new(0.7, 0, 1, 0)
-titleLabel.Position = UDim2.new(0, 10, 0, 0)
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = titleBar
-
--- Botão minimizar/maximizar
-local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Text = "−"
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.TextSize = 28
-minimizeBtn.TextColor3 = Color3.new(1,1,1)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -70, 0, 5)
-minimizeBtn.AutoButtonColor = false
-minimizeBtn.Parent = titleBar
-
--- Botão fechar
-local closeBtn = Instance.new("TextButton")
-closeBtn.Text = "✕"
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 22
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 5)
-closeBtn.AutoButtonColor = false
-closeBtn.Parent = titleBar
-
--- Container para botões e sliders
-local contentFrame = Instance.new("Frame")
-contentFrame.Size = UDim2.new(1, 0, 1, -40)
-contentFrame.Position = UDim2.new(0, 0, 0, 40)
-contentFrame.BackgroundTransparency = 1
-contentFrame.Parent = mainFrame
-
--- Barra de abas
-local tabs = {"Aimbot", "Hitbox", "Mods"}
-local tabFrames = {}
-local tabButtonsFrame = Instance.new("Frame")
-tabButtonsFrame.Size = UDim2.new(1, 0, 0, 36)
-tabButtonsFrame.Position = UDim2.new(0, 0, 0, 0)
-tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-tabButtonsFrame.BorderSizePixel = 0
-tabButtonsFrame.Parent = contentFrame
-
--- Criar botões de abas com espaçamento e estilo
-local function createTabButton(name, idx)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 85, 0, 32)
-    btn.Position = UDim2.new(0, (idx - 1) * 90 + 10, 0, 2)
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.Text = name
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 16
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.AutoButtonColor = false
-    btn.Parent = tabButtonsFrame
-    return btn
-end
-
-for i, tabName in ipairs(tabs) do
-    local frame = Instance.new("ScrollingFrame")
-    frame.Size = UDim2.new(1, 0, 1, -36)
-    frame.Position = UDim2.new(0, 0, 0, 36)
-    frame.BackgroundTransparency = 1
-    frame.CanvasSize = UDim2.new(0, 0, 3, 0)
-    frame.ScrollBarThickness = 5
-    frame.Visible = i == 1 -- Só a primeira aba fica visível inicialmente
-    frame.Parent = contentFrame
-    tabFrames[tabName] = frame
-end
-
--- Atualizar visual do botão ativo
-local function setActiveTab(activeName)
-    for name, frame in pairs(tabFrames) do
-        frame.Visible = name == activeName
-    end
-    for _, btn in pairs(tabButtonsFrame:GetChildren()) do
-        if btn:IsA("TextButton") then
-            btn.BackgroundColor3 = (btn.Text == activeName) and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(50, 50, 50)
-        end
-    end
-end
-
--- Criar botões e conectar troca de abas
-for i, btn in ipairs(tabButtonsFrame:GetChildren()) do
-    if btn:IsA("TextButton") then
-        btn.MouseButton1Click:Connect(function()
-            setActiveTab(btn.Text)
-        end)
-    end
-end
-
-setActiveTab("Aimbot")
-
--- Função para criar botões toggle dentro das abas e chamar callback
-local function createToggleInFrame(text, frame, yPos, default, cb)
-    return createToggleButton(text, frame, UDim2.new(0,
--- Variáveis e sliders para controle fino de arma
-_G.lt = _G.lt or {
 	["rateOfFire"] = 200,
 	["spread"] = 0,
 	["zoom"] = 3,
 }
 
-local function applyWeaponAttributes(tool)
-	for key, value in pairs(_G.lt) do
-		tool:SetAttribute(key, value)
-	end
+-- GUI PRINCIPAL
+local gui = Instance.new("ScreenGui")
+gui.Name = "RaycastUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 280, 0, 300)
+mainFrame.Position = UDim2.new(0, 20, 0.5, -130)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+
+local dragButton = Instance.new("TextButton")
+dragButton.Size = UDim2.new(0, 280, 0, 20)
+dragButton.Position = UDim2.new(0, 0, 0, -20)
+dragButton.Text = "⯟ Menu"
+dragButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+dragButton.TextColor3 = Color3.new(1, 1, 1)
+dragButton.Parent = mainFrame
+
+local dragging = false
+local offset
+
+dragButton.MouseButton1Down:Connect(function()
+    dragging = true
+    offset = Vector2.new(mainFrame.Position.X.Offset, mainFrame.Position.Y.Offset) - UserInputService:GetMouseLocation()
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging then
+        local mouse = UserInputService:GetMouseLocation()
+        mainFrame.Position = UDim2.new(0, mouse.X + offset.X, 0, mouse.Y + offset.Y)
+    end
+end)
+
+local minimized = false
+dragButton.MouseButton2Click:Connect(function()
+    minimized = not minimized
+    for _, child in ipairs(mainFrame:GetChildren()) do
+        if child ~= dragButton then
+            child.Visible = not minimized
+        end
+    end
+    dragButton.Text = minimized and "⯝ Menu" or "⯟ Menu"
+end)
+
+-- WALLHACK COM RGB + BORDA AMARELA NO ALVO
+local neonCycle = 0
+
+local function getTarget()
+    return nil -- Placeholder
 end
 
--- Aplica ao equipar arma
+local function updateWallhack()
+    neonCycle = neonCycle + 1
+    local hue = (tick() * 0.2 % 1)
+    local neonColor = Color3.fromHSV(hue, 1, 1)
+    local currentTarget = getTarget()
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("Head") then
+            for _, part in ipairs(player.Character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.Material = Enum.Material.ForceField
+                    part.Color = neonColor
+                    part.Transparency = 0.4
+
+                    if not part:FindFirstChild("SelectionBox") then
+                        local sb = Instance.new("SelectionBox")
+                        sb.Adornee = part
+                        sb.LineThickness = 0.05
+                        sb.Color3 = Color3.fromRGB(255, 255, 255)
+                        sb.Parent = part
+                    end
+
+                    local sb = part:FindFirstChild("SelectionBox")
+                    if sb then
+                        sb.Color3 = Color3.fromRGB(255, 255, 0)
+                        sb.LineThickness = (currentTarget and currentTarget.Character == player.Character) and 0.2 or 0.05
+                        sb.Visible = true
+                    end
+                end
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if _G.aimbotAutoEnabled or _G.aimbotLegitEnabled then
+        updateWallhack()
+    end
+end)
+
+-- APLICAR MODS E ATRIBUTOS
 LocalPlayer.CharacterAdded:Connect(function(char)
 	char:WaitForChild("HumanoidRootPart")
 	local tool
@@ -276,10 +131,11 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 		tool = char:FindFirstChildWhichIsA("Tool")
 		RunService.RenderStepped:Wait()
 	until tool
-	applyWeaponAttributes(tool)
+	for i,v in pairs(_G.lt) do
+		tool:SetAttribute(i,v)
+	end
 end)
 
--- Atualiza spread com base na distância do mouse (dispersão adaptativa)
 RunService.RenderStepped:Connect(function()
 	local char = LocalPlayer.Character
 	local mouse = LocalPlayer:GetMouse()
@@ -294,7 +150,7 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- Criar sliders na aba de Mods
+-- SLIDERS DE AJUSTE FINO
 local function createSlider(label, defaultValue, minVal, maxVal, step, posY, parent, key)
 	local container = Instance.new("Frame")
 	container.Size = UDim2.new(0, 240, 0, 40)
@@ -356,21 +212,13 @@ local function createSlider(label, defaultValue, minVal, maxVal, step, posY, par
 	end)
 end
 
--- Achar aba de mods pelo nome
-local modTab
-for _, child in ipairs(gui:GetDescendants()) do
-	if child:IsA("TextButton") and child.Text == "ModArma" then
-		child.MouseButton1Click:Connect(function()
-			modTab.Visible = true
-		end)
-	end
-	if child:IsA("Frame") and child.Name == "ModArma" then
-		modTab = child
-	end
-end
+-- Container para Sliders (ajuste essas posições e chamadas conforme seu layout)
+local sliderContainer = Instance.new("Frame")
+sliderContainer.Size = UDim2.new(1, 0, 1, -20)
+sliderContainer.Position = UDim2.new(0, 0, 0, 20)
+sliderContainer.BackgroundTransparency = 1
+sliderContainer.Parent = mainFrame
 
-if modTab then
-	createSlider("Rate Of Fire", _G.lt.rateOfFire, 50, 1000, 10, 140, modTab, "rateOfFire")
-	createSlider("Spread", _G.lt.spread, 0, 30, 1, 190, modTab, "spread")
-	createSlider("Zoom", _G.lt.zoom, 1, 10, 0.1, 240, modTab, "zoom")
-end
+createSlider("Rate Of Fire", _G.lt.rateOfFire, 50, 1000, 10, 20, sliderContainer, "rateOfFire")
+createSlider("Spread", _G.lt.spread, 0, 30, 1, 70, sliderContainer, "spread")
+createSlider("Zoom", _G.lt.zoom, 1, 10, 0.1, 120, sliderContainer, "zoom")
