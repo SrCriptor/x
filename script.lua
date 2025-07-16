@@ -721,49 +721,15 @@ end
 local currentPage = 1
 local totalPages = 3
 
--- Função para atualizar visibilidade dos elementos por página
-local function updatePage()
-    -- Página 1: Aimbots + Mostrar FOV + FOV Ajuste
-    local page1Visible = currentPage == 1
-    aimbotAutoBtn.Visible = page1Visible
-    aimbotManualBtn.Visible = page1Visible
-    aimbotLegitBtn.Visible = page1Visible
-    showFOVBtn.Visible = page1Visible
-    fovMinusBtn.Visible = page1Visible
-    fovPlusBtn.Visible = page1Visible
-
-    -- Página 2: ESP e Seleção Hitbox
-    local page2Visible = currentPage == 2
-    espEnemiesBtn.Visible = page2Visible
-    espAlliesBtn.Visible = page2Visible
-    espBoxBtn.Visible = page2Visible
-    espLineBtn.Visible = page2Visible
-    espHealthBtn.Visible = page2Visible
-    espDistanceBtn.Visible = page2Visible
-    espNameBtn.Visible = page2Visible
-    hitboxSelectBtn.Visible = page2Visible
-
-    -- Página 3: Tutorial
-    tutorialOpenBtn.Visible = (currentPage == 3)
-
-    -- Botões de navegação sempre visíveis
-    prevPageBtn.Visible = true
-    nextPageBtn.Visible = true
-
-    -- Atualiza texto dos botões prev/next conforme página
-    prevPageBtn.Text = (currentPage == 1) and "◀️" or "◀️"
-    nextPageBtn.Text = (currentPage == totalPages) and "▶️" or "▶️"
-end
-
--- Botões para navegação entre páginas
+-- Criar botões de navegação
 local prevPageBtn = Instance.new("TextButton")
 prevPageBtn.Size = UDim2.new(0, 40, 0, 30)
 prevPageBtn.Position = UDim2.new(0, 10, 1, -40)
 prevPageBtn.Text = "◀️"
 prevPageBtn.Font = Enum.Font.SourceSansBold
-prevPageBtn.TextSize = 20
-prevPageBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-prevPageBtn.TextColor3 = Color3.new(1,1,1)
+prevPageBtn.TextSize = 18
+prevPageBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+prevPageBtn.TextColor3 = Color3.new(1, 1, 1)
 prevPageBtn.Parent = panel
 
 local nextPageBtn = Instance.new("TextButton")
@@ -771,10 +737,33 @@ nextPageBtn.Size = UDim2.new(0, 40, 0, 30)
 nextPageBtn.Position = UDim2.new(1, -50, 1, -40)
 nextPageBtn.Text = "▶️"
 nextPageBtn.Font = Enum.Font.SourceSansBold
-nextPageBtn.TextSize = 20
-nextPageBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-nextPageBtn.TextColor3 = Color3.new(1,1,1)
+nextPageBtn.TextSize = 18
+nextPageBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+nextPageBtn.TextColor3 = Color3.new(1, 1, 1)
 nextPageBtn.Parent = panel
+
+-- Função para atualizar visibilidade dos botões e conteúdo por página
+local function updatePage()
+    prevPageBtn.Visible = (currentPage > 1)
+    nextPageBtn.Visible = (currentPage < totalPages)
+    
+    -- Aqui: esconder/mostrar grupos de botões e elementos conforme currentPage
+    -- Exemplo:
+    if currentPage == 1 then
+        -- Mostrar elementos da página 1, esconder outras páginas
+        -- ex: page1Frame.Visible = true
+        -- page2Frame.Visible = false
+        -- page3Frame.Visible = false
+    elseif currentPage == 2 then
+        -- page1Frame.Visible = false
+        -- page2Frame.Visible = true
+        -- page3Frame.Visible = false
+    elseif currentPage == 3 then
+        -- page1Frame.Visible = false
+        -- page2Frame.Visible = false
+        -- page3Frame.Visible = true
+    end
+end
 
 prevPageBtn.MouseButton1Click:Connect(function()
     if currentPage > 1 then
@@ -790,20 +779,55 @@ nextPageBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Botão para abrir tutorial (página 3)
-local tutorialOpenBtn = Instance.new("TextButton")
-tutorialOpenBtn.Size = UDim2.new(1, -20, 0, 30)
-tutorialOpenBtn.Position = UDim2.new(0, 10, 0, 110)
-tutorialOpenBtn.Text = "Abrir Tutorial"
-tutorialOpenBtn.Font = Enum.Font.SourceSansBold
-tutorialOpenBtn.TextSize = 16
-tutorialOpenBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-tutorialOpenBtn.TextColor3 = Color3.new(1, 1, 1)
-tutorialOpenBtn.Visible = false
-tutorialOpenBtn.Parent = panel
+-- Inicializa páginas
+updatePage()
 
-tutorialOpenBtn.MouseButton1Click:Connect(function()
-    tutorialGui.Enabled = true
+-- Drag geral do painel (qualquer parte)
+local dragging = false
+local dragStart, startPos
+
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = panel.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+panel.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Drag também para o botão toggle (🔽/🔼), para mover ele livremente mesmo com o painel minimizado
+local toggleDragging = false
+local toggleDragStart, toggleStartPos
+
+toggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        toggleDragging = true
+        toggleDragStart = input.Position
+        toggleStartPos = toggleButton.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                toggleDragging = false
+            end
+        end)
+    end
+end)
+
+toggleButton.InputChanged:Connect(function(input)
+    if toggleDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - toggleDragStart
+        toggleButton.Position = UDim2.new(toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X, toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y)
+    end
 end)
 
 -- Ajuste FOV Botões (embaixo do toggle Mostrar FOV)
@@ -821,4 +845,4 @@ updatePage()
 toggleButton.Position = UDim2.new(1, -50, 0, 5)
 toggleButton.Visible = true
 
-
+return gui
