@@ -14,6 +14,7 @@ _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
 _G.instareload = false
 _G.noRecol = false
+_G.infiniteAmmo = false
 
 local shooting = false
 local aiming = false
@@ -27,19 +28,6 @@ local aimButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
 local shootButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
     .Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("ShootButton")
 
--- Detectar modo FFA
-local function isFFA()
-    local teams = {}
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Team then
-            teams[player.Team] = true
-        end
-    end
-    local count = 0
-    for _ in pairs(teams) do count = count + 1 end
-    return count <= 1
-end
-
 -- GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "MobileAimbotGUI"
@@ -48,15 +36,15 @@ gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 220, 0, 240)
-panel.Position = UDim2.new(0, 20, 0.5, -120)
+panel.Size = UDim2.new(0, 220, 0, 280)
+panel.Position = UDim2.new(0, 20, 0.5, -140)
 panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 panel.BackgroundTransparency = 0.2
 panel.BorderSizePixel = 0
 panel.Active = true
 panel.Parent = gui
 
--- Drag da GUI
+-- Drag
 panel.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
@@ -78,7 +66,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Função para criar botões
+-- Botão toggle
 local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -20, 0, 30)
@@ -110,7 +98,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
             end
         end
 
-        if flagName == "instareload" or flagName == "noRecol" then
+        if flagName == "instareload" or flagName == "noRecol" or flagName == "infiniteAmmo" then
             local char = LocalPlayer.Character
             if char then
                 local tool = char:FindFirstChildWhichIsA("Tool")
@@ -123,6 +111,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     return button
 end
 
+-- FOV Ajuste
 local function createFOVAdjustButton(text, yPos, delta)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(0.5, -15, 0, 30)
@@ -138,7 +127,7 @@ local function createFOVAdjustButton(text, yPos, delta)
     end)
 end
 
--- Botão minimizar GUI
+-- Minimizar painel
 local minimized = false
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 40, 0, 30)
@@ -153,38 +142,32 @@ toggleButton.Parent = panel
 toggleButton.MouseButton1Click:Connect(function()
     minimized = not minimized
     toggleButton.Text = minimized and "🔼" or "🔽"
-
     for _, v in pairs(panel:GetChildren()) do
         if v:IsA("TextButton") and v ~= toggleButton then
             v.Visible = not minimized
         end
     end
-
-    if minimized then
-        panel.Size = UDim2.new(0, 60, 0, 40)
-        panel.BackgroundTransparency = 1
-        toggleButton.Position = UDim2.new(0, 10, 0, 5)
-    else
-        panel.Size = UDim2.new(0, 220, 0, 240)
-        panel.BackgroundTransparency = 0.2
-        toggleButton.Position = UDim2.new(1, -50, 0, 5)
-    end
+    panel.Size = minimized and UDim2.new(0, 60, 0, 40) or UDim2.new(0, 220, 0, 280)
+    panel.BackgroundTransparency = minimized and 1 or 0.2
+    toggleButton.Position = minimized and UDim2.new(0, 10, 0, 5) or UDim2.new(1, -50, 0, 5)
 end)
 
--- Botões (em ordem desejada)
-local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
-local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
-local espEnemiesBtn = createToggleButton("ESP Inimigos", 110, "espEnemiesEnabled")
-local espAlliesBtn = createToggleButton("ESP Aliados", 145, "espAlliesEnabled")
-local instantReloadBtn = createToggleButton("Instant Reload", 180, "instareload")
-local noRecoilBtn = createToggleButton("No Recoil", 215, "noRecol")
-local showFOVBtn = createToggleButton("Mostrar FOV", 250, "FOV_VISIBLE")
-createFOVAdjustButton("- FOV", 285, -5)
-createFOVAdjustButton("+ FOV", 285, 5)
+-- Botões do menu
+createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
+createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
+createToggleButton("ESP Inimigos", 110, "espEnemiesEnabled")
+createToggleButton("ESP Aliados", 145, "espAlliesEnabled")
+createToggleButton("Instant Reload", 180, "instareload")
+createToggleButton("No Recoil", 215, "noRecol")
+createToggleButton("Infinite Ammo", 250, "infiniteAmmo")
+createToggleButton("Mostrar FOV", 285, "FOV_VISIBLE")
+createFOVAdjustButton("- FOV", 320, -5)
+createFOVAdjustButton("+ FOV", 320, 5)
 
--- Função de aplicar mods de arma
+-- Aplicação de modificadores
 function applyWeaponMods(tool)
     if not tool then return end
+
     if _G.instareload then
         tool:SetAttribute("reloadTime", 0)
     end
@@ -193,9 +176,19 @@ function applyWeaponMods(tool)
         tool:SetAttribute("recoilMax", Vector2.new(0, 0))
         tool:SetAttribute("recoilMin", Vector2.new(0, 0))
     end
+    if _G.infiniteAmmo then
+        tool:SetAttribute("_ammo", math.huge)
+        tool:SetAttribute("magazineSize", math.huge)
+
+        -- Exibição visual fixa de 200 balas
+        local hud = tool:FindFirstChild("AmmoDisplay")
+        if hud and hud:IsA("TextLabel") then
+            hud.Text = "200"
+        end
+    end
 end
 
--- FOV visual
+-- Círculo FOV
 local fovCircle = Drawing.new("Circle")
 fovCircle.Transparency = 0.2
 fovCircle.Thickness = 1.5
@@ -207,3 +200,5 @@ RunService.RenderStepped:Connect(function()
     fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     fovCircle.Visible = _G.FOV_VISIBLE
 end)
+
+return gui
