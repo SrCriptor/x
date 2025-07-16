@@ -125,7 +125,7 @@ local minimized = false
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 40, 0, 30)
 toggleButton.Position = UDim2.new(1, -50, 0, 5)
-toggleButton.Text = "\ud83d\udd3d"
+toggleButton.Text = "🔽"
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 18
 toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -134,9 +134,9 @@ toggleButton.Parent = panel
 
 toggleButton.MouseButton1Click:Connect(function()
     minimized = not minimized
-    toggleButton.Text = minimized and "\ud83d\udd3c" or "\ud83d\udd3d"
+    toggleButton.Text = minimized and "🔼" or "🔽"
     for _, v in pairs(panel:GetChildren()) do
-        if v:IsA("TextButton") and v ~= toggleButton and v.Name ~= "NavButton" then
+        if v:IsA("TextButton") and v ~= toggleButton then
             v.Visible = not minimized
         end
     end
@@ -145,7 +145,6 @@ toggleButton.MouseButton1Click:Connect(function()
     toggleButton.Position = minimized and UDim2.new(0, 10, 0, 5) or UDim2.new(1, -50, 0, 5)
 end)
 
--- Botões página 1
 local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
 local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
 local espEnemiesBtn = createToggleButton("ESP Inimigos", 110, "espEnemiesEnabled")
@@ -154,12 +153,12 @@ local showFOVBtn = createToggleButton("Mostrar FOV", 180, "FOV_VISIBLE")
 createFOVAdjustButton("- FOV", 215, -5)
 createFOVAdjustButton("+ FOV", 215, 5)
 
--- Página 2 (extra)
+-- Pagina 2 (extra)
 local extraPage = panel:Clone()
 extraPage.Parent = gui
 extraPage.Visible = false
 for _, child in pairs(extraPage:GetChildren()) do
-    if child:IsA("TextButton") and child.Name ~= "NavButton" then child:Destroy() end
+    if child:IsA("TextButton") then child:Destroy() end
 end
 
 local function createExtraButton(text, yPos, flagName)
@@ -183,31 +182,36 @@ createExtraButton("Auto Spread", 75, "autoSpread")
 createExtraButton("Instant Reload", 110, "instantReload")
 createExtraButton("Fast Shot", 145, "fastShot")
 
--- Botão único de navegação centralizado
-local navButton = Instance.new("TextButton")
-navButton.Name = "NavButton"
-navButton.Size = UDim2.new(0, 60, 0, 30)
-navButton.Position = UDim2.new(0.5, -30, 1, -35)
-navButton.Text = "▶️"
-navButton.Font = Enum.Font.SourceSansBold
-navButton.TextSize = 18
-navButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-navButton.TextColor3 = Color3.new(1, 1, 1)
-navButton.Parent = panel
+local pageLeft = Instance.new("TextButton")
+pageLeft.Size = UDim2.new(0, 30, 0, 30)
+pageLeft.Position = UDim2.new(0, 5, 1, -35)
+pageLeft.Text = "◀️"
+pageLeft.Font = Enum.Font.SourceSansBold
+pageLeft.TextSize = 18
+pageLeft.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+pageLeft.TextColor3 = Color3.new(1, 1, 1)
+pageLeft.Parent = panel
 
-local navBack = navButton:Clone()
-navBack.Text = "◀️"
-navBack.Parent = extraPage
+local pageRight = Instance.new("TextButton")
+pageRight.Size = UDim2.new(0, 30, 0, 30)
+pageRight.Position = UDim2.new(1, -35, 1, -35)
+pageRight.Text = "▶️"
+pageRight.Font = Enum.Font.SourceSansBold
+pageRight.TextSize = 18
+pageRight.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+pageRight.TextColor3 = Color3.new(1, 1, 1)
+pageRight.Parent = panel
 
 local onMainPage = true
+
 local function togglePages()
     onMainPage = not onMainPage
     panel.Visible = onMainPage
     extraPage.Visible = not onMainPage
 end
 
-navButton.MouseButton1Click:Connect(togglePages)
-navBack.MouseButton1Click:Connect(togglePages)
+pageLeft.MouseButton1Click:Connect(togglePages)
+pageRight.MouseButton1Click:Connect(togglePages)
 
 panel:GetPropertyChangedSignal("Position"):Connect(function()
     extraPage.Position = panel.Position
@@ -223,15 +227,15 @@ end)
 
 -- LT Settings aplicadas via flags
 local ltValues = {
-    ["_ammo"] = 200,
-    ["rateOfFire"] = 200,
-    ["recoilAimReduction"] = Vector2.new(0, 0),
-    ["recoilMax"] = Vector2.new(0, 0),
-    ["recoilMin"] = Vector2.new(0, 0),
-    ["spread"] = 0,
-    ["reloadTime"] = 0,
-    ["zoom"] = 3,
-    ["magazineSize"] = 200
+	["_ammo"] = 200,
+	["rateOfFire"] = 200,
+	["recoilAimReduction"] = Vector2.new(0, 0),
+	["recoilMax"] = Vector2.new(0, 0),
+	["recoilMin"] = Vector2.new(0, 0),
+	["spread"] = 0,
+	["reloadTime"] = 0,
+	["zoom"] = 3,
+	["magazineSize"] = 200
 }
 
 LocalPlayer.CharacterAdded:Connect(function(char)
