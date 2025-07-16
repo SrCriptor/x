@@ -37,10 +37,40 @@ _G.hitboxSelection = _G.hitboxSelection or {
 
 _G.FOV_RADIUS = _G.FOV_RADIUS or 200
 _G.lt = _G.lt or {
-	["rateOfFire"] = 200,
-	["spread"] = 0,
-	["zoom"] = 3,
+    ["rateOfFire"] = 200,
+    ["spread"] = 0,
+    ["zoom"] = 3,
 }
+
+-- Função para aplicar atributos na arma equipada
+local function applyAttributesToTool(tool)
+    if not tool then return end
+    for attr, val in pairs(_G.lt) do
+        tool:SetAttribute(attr, val)
+    end
+end
+
+-- Atualiza arma ao equipar
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            applyAttributesToTool(child)
+        end
+    end)
+end)
+
+-- Atualiza arma equipada no Heartbeat caso atributos mudem no menu
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool then
+            applyAttributesToTool(tool)
+        end
+    end
+end)
+
+
 
 -- Criação do GUI
 local gui = Instance.new("ScreenGui")
@@ -77,8 +107,8 @@ local function createToggle(name, parent, posY, globalVar)
     return btn
 end
 
--- Função auxiliar para criar sliders (values ajustáveis)
-local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step, default)
+-- Função auxiliar para criar sliders (adaptada para tabelas dentro de _G)
+local function createSlider(name, parent, posY, tbl, key, minVal, maxVal, step, default)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 240, 0, 50)
     frame.Position = UDim2.new(0, 10, 0, posY)
@@ -91,7 +121,7 @@ local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step,
     label.TextColor3 = Color3.new(1,1,1)
     label.Font = Enum.Font.GothamBold
     label.TextSize = 14
-    label.Text = string.format("%s: %d", name, _G[globalVar] or default)
+    label.Text = string.format("%s: %d", name, tbl[key] or default)
     label.Parent = frame
 
     local sliderBg = Instance.new("Frame")
@@ -101,7 +131,7 @@ local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step,
     sliderBg.Parent = frame
 
     local sliderFill = Instance.new("Frame")
-    sliderFill.Size = UDim2.new(((_G[globalVar] or default) - minVal) / (maxVal - minVal), 0, 1, 0)
+    sliderFill.Size = UDim2.new(((tbl[key] or default) - minVal) / (maxVal - minVal), 0, 1, 0)
     sliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
     sliderFill.Parent = sliderBg
 
@@ -131,7 +161,7 @@ local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step,
 
             local val = math.floor(minVal + (maxVal - minVal) * scale)
             val = math.floor(val / step + 0.5) * step
-            _G[globalVar] = val
+            tbl[key] = val
             label.Text = string.format("%s: %d", name, val)
         end
     end)
@@ -322,9 +352,9 @@ createToggle("Ignorar Parede (Aim/ESP)", tabs.ESP, 340, "ignoreWall")
 createToggle("Munição Infinita", tabs.Mods, 20, "modInfiniteAmmo")
 createToggle("Sem Recoil", tabs.Mods, 60, "modNoRecoil")
 createToggle("Recarga Instantânea", tabs.Mods, 100, "modInstantReload")
-createSlider("Rate of Fire", tabs.Mods, 150, "lt.rateOfFire", 50, 500, 10, _G.lt.rateOfFire)
-createSlider("Spread", tabs.Mods, 200, "lt.spread", 0, 50, 1, _G.lt.spread)
-createSlider("Zoom", tabs.Mods, 250, "lt.zoom", 1, 10, 1, _G.lt.zoom)
+createSlider("Rate of Fire", tabs.Mods, 150, _G.lt, "rateOfFire", 50, 500, 10, _G.lt.rateOfFire)
+createSlider("Spread", tabs.Mods, 200, _G.lt, "spread", 0, 50, 1, _G.lt.spread)
+createSlider("Zoom", tabs.Mods, 250, _G.lt, "zoom", 1, 10, 1, _G.lt.zoom)
 
 -- Abas: Ajustes (espaço reservado para futuras configs)
 local label = Instance.new("TextLabel")
