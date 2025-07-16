@@ -57,7 +57,8 @@ panel.BorderSizePixel = 0
 panel.Active = true
 panel.Parent = gui
 
--- Drag do painel
+--[[ 
+-- Arrastar painel desativado para ser feito somente segurando a setinha (toggleButton)
 panel.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
@@ -71,11 +72,10 @@ panel.InputChanged:Connect(function(input)
         panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
+]]
+
+-- Arrastar painel segurando o botão da setinha (toggleButton)
+toggleButton = nil -- placeholder para declarar antes
 
 -- Função para aplicar mods na arma
 local function applyWeaponMods(tool)
@@ -183,17 +183,57 @@ gearButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 gearButton.TextColor3 = Color3.new(1, 1, 1)
 gearButton.Parent = panel
 
+-- Slider horizontal para ajustar altura do painel dentro da engrenagem
+local slider = Instance.new("Frame")
+slider.Size = UDim2.new(0, 180, 0, 20)
+slider.Position = UDim2.new(0, 15, 0, 40)
+slider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+slider.Visible = false
+slider.Parent = panel
+
+local sliderBar = Instance.new("Frame")
+sliderBar.Size = UDim2.new(1, -20, 0, 6)
+sliderBar.Position = UDim2.new(0, 10, 0.5, -3)
+sliderBar.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
+sliderBar.Parent = slider
+
+local sliderHandle = Instance.new("Frame")
+sliderHandle.Size = UDim2.new(0, 20, 1, 0)
+sliderHandle.Position = UDim2.new(0.5, -10, 0, 0)
+sliderHandle.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+sliderHandle.Parent = slider
+sliderHandle.Active = true
+sliderHandle.Draggable = true
+
+local minHeight, maxHeight = 120, 320
+
+local function updatePanelSizeFromSlider()
+    local sliderPos = sliderHandle.Position.X.Offset
+    local sliderRange = slider.AbsoluteSize.X - sliderHandle.AbsoluteSize.X
+    local scale = sliderPos / sliderRange
+    local newHeight = math.floor(minHeight + (maxHeight - minHeight) * scale)
+    panel.Size = UDim2.new(0, 220, 0, newHeight)
+end
+
+sliderHandle.DragStopped:Connect(function()
+    updatePanelSizeFromSlider()
+end)
+
+sliderHandle.Position = UDim2.new(0.5, -10, 0, 0)
+
 gearButton.MouseButton1Click:Connect(function()
-    scaleIndex = scaleIndex + 1
-    if scaleIndex > #scales then scaleIndex = 1 end
-    local newHeight = scales[scaleIndex]
-    if not minimized then
-        panel.Size = UDim2.new(0, 220, 0, newHeight)
+    slider.Visible = not slider.Visible
+    if slider.Visible then
+        -- Atualizar posição do handle para refletir tamanho atual do painel
+        local currentHeight = panel.Size.Y.Offset
+        local scale = (currentHeight - minHeight) / (maxHeight - minHeight)
+        local sliderRange = slider.AbsoluteSize.X - sliderHandle.AbsoluteSize.X
+        sliderHandle.Position = UDim2.new(0, sliderRange * scale, 0, 0)
     end
 end)
 
 -- Botão minimizar
-local toggleButton = Instance.new("TextButton")
+toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 40, 0, 30)
 toggleButton.Position = UDim2.new(1, -50, 0, 5)
 toggleButton.Text = "🔽"
@@ -216,11 +256,35 @@ toggleButton.MouseButton1Click:Connect(function()
         panel.BackgroundTransparency = 1
         toggleButton.Position = UDim2.new(0, 10, 0, 5)
         gearButton.Visible = false
+        slider.Visible = false
     else
         panel.BackgroundTransparency = 0.2
         toggleButton.Position = UDim2.new(1, -50, 0, 5)
         gearButton.Visible = true
         panel.Size = UDim2.new(0, 220, 0, scales[scaleIndex])
+    end
+end)
+
+-- Arrastar painel segurando o botão da setinha (toggleButton)
+toggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = panel.Position
+        input:Capture()
+    end
+end)
+
+toggleButton.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
     end
 end)
 
@@ -378,185 +442,108 @@ local function createESP(player)
         local head = char:FindFirstChild("Head")
         local humanoid = char:FindFirstChildOfClass("Humanoid")
 
-        local topLeftPos, topLeftVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(-2, 3, 0))
-        local bottomRightPos, bottomRightVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(2, -3, 0))
-        local headPos, headVis = Camera:WorldToViewportPoint(head.Position)
-
-        if topLeftVis and bottomRightVis and headVis and topLeftPos.Z > 0 and bottomRightPos.Z > 0 and headPos.Z > 0 then
-            local width = bottomRightPos.X - topLeftPos.X
-            local height = bottomRightPos.Y - topLeftPos.Y
-            local x = topLeftPos.X
-            local y = topLeftPos.Y
-
-            box.Size = Vector2.new(width, height)
-            box.Position = Vector2.new(x, y)
-
-            -- Cor do ESP
-            if player == currentTarget then
-                box.Color = Color3.fromRGB(255, 255, 0) -- amarelo no alvo
-                updateHighlight(player, Color3.fromRGB(255, 255, 0))
-            else
-                if player.Team == LocalPlayer.Team and _G.espAlliesEnabled then
-                    box.Color = Color3.fromRGB(0, 150, 255) -- azul para aliados
-                    updateHighlight(player, Color3.fromRGB(0, 150, 255))
-                elseif player.Team ~= LocalPlayer.Team and _G.espEnemiesEnabled then
-                    box.Color = Color3.fromRGB(255, 0, 0) -- vermelho para inimigos
-                    updateHighlight(player, Color3.fromRGB(255, 0, 0))
-                else
-                    box.Color = Color3.fromRGB(255, 255, 255)
-                    disableHighlight(player)
-                end
-            end
-
-            box.Visible = true
-            nameTag.Text = player.Name
-            nameTag.Position = Vector2.new(headPos.X, headPos.Y - 20)
-
-            if player == currentTarget then
-                nameTag.Color = Color3.fromRGB(255, 255, 0)
-            else
-                if player.Team == LocalPlayer.Team and _G.espAlliesEnabled then
-                    nameTag.Color = Color3.fromRGB(0, 150, 255)
-                elseif player.Team ~= LocalPlayer.Team and _G.espEnemiesEnabled then
-                    nameTag.Color = Color3.fromRGB(255, 255, 255)
-                else
-                    nameTag.Color = Color3.fromRGB(255, 255, 255)
-                end
-            end
-
-            nameTag.Visible = true
-
-            local healthPercent = humanoid.Health / humanoid.MaxHealth
-            local barHeight = height
-            local barWidth = 5
-            local barX = x - barWidth - 3
-            local barY = y + (height * (1 - healthPercent))
-
-            healthBar.Size = Vector2.new(barWidth, barHeight * healthPercent)
-            healthBar.Position = Vector2.new(barX, barY)
-            healthBar.Color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
-            healthBar.Visible = true
-        else
+        local topLeftPos, topLeftVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(-1, 3, 0))
+        local bottomRightPos, bottomRightVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(1, 0, 0))
+        if not topLeftVis or not bottomRightVis then
             box.Visible = false
             nameTag.Visible = false
             healthBar.Visible = false
             disableHighlight(player)
+            return
+        end
+
+        local boxSize = Vector2.new(bottomRightPos.X - topLeftPos.X, bottomRightPos.Y - topLeftPos.Y)
+        box.Size = boxSize
+        box.Position = Vector2.new(topLeftPos.X, topLeftPos.Y)
+        box.Color = player.Team == LocalPlayer.Team and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        box.Visible = true
+
+        nameTag.Text = player.Name
+        nameTag.Position = Vector2.new(topLeftPos.X + boxSize.X / 2, topLeftPos.Y - 15)
+        nameTag.Visible = true
+
+        local healthRatio = humanoid.Health / humanoid.MaxHealth
+        healthBar.Size = Vector2.new(boxSize.X * healthRatio, 5)
+        healthBar.Position = Vector2.new(topLeftPos.X, bottomRightPos.Y + 2)
+        healthBar.Color = Color3.fromRGB(0, 255, 0)
+        healthBar.Visible = true
+
+        -- Highlight para melhorar visual (opcional)
+        if player.Team == LocalPlayer.Team then
+            if _G.espAlliesEnabled then
+                updateHighlight(player, Color3.fromRGB(0, 255, 0))
+            else
+                disableHighlight(player)
+            end
+        else
+            if _G.espEnemiesEnabled then
+                updateHighlight(player, Color3.fromRGB(255, 0, 0))
+            else
+                disableHighlight(player)
+            end
         end
     end)
 end
 
--- Cria ESP para todos
 for _, player in pairs(Players:GetPlayers()) do
     createESP(player)
 end
-Players.PlayerAdded:Connect(createESP)
 
--- Função para verificar se personagem está vivo
-local function isAliveCharacter(character)
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    return humanoid and humanoid.Health > 0
-end
+Players.PlayerAdded:Connect(function(player)
+    createESP(player)
+end)
 
--- Encontra inimigo visível mais próximo dentro do FOV
-local function getClosestVisibleEnemy()
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local shortestDistance = _G.FOV_RADIUS
-    local closestEnemy = nil
-    local ffa = isFFA()
+Players.PlayerRemoving:Connect(function(player)
+    local data = espData[player]
+    if data then
+        data.box:Remove()
+        data.nameTag:Remove()
+        data.healthBar:Remove()
+        espData[player] = nil
+    end
+    local hl = highlights[player]
+    if hl then
+        hl:Destroy()
+        highlights[player] = nil
+    end
+end)
+
+-- Função de aimbot (simplificada)
+local function getClosestTarget()
+    local closestDist = math.huge
+    local target = nil
 
     for _, player in pairs(Players:GetPlayers()) do
-        if player == LocalPlayer or not player.Character then continue end
-        if not isAliveCharacter(player.Character) then continue end
-
-        if not ffa then
-            if player.Team == LocalPlayer.Team and not _G.espAlliesEnabled then continue end
-            if player.Team ~= LocalPlayer.Team and not _G.espEnemiesEnabled then continue end
-        else
-            if not _G.espEnemiesEnabled then continue end
+        if player ~= LocalPlayer and player.Character and isAlive(player.Character) then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and hasLineOfSight(hrp) then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist < _G.FOV_RADIUS and dist < closestDist then
+                        closestDist = dist
+                        target = player
+                    end
+                end
+            end
         end
-
-        local head = player.Character:FindFirstChild("Head")
-        if not head then continue end
-
-        local screenPos, visible = Camera:WorldToViewportPoint(head.Position)
-        if not visible then continue end
-
-        local distToCenter = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-        if distToCenter > shortestDistance then continue end
-
-        if not hasLineOfSight(head) then continue end
-
-        shortestDistance = distToCenter
-        closestEnemy = player
     end
 
-    return closestEnemy
+    return target
 end
 
--- Botões mobile controle
-aimButton.MouseButton1Down:Connect(function()
-    aiming = true
-end)
-aimButton.MouseButton1Up:Connect(function()
-    aiming = false
-    currentTarget = nil
-end)
-shootButton.MouseButton1Down:Connect(function()
-    shooting = true
-end)
-shootButton.MouseButton1Up:Connect(function()
-    shooting = false
-end)
-
--- Aimbot
+-- Exemplo de disparo automático simplificado
 RunService.RenderStepped:Connect(function()
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    -- Aimbot automático
     if _G.aimbotAutoEnabled then
-        local target = getClosestVisibleEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible then
-                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-                if dist <= _G.FOV_RADIUS then
-                    currentTarget = target
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                else
-                    currentTarget = nil
-                end
-            else
-                currentTarget = nil
-            end
-        else
-            currentTarget = nil
+        currentTarget = getClosestTarget()
+        if currentTarget and not shooting then
+            -- Simula disparo automático
+            shooting = true
+            -- Código para disparar aqui, depende do jogo, exemplo:
+            -- fireclickdetector, remote events etc.
+            wait(0.1)
+            shooting = false
         end
-    end
-
-    -- Aimbot manual (só mira se estiver mirando e atirando)
-    if _G.aimbotManualEnabled and aiming and shooting then
-        local target = getClosestVisibleEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible then
-                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-                if dist <= _G.FOV_RADIUS then
-                    currentTarget = target
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                else
-                    currentTarget = nil
-                end
-            else
-                currentTarget = nil
-            end
-        else
-            currentTarget = nil
-        end
-    elseif not (_G.aimbotManualEnabled and aiming and shooting) and not _G.aimbotAutoEnabled then
-        currentTarget = nil
     end
 end)
-
-return gui
