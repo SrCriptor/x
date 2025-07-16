@@ -107,6 +107,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
         if exclusiveFlag and _G[flagName] then
             _G[exclusiveFlag] = false
         end
+
         button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
 
         if exclusiveFlag then
@@ -235,31 +236,52 @@ local function getClosestVisibleEnemy()
     return closestEnemy
 end
 
--- Wallhack + Highlight
+-- Highlights
 local highlights = {}
 
-local function createHighlight(player)
-    local hl = Instance.new("Highlight")
-    hl.Parent = workspace
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.FillTransparency = 0.5
-    return hl
+local function getCharacterPart(character)
+    if character:FindFirstChild("Head") then
+        return character.Head
+    elseif character:FindFirstChild("HumanoidRootPart") then
+        return character.HumanoidRootPart
+    else
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                return part
+            end
+        end
+    end
+    return nil
 end
 
-local function updateHighlight(player, isTarget, alive, isVisible)
+local function updateHighlight(player, isTarget)
     if not player.Character then return end
+    local char = player.Character
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        if highlights[player] then
+            highlights[player].Enabled = false
+        end
+        return
+    end
+
     local highlight = highlights[player]
     if not highlight then
-        highlight = createHighlight(player)
+        highlight = Instance.new("Highlight")
+        highlight.Parent = workspace
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillTransparency = 0.5
         highlights[player] = highlight
     end
 
-    if not alive or not isVisible then
+    local adorneePart = getCharacterPart(char)
+    if adorneePart then
+        highlight.Adornee = char
+    else
         highlight.Enabled = false
         return
     end
 
-    highlight.Adornee = player.Character
     highlight.Enabled = true
 
     if isTarget then
@@ -267,22 +289,23 @@ local function updateHighlight(player, isTarget, alive, isVisible)
         highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
         highlight.FillTransparency = 0.3
     else
-        local t = tick() * 2
-        local r = (math.sin(t) + 1) / 2
-        local g = (math.sin(t + 2) + 1) / 2
-        local b = (math.sin(t + 4) + 1) / 2
-
         if player.Team == LocalPlayer.Team then
-            -- Aliados em azul rgb animado
-            highlight.FillColor = Color3.new(r * 0.2, g * 0.5, b)
-            highlight.OutlineColor = Color3.new(r * 0.1, g * 0.25, b * 0.5)
+            local t = tick() * 2
+            local r = (math.sin(t) + 1) / 2 * 0.2
+            local g = (math.sin(t + 2) + 1) / 2 * 0.5
+            local b = (math.sin(t + 4) + 1) / 2 * 1
+            highlight.FillColor = Color3.new(r, g, b)
+            highlight.OutlineColor = Color3.new(r * 0.5, g * 0.5, b * 0.5)
+            highlight.FillTransparency = 0.5
         else
-            -- Inimigos em vermelho-laranja rgb animado
-            highlight.FillColor = Color3.new(r, g * 0.3, b * 0)
+            local t = tick() * 2
+            local r = (math.sin(t) + 1) / 2 * 1
+            local g = (math.sin(t + 2) + 1) / 2 * 0.3
+            local b = 0
+            highlight.FillColor = Color3.new(r, g, b)
             highlight.OutlineColor = Color3.new(r * 0.5, g * 0.15, 0)
+            highlight.FillTransparency = 0.5
         end
-
-        highlight.FillTransparency = 0.5
     end
 end
 
@@ -294,43 +317,13 @@ local function updateAllHighlights()
             end
             continue
         end
-
-        local char = player.Character
-        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then
-            if highlights[player] then highlights[player].Enabled = false end
-            continue
-        end
-
-        local isFFA = isFFA()
-        local isAlly = (not isFFA) and (player.Team == LocalPlayer.Team)
-
-        if (isAlly and not _G.espAlliesEnabled) or (not isAlly and not _G.espEnemiesEnabled) then
-            if highlights[player] then highlights[player].Enabled = false end
-            continue
-        end
-
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then
-            if highlights[player] then highlights[player].Enabled = false end
-            continue
-        end
-
-        local visible = hasLineOfSight(hrp)
-        if not visible then
-            if highlights[player] then highlights[player].Enabled = false end
-            continue
-        end
-
-        local isTarget = (player == currentTarget)
-        updateHighlight(player, isTarget, true, true)
+        updateHighlight(player, player == currentTarget)
     end
 end
 
--- Atualiza wallhack sempre que jogador entra, morre ou respawna
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function()
-        task.wait(0.5)
+        task.wait(1)
         updateAllHighlights()
     end)
 end)
@@ -359,7 +352,6 @@ local function disableOtherAimbot(activeFlag)
     end
 end
 
--- Conecta toggles para garantir exclusividade dos aimbots
 aimbotAutoBtn.MouseButton1Click:Connect(function()
     if _G.aimbotAutoEnabled then
         disableOtherAimbot("aimbotAutoEnabled")
@@ -388,16 +380,16 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Função para ajustar o tiro por rateOfFire (exemplo, modifique conforme necessário)
+-- Função para ajustar o tiro por rateOfFire (exemplo simplificado)
 local function shootGun(tool)
     if not tool then return end
-    local fireRate = tool:GetAttribute("rateOfFire") or 70
+    -- Exemplo simples, só delay entre tiros
     for i = 1, 5 do
         task.wait(0.04)
     end
 end
 
--- Aimbot Automático
+-- Aimbot Automático e Legit
 RunService.RenderStepped:Connect(function()
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
@@ -426,7 +418,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot Legit
     if _G.aimbotManualEnabled and aiming and shooting then
         local target = getClosestVisibleEnemy()
         if target and target.Character and target.Character:FindFirstChild("Head") then
@@ -455,7 +446,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- No Recoil, Infinite Ammo e Instant Reload - Ativados por padrão
+-- No Recoil, Infinite Ammo e Instant Reload
 
 local function applyGunAttributes(tool)
     if not tool then return end
@@ -491,13 +482,4 @@ end
 
 LocalPlayer.CharacterRemoving:Connect(function()
     currentTarget = nil
-end)
-
-RunService.RenderStepped:Connect(function()
-    if LocalPlayer.Character then
-        local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
-        if tool then
-            applyGunAttributes(tool)
-        end
-    end
 end)
