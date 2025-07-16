@@ -1,157 +1,168 @@
--- Serviços
+-- [INTERFACE COMPLETA ESTILO RAYCAST COM AIMBOT, HITBOX E MODS DE ARMA + HITBOX POPUP E VERIFICAÇÕES MELHORADAS]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- Variáveis globais padrão
-_G.aimbotAutoEnabled = false
-_G.aimbotManualEnabled = false
-_G.FOV_RADIUS = 65
-_G.hitboxSelection = {
-    Head = true,       -- Head começa como prioritário selecionado
-    Torso = false,
-    LeftArm = false,
-    RightArm = false,
-    LeftLeg = false,
-    RightLeg = false,
+-- Variáveis Globais Padrão
+_G.aimbotAutoEnabled = _G.aimbotAutoEnabled or false
+_G.aimbotLegitEnabled = _G.aimbotLegitEnabled or false
+_G.modInfiniteAmmo = _G.modInfiniteAmmo or false
+_G.modNoRecoil = _G.modNoRecoil or false
+_G.modInstantReload = _G.modInstantReload or false
+_G.hitboxSelection = _G.hitboxSelection or {
+    Head = true, Torso = false, LeftArm = false, RightArm = false, LeftLeg = false, RightLeg = false
+}
+_G.FOV_RADIUS = _G.FOV_RADIUS or 200
+
+-- GUI PRINCIPAL
+local gui = Instance.new("ScreenGui")
+gui.Name = "RaycastUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 280, 0, 260)
+mainFrame.Position = UDim2.new(0, 20, 0.5, -130)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+
+local tabButtonsFrame = Instance.new("Frame")
+tabButtonsFrame.Size = UDim2.new(1, 0, 0, 25)
+tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+tabButtonsFrame.Parent = mainFrame
+
+local tabs = {
+    Aimbot = Instance.new("Frame"),
+    Hitbox = Instance.new("Frame"),
+    ModArma = Instance.new("Frame")
 }
 
--- Função para criar ToggleButton simples
-local function createToggleButton(text, posY, flagName, exclusiveFlag)
+for name, frame in pairs(tabs) do
+    frame.Size = UDim2.new(1, 0, 1, -25)
+    frame.Position = UDim2.new(0, 0, 0, 25)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.Visible = false
+    frame.Parent = mainFrame
+end
+
+tabs.Aimbot.Visible = true
+
+local function createTabButton(name, index)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -20, 0, 25)  -- menor altura
-    btn.Position = UDim2.new(0, 10, 0, posY)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 14                   -- fonte menor
-    btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Text = text..": OFF"
-    btn.Parent = nil -- será definido pelo criador do menu
-
-    btn.MouseButton1Click:Connect(function()
-        _G[flagName] = not _G[flagName]
-        if exclusiveFlag and _G[flagName] then
-            _G[exclusiveFlag] = false
-        end
-        btn.Text = text .. (_G[flagName] and ": ON" or ": OFF")
-        -- Atualizar exclusividade no botão complementar
-        if exclusiveFlag and btn.Parent then
-            for _, v in pairs(btn.Parent:GetChildren()) do
-                if v:IsA("TextButton") and v ~= btn then
-                    if v.Text:lower():find(exclusiveFlag:lower()) then
-                        v.Text = v.Text:sub(1, v.Text:find(":")) .. (_G[exclusiveFlag] and " ON" or " OFF")
-                    end
-                end
-            end
-        end
-    end)
-
+    btn.Size = UDim2.new(0.25, -2, 1, 0)
+    btn.Position = UDim2.new(0.25 * (index - 1), index > 1 and (index - 1) * 2 or 0, 0, 0)
+    btn.Text = name
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Parent = tabButtonsFrame
     return btn
 end
 
--- Função para criar Popup de seleção de hitbox
+local tabIndex = 1
+for tabName, tabFrame in pairs(tabs) do
+    local button = createTabButton(tabName, tabIndex)
+    button.MouseButton1Click:Connect(function()
+        for _, frame in pairs(tabs) do frame.Visible = false end
+        tabFrame.Visible = true
+    end)
+    tabIndex += 1
+end
+
+local function createToggleRay(name, yOffset, globalName, parent)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 240, 0, 25)
+    btn.Position = UDim2.new(0, 20, 0, yOffset)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.Text = name .. ": OFF"
+    btn.Parent = parent
+
+    local function update()
+        local isActive = _G[globalName]
+        btn.Text = name .. ": " .. (isActive and "ON" or "OFF")
+        btn.BackgroundColor3 = isActive and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(35, 35, 35)
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        for _, other in pairs({"aimbotAutoEnabled", "aimbotLegitEnabled"}) do
+            if other ~= globalName and (globalName == "aimbotAutoEnabled" or globalName == "aimbotLegitEnabled") then
+                _G[other] = false
+            end
+        end
+        _G[globalName] = not _G[globalName]
+        update()
+    end)
+
+    update()
+end
+
+-- Aimbot
+createToggleRay("Aimbot Automático", 40, "aimbotAutoEnabled", tabs.Aimbot)
+createToggleRay("Aimbot Legit", 80, "aimbotLegitEnabled", tabs.Aimbot)
+
+-- Mods
+createToggleRay("Infinite Ammo", 30, "modInfiniteAmmo", tabs.ModArma)
+createToggleRay("No Recoil", 65, "modNoRecoil", tabs.ModArma)
+createToggleRay("Instant Reload", 100, "modInstantReload", tabs.ModArma)
+
+-- Hitbox Popup
 local function createHitboxPopup()
     local popup = Instance.new("Frame")
-    popup.Size = UDim2.new(0, 250, 0, 340)  -- menor tamanho
+    popup.Size = UDim2.new(0, 250, 0, 340)
     popup.Position = UDim2.new(0.5, -125, 0.5, -170)
-    popup.BackgroundColor3 = Color3.fromRGB(30,30,30)
-    popup.BorderSizePixel = 0
+    popup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     popup.Visible = false
-    popup.Active = true
     popup.ZIndex = 10
+    popup.Active = true
+    popup.Parent = gui
 
-    -- Imagem "Bacon" Roblox
-    local img = Instance.new("ImageLabel")
-    img.Size = UDim2.new(0, 130, 0, 260)
-    img.Position = UDim2.new(0.5, -65, 0, 10)
-    img.BackgroundTransparency = 1
-    img.Image = "rbxassetid://3926305904" -- imagem do boneco Roblox Bacon (ajuste se quiser outra)
-    img.Parent = popup
-
-    -- Botão fechar
     local closeBtn = Instance.new("TextButton")
     closeBtn.Text = "Fechar"
     closeBtn.Size = UDim2.new(0, 70, 0, 25)
     closeBtn.Position = UDim2.new(1, -80, 0, 10)
     closeBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
     closeBtn.Font = Enum.Font.SourceSansBold
-    closeBtn.TextColor3 = Color3.new(1,1,1)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.TextSize = 14
     closeBtn.Parent = popup
-    closeBtn.ZIndex = 11
 
     closeBtn.MouseButton1Click:Connect(function()
         popup.Visible = false
     end)
 
-    -- Função para criar botão invisível sobre a parte do corpo
     local function createHitboxButton(name, position, size)
         local btn = Instance.new("TextButton")
-        btn.BackgroundColor3 = Color3.new(0,0,0)
-        btn.BackgroundTransparency = 1 -- invisível
+        btn.BackgroundTransparency = 1
         btn.Position = position
         btn.Size = size
         btn.Text = ""
         btn.ZIndex = 15
         btn.Parent = popup
 
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1,0,1,0)
-        label.Position = UDim2.new(0,0,0,0)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.new(1,0,0) -- vermelho para prioritário
-        label.Font = Enum.Font.SourceSansBold
-        label.TextSize = 14
-        label.Text = name
-        label.Parent = btn
-        label.Visible = false
-
-        -- Indicação de seleção prioritária (borda vermelha)
         local border = Instance.new("Frame")
-        border.Size = UDim2.new(1,0,1,0)
-        border.Position = UDim2.new(0,0,0,0)
+        border.Size = UDim2.new(1, 0, 1, 0)
+        border.Position = UDim2.new(0, 0, 0, 0)
         border.BorderColor3 = Color3.fromRGB(255, 0, 0)
         border.BorderSizePixel = 2
         border.BackgroundTransparency = 1
-        border.Visible = false
+        border.Visible = _G.hitboxSelection[name] or false
         border.Parent = btn
 
         btn.MouseButton1Click:Connect(function()
-            -- Alternar seleção: desliga se estava ativo, ativa se não
-            if _G.hitboxSelection[name] then
-                _G.hitboxSelection[name] = false
-                border.Visible = false
-                label.Visible = false
-            else
-                _G.hitboxSelection[name] = true
-                border.Visible = true
-                label.Visible = true
-            end
+            _G.hitboxSelection[name] = not _G.hitboxSelection[name]
+            border.Visible = _G.hitboxSelection[name]
         end)
-
-        -- Atualiza visual ao abrir o popup
-        local function updateVisual()
-            if _G.hitboxSelection[name] then
-                border.Visible = true
-                label.Visible = true
-            else
-                border.Visible = false
-                label.Visible = false
-            end
-        end
-
-        popup:GetPropertyChangedSignal("Visible"):Connect(function()
-            if popup.Visible then
-                updateVisual()
-            end
-        end)
-
-        return btn
     end
 
-    -- Criar botões hitbox com posições aproximadas sobre o "Bacon"
     createHitboxButton("Head", UDim2.new(0.45, 0, 0.03, 0), UDim2.new(0, 35, 0, 35))
     createHitboxButton("Torso", UDim2.new(0.4, 0, 0.28, 0), UDim2.new(0, 50, 0, 70))
     createHitboxButton("LeftArm", UDim2.new(0.22, 0, 0.3, 0), UDim2.new(0, 30, 0, 60))
@@ -162,127 +173,70 @@ local function createHitboxPopup()
     return popup
 end
 
--- Função para criar o menu principal com páginas
-local function createMainMenu()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "AimbotControlGUI"
-    gui.IgnoreGuiInset = true
-    gui.ResetOnSpawn = false
-    gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local popup = createHitboxPopup()
 
-    local panel = Instance.new("Frame")
-    panel.Size = UDim2.new(0, 200, 0, 280) -- menor painel
-    panel.Position = UDim2.new(0, 20, 0.5, -140)
-    panel.BackgroundColor3 = Color3.fromRGB(30,30,30)
-    panel.BorderSizePixel = 0
-    panel.Parent = gui
+local hitboxBtn = Instance.new("TextButton")
+hitboxBtn.Text = "Selecionar Hitbox"
+hitboxBtn.Size = UDim2.new(0, 240, 0, 30)
+hitboxBtn.Position = UDim2.new(0, 20, 0, 40)
+hitboxBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+hitboxBtn.TextColor3 = Color3.new(1, 1, 1)
+hitboxBtn.Font = Enum.Font.SourceSansBold
+hitboxBtn.TextSize = 14
+hitboxBtn.Parent = tabs.Hitbox
 
-    -- Paginação (botões)
-    local currentPage = 1
+hitboxBtn.MouseButton1Click:Connect(function()
+    popup.Visible = not popup.Visible
+end)
 
-    local page1Btn = Instance.new("TextButton")
-    page1Btn.Text = "Aimbots"
-    page1Btn.Size = UDim2.new(0.5, -5, 0, 25)
-    page1Btn.Position = UDim2.new(0, 5, 0, 5)
-    page1Btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    page1Btn.TextColor3 = Color3.new(1,1,1)
-    page1Btn.Font = Enum.Font.SourceSansBold
-    page1Btn.TextSize = 14
-    page1Btn.Parent = panel
-
-    local page2Btn = Instance.new("TextButton")
-    page2Btn.Text = "Hitbox"
-    page2Btn.Size = UDim2.new(0.5, -5, 0, 25)
-    page2Btn.Position = UDim2.new(0.5, 0, 0, 5)
-    page2Btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    page2Btn.TextColor3 = Color3.new(1,1,1)
-    page2Btn.Font = Enum.Font.SourceSansBold
-    page2Btn.TextSize = 14
-    page2Btn.Parent = panel
-
-    -- Container das páginas
-    local page1 = Instance.new("Frame")
-    page1.Size = UDim2.new(1, -10, 1, -40)
-    page1.Position = UDim2.new(0, 5, 0, 35)
-    page1.BackgroundTransparency = 1
-    page1.Parent = panel
-
-    local page2 = Instance.new("Frame")
-    page2.Size = page1.Size
-    page2.Position = page1.Position
-    page2.BackgroundTransparency = 1
-    page2.Visible = false
-    page2.Parent = panel
-
-    -- Página 1: toggles dos aimbots (exclusivos)
-    local autoBtn = createToggleButton("Aimbot Automático", 10, "aimbotAutoEnabled", "aimbotManualEnabled")
-    autoBtn.Parent = page1
-
-    local legitBtn = createToggleButton("Aimbot Legit", 50, "aimbotManualEnabled", "aimbotAutoEnabled")
-    legitBtn.Parent = page1
-
-    -- Atualiza texto e estado para refletir exclusividade
-    local function updateToggles()
-        autoBtn.Text = "Aimbot Automático: " .. (_G.aimbotAutoEnabled and "ON" or "OFF")
-        legitBtn.Text = "Aimbot Legit: " .. (_G.aimbotManualEnabled and "ON" or "OFF")
-    end
-
-    autoBtn.MouseButton1Click:Connect(function()
-        if _G.aimbotAutoEnabled then
-            _G.aimbotManualEnabled = false
-        end
-        updateToggles()
-    end)
-
-    legitBtn.MouseButton1Click:Connect(function()
-        if _G.aimbotManualEnabled then
-            _G.aimbotAutoEnabled = false
-        end
-        updateToggles()
-    end)
-
-    -- Página 2: botão abrir popup hitbox
-    local openHitboxBtn = Instance.new("TextButton")
-    openHitboxBtn.Text = "Selecionar Hitbox"
-    openHitboxBtn.Size = UDim2.new(0.8, 0, 0, 30)
-    openHitboxBtn.Position = UDim2.new(0.1, 0, 0, 15)
-    openHitboxBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    openHitboxBtn.TextColor3 = Color3.new(1,1,1)
-    openHitboxBtn.Font = Enum.Font.SourceSansBold
-    openHitboxBtn.TextSize = 14
-    openHitboxBtn.Parent = page2
-
-    local hitboxPopup = createHitboxPopup()
-    hitboxPopup.Parent = gui
-
-    openHitboxBtn.MouseButton1Click:Connect(function()
-        hitboxPopup.Visible = not hitboxPopup.Visible
-    end)
-
-    -- Função de alternância entre páginas
-    local function switchPage(pageNum)
-        currentPage = pageNum
-        if pageNum == 1 then
-            page1.Visible = true
-            page2.Visible = false
-            page1Btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-            page2Btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-        else
-            page1.Visible = false
-            page2.Visible = true
-            page1Btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-            page2Btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-        end
-    end
-
-    page1Btn.MouseButton1Click:Connect(function() switchPage(1) end)
-    page2Btn.MouseButton1Click:Connect(function() switchPage(2) end)
-
-    return gui
+-- FOV Check e Visibilidade
+local function canShootThrough(part)
+    if not part then return false end
+    local mat = part.Material
+    return mat == Enum.Material.Glass or mat == Enum.Material.ForceField or mat == Enum.Material.Fabric
 end
 
--- Cria o menu e retorna
-local aimbotGUI = createMainMenu()
+local function canSee(part)
+    local origin = Camera.CFrame.Position
+    local dir = (part.Position - origin).Unit * 500
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = workspace:Raycast(origin, dir, rayParams)
+    if result then
+        return result.Instance:IsDescendantOf(part.Parent) or canShootThrough(result.Instance)
+    end
+    return true
+end
 
--- Retorno para uso externo
-return aimbotGUI
+-- Aplicar Mods
+local function applyWeaponMods(tool)
+    if not tool then return end
+    if _G.modNoRecoil then
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
+    end
+    if _G.modInfiniteAmmo then
+        local mag = tool:GetAttribute("magazineSize") or 200
+        tool:SetAttribute("_ammo", math.huge)
+        tool:SetAttribute("magazineSize", mag)
+        local display = tool:FindFirstChild("AmmoDisplay")
+        if display and display:IsA("TextLabel") then
+            display.Text = tostring(mag)
+        end
+    end
+    if _G.modInstantReload then
+        tool:SetAttribute("reloadTime", 0)
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool then
+            applyWeaponMods(tool)
+        end
+    end
+end)
