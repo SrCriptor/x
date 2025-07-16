@@ -27,7 +27,7 @@ _G.espWallhackEnabled = true
 -- Inicial: cabeça e torso prioritários por padrão
 _G.hitboxSelection = {
     Head = "Prioritário",
-    Torso = "Prioritário",
+    Torso = "Nenhum",
     LeftArm = "Nenhum",
     RightArm = "Nenhum",
     LeftLeg = "Nenhum",
