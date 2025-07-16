@@ -82,6 +82,7 @@ local function makeDraggable(frame, dragBtn)
 end
 
 -- Main panel
+
 panel = Instance.new("Frame")
 panel.Size = UDim2.new(0, 240, 0, 270)
 panel.Position = UDim2.new(0, 20, 0.5, -135)
@@ -89,10 +90,12 @@ panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 panel.BackgroundTransparency = 0.2
 panel.BorderSizePixel = 0
 panel.Active = true
+panel.Visible = true
 panel.Parent = gui
 makeDraggable(panel)
 
 -- Minimize/maximize button (draggable when minimized)
+
 minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 40, 0, 30)
 minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
@@ -101,9 +104,11 @@ minimizeBtn.Font = Enum.Font.SourceSansBold
 minimizeBtn.TextSize = 18
 minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.Visible = true
 minimizeBtn.Parent = panel
 
 -- Navigation buttons
+
 navLeft = Instance.new("TextButton")
 navLeft.Size = UDim2.new(0, 30, 0, 30)
 navLeft.Position = UDim2.new(0, 10, 1, -40)
@@ -112,7 +117,9 @@ navLeft.Font = Enum.Font.SourceSansBold
 navLeft.TextSize = 18
 navLeft.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 navLeft.TextColor3 = Color3.new(1, 1, 1)
+navLeft.Visible = true
 navLeft.Parent = panel
+
 
 navRight = Instance.new("TextButton")
 navRight.Size = UDim2.new(0, 30, 0, 30)
@@ -122,6 +129,7 @@ navRight.Font = Enum.Font.SourceSansBold
 navRight.TextSize = 18
 navRight.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 navRight.TextColor3 = Color3.new(1, 1, 1)
+navRight.Visible = true
 navRight.Parent = panel
 
 -- Hide navigation on page 3 (tutorial) if needed
