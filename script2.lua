@@ -249,14 +249,14 @@ end
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, baseWidth, 0, baseHeight)
-mainFrame.Position = UDim2.new(0, 20, 0.5, -baseHeight/2)
+mainFrame.Position = UDim2.new(0.5, -baseWidth/2, 0.5, -baseHeight/2)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = gui
 
 -- Tabs
 local tabButtonsFrame = Instance.new("Frame")
-tabButtonsFrame.Size = UDim2.new(1, 0, 0, 30)
+tabButtonsFrame.Size = UDim2.new(1, 0, 0, 25)
 tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(15,15,15)
 tabButtonsFrame.Parent = mainFrame
 
@@ -272,8 +272,8 @@ local tabOrder = {"Aimbot","ESP","Hitbox","Mods","Ajustes"}
 
 for _, tabName in ipairs(tabOrder) do
     local frame = tabs[tabName]
-    frame.Size = UDim2.new(1,0,1,-30)
-    frame.Position = UDim2.new(0,0,0,30)
+    frame.Size = UDim2.new(1,0,1,-25)
+    frame.Position = UDim2.new(0,0,0,25)
     frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
     frame.Visible = false
     frame.Parent = mainFrame
@@ -282,14 +282,14 @@ end
 tabs.Aimbot.Visible = true
 tabs.Aimbot.BackgroundColor3 = Color3.fromRGB(40,40,40)
 
--- Criar botões das tabs
+-- Criar botões das tabs com fonte menor e tamanho ajustado
 for i, tabName in ipairs(tabOrder) do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1/#tabOrder, -2, 1, 0)
     btn.Position = UDim2.new((i-1)/#tabOrder, i>1 and 2 or 0, 0, 0)
     btn.Text = tabName
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 15
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 12
     btn.TextColor3 = Color3.new(1,1,1)
     btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     btn.Parent = tabButtonsFrame
@@ -297,12 +297,106 @@ for i, tabName in ipairs(tabOrder) do
     btn.MouseButton1Click:Connect(function()
         for _, f in pairs(tabs) do
             f.Visible = false
-            f.BackgroundColor3 = Color3.fromRGB(25,25,25) -- fundo cinza padrão para as abas
+            f.BackgroundColor3 = Color3.fromRGB(25,25,25)
         end
         tabs[tabName].Visible = true
-        tabs[tabName].BackgroundColor3 = Color3.fromRGB(40,40,40) -- destaque aba ativa
+        tabs[tabName].BackgroundColor3 = Color3.fromRGB(40,40,40)
     end)
 end
+
+-- Ajustar função createToggle e createSlider para usar fonte 12 e altura menores (exemplo 25px botão, 40px slider)
+
+local function createToggle(name, parent, posY, globalVar)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, baseWidth - 20, 0, 25)
+    btn.Position = UDim2.new(0, 10, 0, posY)
+    btn.BackgroundColor3 = _G[globalVar] and Color3.fromRGB(0,170,0) or Color3.fromRGB(35,35,35)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 12
+    btn.Text = name .. ": " .. (_G[globalVar] and "ON" or "OFF")
+    btn.Parent = parent
+
+    btn.MouseButton1Click:Connect(function()
+        _G[globalVar] = not _G[globalVar]
+        btn.BackgroundColor3 = _G[globalVar] and Color3.fromRGB(0,170,0) or Color3.fromRGB(35,35,35)
+
+        btn.Text = name .. ": " .. (_G[globalVar] and "ON" or "OFF")
+
+        -- Exclusividade Aimbot Auto/Legit
+        if globalVar == "aimbotAutoEnabled" and _G.aimbotAutoEnabled then
+            _G.aimbotLegitEnabled = false
+        elseif globalVar == "aimbotLegitEnabled" and _G.aimbotLegitEnabled then
+            _G.aimbotAutoEnabled = false
+        end
+    end)
+
+    return btn
+end
+
+local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step, default)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, baseWidth - 20, 0, 40)
+    frame.Position = UDim2.new(0, 10, 0, posY)
+    frame.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1,1,1)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.Text = string.format("%s: %d", name, _G[globalVar] or default)
+    label.Parent = frame
+
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(1, -20, 0, 10)
+    sliderBg.Position = UDim2.new(0, 10, 0, 30)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    sliderBg.Parent = frame
+
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new(((_G[globalVar] or default) - minVal) / (maxVal - minVal), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+    sliderFill.Parent = sliderBg
+
+    local sliderBtn = Instance.new("TextButton")
+    sliderBtn.Size = UDim2.new(0, 14, 0, 14)
+    sliderBtn.Position = UDim2.new(sliderFill.Size.X.Scale, 0, 0.5, -7)
+    sliderBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+    sliderBtn.BorderSizePixel = 0
+    sliderBtn.AutoButtonColor = false
+    sliderBtn.Parent = sliderBg
+
+    local dragging = false
+    sliderBtn.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local relativeX = math.clamp(input.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+            local scale = relativeX / sliderBg.AbsoluteSize.X
+            sliderFill.Size = UDim2.new(scale, 0, 1, 0)
+            sliderBtn.Position = UDim2.new(scale, 0, 0.5, -7)
+
+            local val = math.floor(minVal + (maxVal - minVal) * scale)
+            val = math.floor(val / step + 0.5) * step
+            _G[globalVar] = val
+            label.Text = string.format("%s: %d", name, val)
+        end
+    end)
+
+    return frame
+end
+
+-- Chamar update tamanho no início para aplicar tamanho e posição centrada
+updateMenuSize()
 
 -- PopUp Hitbox
 local popupHitbox = createHitboxPopup(gui)
