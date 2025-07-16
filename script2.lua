@@ -178,16 +178,16 @@ local showFOVBtn = createToggleButton("Mostrar FOV", 180, "FOV_VISIBLE")
 createFOVAdjustButton("- FOV", 215, -5)
 createFOVAdjustButton("+ FOV", 215, 5)
 
--- Botão Auto Reload
-local autoReloadBtn = createToggleButton("Auto Reload", 250, "modAutoReload")
+-- Botão Instant Reload
+local instantReloadBtn = createToggleButton("Instant Reload", 250, "modInstantReload")
 -- Botão No Recoil (avançado)
 local noRecoilBtn = createToggleButton("No Recoil", 285, "modNoRecoil")
 
 -- ======= MODS DE ARMA (APLICAÇÃO) =======
 local function applyWeaponMods(tool)
     if not tool then return end
-    -- Auto Reload
-    if _G.modAutoReload then
+    -- Instant Reload
+    if _G.modInstantReload then
         tool:SetAttribute("reloadTime", 0)
     end
     -- No Recoil avançado
