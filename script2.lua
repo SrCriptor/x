@@ -4,11 +4,11 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- FLAGS GLOBAIS padrão true ON
+-- Flags globais padrões
 _G.FOV_RADIUS = 65
 _G.FOV_VISIBLE = true
 _G.aimbotAutoEnabled = false
-_G.aimbotManualEnabled = false -- aqui usado como "Aimbot Legit"
+_G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
 _G.noRecoilEnabled = true
@@ -21,14 +21,14 @@ local shooting = false
 local dragging = false
 local dragStart, startPos
 
--- ======== GUI ========
-
+-- GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "MobileAimbotGUI"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Painel principal
 local panel = Instance.new("Frame")
 panel.Size = UDim2.new(0, 220, 0, 320)
 panel.Position = UDim2.new(0, 20, 0.5, -160)
@@ -38,13 +38,13 @@ panel.BorderSizePixel = 0
 panel.Active = true
 panel.Parent = gui
 
--- Botão minimizar/abrir que também pode ser arrastado
+-- Botão setinha minimizar/abrir, arrastável separadamente
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 40, 0, 30)
-toggleButton.Position = UDim2.new(1, -50, 0, 5)
+toggleButton.Position = UDim2.new(0, 250, 0.5, -160)
 toggleButton.Text = "🔽"
 toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.TextSize = 18
+toggleButton.TextSize = 20
 toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 toggleButton.TextColor3 = Color3.new(1, 1, 1)
 toggleButton.Parent = gui
@@ -65,13 +65,17 @@ toggleButton.MouseButton1Click:Connect(function()
     updateToggleState()
 end)
 
--- Drag para painel e para toggleButton (pode arrastar quando minimizado)
 local function setupDrag(guiElement)
     guiElement.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = guiElement.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
         end
     end)
     guiElement.InputChanged:Connect(function(input)
@@ -84,13 +88,7 @@ end
 setupDrag(panel)
 setupDrag(toggleButton)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
--- Botão toggle criado com exclusividade opcional (exclusiveFlag)
+-- Criação dos botões toggle com exclusividade (desliga outro aimbot)
 local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -20, 0, 30)
@@ -102,20 +100,22 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     button.TextColor3 = Color3.new(1, 1, 1)
     button.Parent = panel
 
+    -- Inicializa texto conforme flag
+    button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
+
     button.MouseButton1Click:Connect(function()
         _G[flagName] = not _G[flagName]
         if exclusiveFlag and _G[flagName] then
             _G[exclusiveFlag] = false
         end
+        -- Atualiza o texto
         button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
 
+        -- Atualiza botão do flag exclusivo
         if exclusiveFlag then
             for _, sibling in pairs(panel:GetChildren()) do
                 if sibling:IsA("TextButton") and sibling ~= button then
-                    local siblingText = sibling.Text:lower()
-                    local exclusiveFlagText = exclusiveFlag:gsub("([A-Z])", " %1"):lower()
-                    exclusiveFlagText = exclusiveFlagText:gsub("^%l", string.upper)
-                    if siblingText:find(exclusiveFlagText) then
+                    if sibling.Text:lower():find(exclusiveFlag:lower()) then
                         sibling.Text = sibling.Text:sub(1, sibling.Text:find(":")) .. (_G[exclusiveFlag] and " ON" or " OFF")
                     end
                 end
@@ -140,19 +140,19 @@ local function createFOVAdjustButton(text, yPos, delta)
     end)
 end
 
--- Criar botões conforme solicitado (posições no painel ajustadas)
-local noRecoilBtn = createToggleButton("No Recoil", 40, "noRecoilEnabled")
-local infiniteAmmoBtn = createToggleButton("Infinite Ammo", 75, "infiniteAmmoEnabled")
-local instantReloadBtn = createToggleButton("Instant Reload", 110, "instantReloadEnabled")
+-- Criar botões
 local aimbotAutoBtn = createToggleButton("Aimbot Auto", 145, "aimbotAutoEnabled", "aimbotManualEnabled")
 local aimbotLegitBtn = createToggleButton("Aimbot Legit", 180, "aimbotManualEnabled", "aimbotAutoEnabled")
 local espEnemiesBtn = createToggleButton("ESP Inimigos", 215, "espEnemiesEnabled")
 local espAlliesBtn = createToggleButton("ESP Aliados", 250, "espAlliesEnabled")
+local noRecoilBtn = createToggleButton("No Recoil", 40, "noRecoilEnabled")
+local infiniteAmmoBtn = createToggleButton("Infinite Ammo", 75, "infiniteAmmoEnabled")
+local instantReloadBtn = createToggleButton("Instant Reload", 110, "instantReloadEnabled")
 local showFOVBtn = createToggleButton("Mostrar FOV", 285, "FOV_VISIBLE")
 createFOVAdjustButton("- FOV", 320, -5)
 createFOVAdjustButton("+ FOV", 320, 5)
 
--- ======= DESENHO DO FOV =======
+-- Círculo do FOV
 local fovCircle = Drawing.new("Circle")
 fovCircle.Transparency = 0.2
 fovCircle.Thickness = 1.5
@@ -165,7 +165,7 @@ RunService.RenderStepped:Connect(function()
     fovCircle.Visible = _G.FOV_VISIBLE
 end)
 
--- ======== FUNÇÕES AUXILIARES ========
+-- Funções úteis
 local function isAlive(character)
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     return humanoid and humanoid.Health > 0
@@ -238,16 +238,22 @@ local function getClosestVisibleEnemy()
     return closestEnemy
 end
 
--- ======== WALLHACK RGB + ESP + HIGHLIGHT ========
+-- Wallhack + Highlight
 local highlights = {}
+
+local function createHighlight(player)
+    local hl = Instance.new("Highlight")
+    hl.Parent = workspace
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.FillTransparency = 0.5
+    return hl
+end
 
 local function updateHighlight(player, isTarget, alive, isVisible)
     if not player.Character then return end
     local highlight = highlights[player]
     if not highlight then
-        highlight = Instance.new("Highlight")
-        highlight.Parent = workspace
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight = createHighlight(player)
         highlights[player] = highlight
     end
 
@@ -315,16 +321,87 @@ local function updateAllHighlights()
     end
 end
 
+-- Atualiza wallhack sempre que jogador entra, morre ou respawna
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        updateAllHighlights()
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if highlights[player] then
+        highlights[player]:Destroy()
+        highlights[player] = nil
+    end
+end)
+
+-- Render loop para atualizações constantes
 RunService.RenderStepped:Connect(function()
     updateAllHighlights()
 end)
 
--- ======== AIMBOT ========
+-- AIMBOT - funções para garantir exclusividade
 
+local function disableOtherAimbot(activeFlag)
+    if activeFlag == "aimbotAutoEnabled" then
+        _G.aimbotManualEnabled = false
+        aimbotLegitBtn.Text = "Aimbot Legit: OFF"
+    elseif activeFlag == "aimbotManualEnabled" then
+        _G.aimbotAutoEnabled = false
+        aimbotAutoBtn.Text = "Aimbot Auto: OFF"
+    end
+end
+
+-- Conecta toggles para garantir exclusividade dos aimbots
+aimbotAutoBtn.MouseButton1Click:Connect(function()
+    if _G.aimbotAutoEnabled then
+        disableOtherAimbot("aimbotAutoEnabled")
+    end
+end)
+
+aimbotLegitBtn.MouseButton1Click:Connect(function()
+    if _G.aimbotManualEnabled then
+        disableOtherAimbot("aimbotManualEnabled")
+    end
+end)
+
+-- Controle do aimbot legit manual
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = true
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+        shooting = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = false
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+        shooting = false
+    end
+end)
+
+-- Função para ajustar o tiro por rateOfFire
+local function shootGun(tool)
+    if not tool then return end
+    local fireRate = tool:GetAttribute("rateOfFire") or 200
+    -- A cada 5 disparos: (200 / 5) = 40 ticks entre disparos (aprox)
+    -- Aqui você pode ajustar fireRate para controlar cadência
+    -- Exemplo para atirar 5 tiros por vez, delay entre cada 40ms (ajuste conforme necessidade)
+
+    -- Para exemplo básico, vamos simular disparo 5x em sequência com delay
+    for i = 1, 5 do
+        -- Aqui deve chamar o método do seu jogo para disparar a arma
+        -- tool:Fire() -- Exemplo, substitua pela função do seu jogo
+        task.wait(0.04) -- 40 ms entre tiros = 25 tiros por segundo (ajuste)
+    end
+end
+
+-- Aimbot Automático
 RunService.RenderStepped:Connect(function()
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-    -- Aimbot Automático
     if _G.aimbotAutoEnabled then
         local target = getClosestVisibleEnemy()
         if target and target.Character and target.Character:FindFirstChild("Head") then
@@ -335,6 +412,11 @@ RunService.RenderStepped:Connect(function()
                 if dist <= _G.FOV_RADIUS and hasLineOfSight(head) then
                     currentTarget = target
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                    -- Exemplo para disparar:
+                    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+                    if tool then
+                        shootGun(tool)
+                    end
                 else
                     currentTarget = nil
                 end
@@ -346,7 +428,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot Legit (manual automático)
+    -- Aimbot Legit
     if _G.aimbotManualEnabled and aiming and shooting then
         local target = getClosestVisibleEnemy()
         if target and target.Character and target.Character:FindFirstChild("Head") then
@@ -357,7 +439,10 @@ RunService.RenderStepped:Connect(function()
                 if dist <= _G.FOV_RADIUS and hasLineOfSight(head) then
                     currentTarget = target
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                    -- Aqui poderia disparar tiro automático com delay "legit"
+                    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+                    if tool then
+                        shootGun(tool)
+                    end
                 else
                     currentTarget = nil
                 end
@@ -372,55 +457,52 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ======== NO RECOIL, INFINITE AMMO, INSTANT RELOAD ========
--- Implementação básica, adaptável conforme seu jogo
+-- No Recoil, Infinite Ammo e Instant Reload - Ativados por padrão
 
 local function applyGunAttributes(tool)
     if not tool then return end
-    tool:SetAttribute("_ammo", 200)
-    tool:SetAttribute("magazineSize", 200)
-    tool:SetAttribute("reloadTime", 0)
-    tool:SetAttribute("spread", 0)
-    tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-    tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-    tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-    tool:SetAttribute("rateOfFire", 250)
-    tool:SetAttribute("zoom", 3)
-end
-
-local function updateGunAttributes()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local tool = char:FindFirstChildWhichIsA("Tool")
-    if not tool then return end
-
-    if _G.noRecoilEnabled or _G.infiniteAmmoEnabled or _G.instantReloadEnabled then
-        applyGunAttributes(tool)
+    if _G.noRecoilEnabled then
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
+        tool:SetAttribute("spread", 0)
+    end
+    if _G.infiniteAmmoEnabled then
+        tool:SetAttribute("_ammo", 200) -- Visualmente 200, porém infinito
+        tool:SetAttribute("magazineSize", 200)
+    end
+    if _G.instantReloadEnabled then
+        tool:SetAttribute("reloadTime", 0)
     end
 end
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.2)
-    updateGunAttributes()
+local function onCharacterAdded(character)
+    local tool
+    repeat
+        tool = character:FindFirstChildWhichIsA("Tool")
+        task.wait()
+    until tool
+    applyGunAttributes(tool)
+end
+
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+-- Aplica atributos ao entrar no jogo e caso personagem já exista
+if LocalPlayer.Character then
+    onCharacterAdded(LocalPlayer.Character)
+end
+
+-- Reseta atributos ao morrer e respawnar (reativa os scripts)
+LocalPlayer.CharacterRemoving:Connect(function()
+    currentTarget = nil
 end)
 
+-- RenderStepped para atualizar atributos e outras coisas
 RunService.RenderStepped:Connect(function()
-    updateGunAttributes()
-end)
-
--- ======== CONTROLES DE INPUT PARA AIMBOT LEGIT ========
-UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = true
-    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-        shooting = true
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = false
-    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-        shooting = false
+    if LocalPlayer.Character then
+        local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+        if tool then
+            applyGunAttributes(tool)
+        end
     end
 end)
