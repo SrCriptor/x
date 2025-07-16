@@ -334,7 +334,7 @@ local function createToggle(name, parent, posY, globalVar)
     return btn
 end
 
-local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step, default)
+local function createTableSlider(name, parent, posY, tbl, key, minVal, maxVal, step, default)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, baseWidth - 20, 0, 40)
     frame.Position = UDim2.new(0, 10, 0, posY)
@@ -347,7 +347,7 @@ local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step,
     label.TextColor3 = Color3.new(1,1,1)
     label.Font = Enum.Font.Gotham
     label.TextSize = 12
-    label.Text = string.format("%s: %d", name, _G[globalVar] or default)
+    label.Text = string.format("%s: %d", name, tbl[key] or default)
     label.Parent = frame
 
     local sliderBg = Instance.new("Frame")
@@ -357,7 +357,7 @@ local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step,
     sliderBg.Parent = frame
 
     local sliderFill = Instance.new("Frame")
-    sliderFill.Size = UDim2.new(((_G[globalVar] or default) - minVal) / (maxVal - minVal), 0, 1, 0)
+    sliderFill.Size = UDim2.new(((tbl[key] or default) - minVal) / (maxVal - minVal), 0, 1, 0)
     sliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
     sliderFill.Parent = sliderBg
 
@@ -387,7 +387,7 @@ local function createSlider(name, parent, posY, globalVar, minVal, maxVal, step,
 
             local val = math.floor(minVal + (maxVal - minVal) * scale)
             val = math.floor(val / step + 0.5) * step
-            _G[globalVar] = val
+            tbl[key] = val
             label.Text = string.format("%s: %d", name, val)
         end
     end)
@@ -460,9 +460,9 @@ createToggle("Ignorar Parede (Aim/ESP)", tabs.ESP, 340, "ignoreWall")
 createToggle("Munição Infinita", tabs.Mods, 20, "modInfiniteAmmo")
 createToggle("Sem Recoil", tabs.Mods, 60, "modNoRecoil")
 createToggle("Recarga Instantânea", tabs.Mods, 100, "modInstantReload")
-createSlider("Rate of Fire", tabs.Mods, 150, _G.lt, "rateOfFire", 50, 500, 10, _G.lt.rateOfFire)
-createSlider("Spread", tabs.Mods, 200, _G.lt, "spread", 0, 50, 1, _G.lt.spread)
-createSlider("Zoom", tabs.Mods, 250, _G.lt, "zoom", 1, 10, 1, _G.lt.zoom)
+createTableSlider("Rate of Fire", tabs.Mods, 150, _G.lt, "rateOfFire", 50, 500, 10, _G.lt.rateOfFire)
+createTableSlider("Spread", tabs.Mods, 200, _G.lt, "spread", 0, 50, 1, _G.lt.spread)
+createTableSlider("Zoom", tabs.Mods, 250, _G.lt, "zoom", 1, 10, 1, _G.lt.zoom)
 
 -- Abas: Ajustes (espaço reservado para futuras configs)
 local label = Instance.new("TextLabel")
