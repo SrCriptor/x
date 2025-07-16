@@ -15,7 +15,7 @@ _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
 _G.infiniteAmmo = false
 _G.autoSpread = false
-_G.instantReload = false
+_G.instantReload = true
 _G.fastShot = false
 
 local shooting = false
@@ -224,7 +224,7 @@ end)
 -- LT Settings aplicadas via flags
 local ltValues = {
     ["_ammo"] = 200,
-    ["rateOfFire"] = 200,
+    ["rateOfFire"] = 15,
     ["recoilAimReduction"] = Vector2.new(0, 0),
     ["recoilMax"] = Vector2.new(0, 0),
     ["recoilMin"] = Vector2.new(0, 0),
