@@ -100,7 +100,6 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     button.TextColor3 = Color3.new(1, 1, 1)
     button.Parent = panel
 
-    -- Inicializa texto conforme flag
     button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
 
     button.MouseButton1Click:Connect(function()
@@ -108,10 +107,8 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
         if exclusiveFlag and _G[flagName] then
             _G[exclusiveFlag] = false
         end
-        -- Atualiza o texto
         button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
 
-        -- Atualiza botão do flag exclusivo
         if exclusiveFlag then
             for _, sibling in pairs(panel:GetChildren()) do
                 if sibling:IsA("TextButton") and sibling ~= button then
@@ -274,8 +271,17 @@ local function updateHighlight(player, isTarget, alive, isVisible)
         local r = (math.sin(t) + 1) / 2
         local g = (math.sin(t + 2) + 1) / 2
         local b = (math.sin(t + 4) + 1) / 2
-        highlight.FillColor = Color3.new(r, g, b)
-        highlight.OutlineColor = Color3.new(r * 0.3, g * 0.3, b * 0.3)
+
+        if player.Team == LocalPlayer.Team then
+            -- Aliados em azul rgb animado
+            highlight.FillColor = Color3.new(r * 0.2, g * 0.5, b)
+            highlight.OutlineColor = Color3.new(r * 0.1, g * 0.25, b * 0.5)
+        else
+            -- Inimigos em vermelho-laranja rgb animado
+            highlight.FillColor = Color3.new(r, g * 0.3, b * 0)
+            highlight.OutlineColor = Color3.new(r * 0.5, g * 0.15, 0)
+        end
+
         highlight.FillTransparency = 0.5
     end
 end
@@ -382,12 +388,12 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Função para ajustar o tiro por rateOfFire
+-- Função para ajustar o tiro por rateOfFire (exemplo, modifique conforme necessário)
 local function shootGun(tool)
     if not tool then return end
     local fireRate = tool:GetAttribute("rateOfFire") or 70
     for i = 1, 5 do
-        task.wait(0.04) -- 40 ms entre tiros = 25 tiros por segundo (ajuste)
+        task.wait(0.04)
     end
 end
 
@@ -405,7 +411,6 @@ RunService.RenderStepped:Connect(function()
                 if dist <= _G.FOV_RADIUS and hasLineOfSight(head) then
                     currentTarget = target
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                    -- Exemplo para disparar:
                     local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
                     if tool then
                         shootGun(tool)
@@ -461,7 +466,7 @@ local function applyGunAttributes(tool)
         tool:SetAttribute("spread", 0)
     end
     if _G.infiniteAmmoEnabled then
-        tool:SetAttribute("_ammo", 200) -- Visualmente 200, porém infinito
+        tool:SetAttribute("_ammo", 200)
         tool:SetAttribute("magazineSize", 200)
     end
     if _G.instantReloadEnabled then
@@ -480,17 +485,14 @@ end
 
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 
--- Aplica atributos ao entrar no jogo e caso personagem já exista
 if LocalPlayer.Character then
     onCharacterAdded(LocalPlayer.Character)
 end
 
--- Reseta atributos ao morrer e respawnar (reativa os scripts)
 LocalPlayer.CharacterRemoving:Connect(function()
     currentTarget = nil
 end)
 
--- RenderStepped para atualizar atributos e outras coisas
 RunService.RenderStepped:Connect(function()
     if LocalPlayer.Character then
         local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
