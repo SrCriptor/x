@@ -41,23 +41,12 @@ local MainWindow = Rayfield:CreateWindow({
  DisableBuildWarnings = true,
  
  ConfigurationSaving = {
- Enabled = true,
- FolderName = nil,
- FileName = "GlobalAimbotAndGunMods"
-    },
- 
- KeySystem = false,
- KeySettings = {
- Title = "Global Aimbot & Gun Mods",
- Subtitle = "Key System",
- Note = "enter the Key",
- FileName = "GlobalAimbotAndGunModsKey",
- SaveKey = true,
- GrabKeyFromSite = false,
- Key = {"fmffmffm67"}
-    }
+  Enabled = true,
+  FolderName = nil,
+  FileName = "GlobalAimbotAndGunMods"
+ }
 })
- 
+
 local createdESPs = {}
  
 local Players = game:GetService("Players")
