@@ -39,89 +39,234 @@ end
 
 -- ======= INTERFACE =======
 
+
+-- Modular GUI with 3 pages, navigation, and draggable/minimizable panel
 local gui = Instance.new("ScreenGui")
 gui.Name = "MobileAimbotGUI"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- State for menu
+local currentPage = 1
+local totalPages = 3
+local minimized = false
+local panel, navLeft, navRight, minimizeBtn, hitboxPopup, hitboxSelectionBtns, tutorialPage
+local dragObj, dragOffset
 
-local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 220, 0, 240)
-panel.Position = UDim2.new(0, 20, 0.5, -120)
+-- Helper: create draggable frame
+local function makeDraggable(frame, dragBtn)
+    local dragging = false
+    local dragStart, startPos
+    local function onInputBegan(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end
+    local function onInputChanged(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end
+    local function onInputEnded(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end
+    (dragBtn or frame).InputBegan:Connect(onInputBegan)
+    (dragBtn or frame).InputChanged:Connect(onInputChanged)
+    UserInputService.InputEnded:Connect(onInputEnded)
+end
+
+-- Main panel
+panel = Instance.new("Frame")
+panel.Size = UDim2.new(0, 240, 0, 270)
+panel.Position = UDim2.new(0, 20, 0.5, -135)
 panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 panel.BackgroundTransparency = 0.2
 panel.BorderSizePixel = 0
 panel.Active = true
 panel.Parent = gui
+makeDraggable(panel)
 
--- Sistema de páginas
-local currentPage = 1
-local totalPages = 2
-local pageObjects = {{}, {}}
+-- Minimize/maximize button (draggable when minimized)
+minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 40, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+minimizeBtn.Text = "🔽"
+minimizeBtn.Font = Enum.Font.SourceSansBold
+minimizeBtn.TextSize = 18
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.Parent = panel
 
-local function setPage(page)
-    currentPage = page
-    for i, objs in ipairs(pageObjects) do
-        for _, obj in ipairs(objs) do
-            obj.Visible = (i == page)
+-- Navigation buttons
+navLeft = Instance.new("TextButton")
+navLeft.Size = UDim2.new(0, 30, 0, 30)
+navLeft.Position = UDim2.new(0, 10, 1, -40)
+navLeft.Text = "◀️"
+navLeft.Font = Enum.Font.SourceSansBold
+navLeft.TextSize = 18
+navLeft.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+navLeft.TextColor3 = Color3.new(1, 1, 1)
+navLeft.Parent = panel
+
+navRight = Instance.new("TextButton")
+navRight.Size = UDim2.new(0, 30, 0, 30)
+navRight.Position = UDim2.new(1, -40, 1, -40)
+navRight.Text = "▶️"
+navRight.Font = Enum.Font.SourceSansBold
+navRight.TextSize = 18
+navRight.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+navRight.TextColor3 = Color3.new(1, 1, 1)
+navRight.Parent = panel
+
+-- Hide navigation on page 3 (tutorial) if needed
+local function updateNav()
+    navLeft.Visible = currentPage > 1
+    navRight.Visible = currentPage < totalPages
+end
+updateNav()
+
+navLeft.MouseButton1Click:Connect(function()
+    if currentPage > 1 then currentPage = currentPage - 1 end
+    updateNav()
+end)
+navRight.MouseButton1Click:Connect(function()
+    if currentPage < totalPages then currentPage = currentPage + 1 end
+    updateNav()
+end)
+
+-- Minimize/maximize logic
+local function setMinimized(state)
+    minimized = state
+    if minimized then
+        panel.Size = UDim2.new(0, 60, 0, 40)
+        panel.BackgroundTransparency = 1
+        minimizeBtn.Text = "🔼"
+        minimizeBtn.Position = UDim2.new(0, 10, 0, 5)
+        for _, v in pairs(panel:GetChildren()) do
+            if v:IsA("TextButton") and v ~= minimizeBtn then v.Visible = false end
         end
+    else
+        panel.Size = UDim2.new(0, 240, 0, 270)
+        panel.BackgroundTransparency = 0.2
+        minimizeBtn.Text = "🔽"
+        minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+        for _, v in pairs(panel:GetChildren()) do
+            if v:IsA("TextButton") and v ~= minimizeBtn then v.Visible = true end
+        end
+        updateNav()
+    end
+end
+minimizeBtn.MouseButton1Click:Connect(function()
+    setMinimized(not minimized)
+end)
+makeDraggable(panel, minimizeBtn)
+
+
+-- ======= FUNÇÕES DE MODIFICAÇÃO DE ARMA =======
+_G.infiniteAmmoEnabled = false
+_G.noRecoilEnabled = false
+_G.noSpreadEnabled = false
+_G.instantReloadEnabled = false
+
+local function applyWeaponMods(tool)
+    if not tool then return end
+    if _G.infiniteAmmoEnabled then
+        tool:SetAttribute("magazineSize", 200)
+        tool:SetAttribute("_ammo", 200)
+    end
+    if _G.noRecoilEnabled then
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0,0))
+        tool:SetAttribute("recoilMax", Vector2.new(0,0))
+        tool:SetAttribute("recoilMin", Vector2.new(0,0))
+    end
+    if _G.noSpreadEnabled then
+        tool:SetAttribute("spread", 0)
+    end
+    if _G.instantReloadEnabled then
+        tool:SetAttribute("reloadTime", 0)
     end
 end
 
--- Botões de navegação
-local nextBtn = Instance.new("TextButton")
-nextBtn.Size = UDim2.new(0, 30, 0, 30)
-nextBtn.Position = UDim2.new(1, -40, 1, -35)
-nextBtn.Text = "▶️"
-nextBtn.Font = Enum.Font.SourceSansBold
-nextBtn.TextSize = 18
-nextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-nextBtn.TextColor3 = Color3.new(1, 1, 1)
-nextBtn.Parent = panel
-table.insert(pageObjects[1], nextBtn)
-table.insert(pageObjects[2], nextBtn)
+local function resetWeaponMods(tool)
+    if not tool then return end
+    -- Reset to default or do nothing (depends on your game, here we just set to some defaults)
+    if not _G.infiniteAmmoEnabled then
+        tool:SetAttribute("magazineSize", 30)
+        tool:SetAttribute("_ammo", 30)
+    end
+    if not _G.noRecoilEnabled then
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0.5,0.5))
+        tool:SetAttribute("recoilMax", Vector2.new(2,2))
+        tool:SetAttribute("recoilMin", Vector2.new(1,1))
+    end
+    if not _G.noSpreadEnabled then
+        tool:SetAttribute("spread", 2)
+    end
+    if not _G.instantReloadEnabled then
+        tool:SetAttribute("reloadTime", 1.5)
+    end
+end
 
-local prevBtn = Instance.new("TextButton")
-prevBtn.Size = UDim2.new(0, 30, 0, 30)
-prevBtn.Position = UDim2.new(0, 10, 1, -35)
-prevBtn.Text = "◀️"
-prevBtn.Font = Enum.Font.SourceSansBold
-prevBtn.TextSize = 18
-prevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-prevBtn.TextColor3 = Color3.new(1, 1, 1)
-prevBtn.Parent = panel
-table.insert(pageObjects[1], prevBtn)
-table.insert(pageObjects[2], prevBtn)
+local function updateWeaponMods()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool then
+        applyWeaponMods(tool)
+    end
+end
 
-nextBtn.MouseButton1Click:Connect(function()
-    if currentPage < totalPages then setPage(currentPage + 1) end
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            task.wait(0.1)
+            applyWeaponMods(child)
+        end
+    end)
+    -- Se já tem tool
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool then applyWeaponMods(tool) end
 end)
-prevBtn.MouseButton1Click:Connect(function()
-    if currentPage > 1 then setPage(currentPage - 1) end
-end)
 
--- Drag da interface
-panel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = panel.Position
+-- Loop para manter mods ativos
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        updateWeaponMods()
     end
 end)
 
-panel.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-        local delta = input.Position - dragStart
-        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
+-- ======= BOTÕES DE MODS DE ARMA (PÁGINA 1) =======
+local function createModButton(text, yPos, flagName)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -20, 0, 28)
+    button.Position = UDim2.new(0, 10, 0, yPos)
+    button.Text = text .. ": OFF"
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 15
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Parent = panel
+    button.MouseButton1Click:Connect(function()
+        _G[flagName] = not _G[flagName]
+        button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
+        updateWeaponMods()
+    end)
+    return button
+end
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
+-- Ajuste os yPos conforme necessário para não sobrepor outros botões
+local modBtnY = 250
+local infiniteAmmoBtn = createModButton("Munição Infinita", modBtnY, "infiniteAmmoEnabled")
+local noRecoilBtn = createModButton("Sem Recoil", modBtnY+32, "noRecoilEnabled")
+local noSpreadBtn = createModButton("Sem Spread", modBtnY+64, "noSpreadEnabled")
+local instantReloadBtn = createModButton("Reload Instantâneo", modBtnY+96, "instantReloadEnabled")
 
 -- Função para criar botões toggle com exclusividade entre 2 flags
 local function createToggleButton(text, yPos, flagName, exclusiveFlag)
@@ -207,8 +352,6 @@ toggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
-
--- Página 1
 local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
 local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
 local espEnemiesBtn = createToggleButton("ESP Inimigos", 110, "espEnemiesEnabled")
@@ -216,157 +359,6 @@ local espAlliesBtn = createToggleButton("ESP Aliados", 145, "espAlliesEnabled")
 local showFOVBtn = createToggleButton("Mostrar FOV", 180, "FOV_VISIBLE")
 createFOVAdjustButton("- FOV", 215, -5)
 createFOVAdjustButton("+ FOV", 215, 5)
-table.insert(pageObjects[1], aimbotAutoBtn)
-table.insert(pageObjects[1], aimbotManualBtn)
-table.insert(pageObjects[1], espEnemiesBtn)
-table.insert(pageObjects[1], espAlliesBtn)
-table.insert(pageObjects[1], showFOVBtn)
-for _, obj in ipairs(panel:GetChildren()) do
-    if obj:IsA("TextButton") and obj.Text:find("FOV") then
-        table.insert(pageObjects[1], obj)
-    end
-end
-
--- Página 2: Novos botões
-local function createSimpleToggle(text, yPos, flagName)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -20, 0, 30)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
-    btn.Text = text .. ": OFF"
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 16
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Parent = panel
-    btn.Visible = false
-    btn.MouseButton1Click:Connect(function()
-        _G[flagName] = not _G[flagName]
-        btn.Text = text .. (_G[flagName] and ": ON" or ": OFF")
-    end)
-    return btn
-end
-
-local infiniteAmmoBtn = createSimpleToggle("Infinite Ammo", 40, "infiniteAmmoEnabled")
-local autoSpreadBtn = createSimpleToggle("Auto Spread", 75, "autoSpreadEnabled")
-local instantReloadBtn = createSimpleToggle("Instant Reload", 110, "instantReloadEnabled")
-local fastShotBtn = createSimpleToggle("Fastshot", 145, "fastShotEnabled")
-table.insert(pageObjects[2], infiniteAmmoBtn)
-table.insert(pageObjects[2], autoSpreadBtn)
-table.insert(pageObjects[2], instantReloadBtn)
-table.insert(pageObjects[2], fastShotBtn)
-
-
-setPage(1)
-
--- ======= FUNÇÕES DE MODIFICAÇÃO DE ARMA =======
-local originalAttributes = {}
-local function getTool()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    return char:FindFirstChildWhichIsA("Tool")
-end
-
-local function saveOriginalAttributes(tool)
-    if not tool or originalAttributes[tool] then return end
-    originalAttributes[tool] = {}
-    for _, attr in ipairs({"_ammo", "rateOfFire", "recoilAimReduction", "recoilMax", "recoilMin", "spread", "reloadTime", "zoom", "magazineSize"}) do
-        originalAttributes[tool][attr] = tool:GetAttribute(attr)
-    end
-end
-
-local function restoreOriginalAttributes(tool)
-    if not tool or not originalAttributes[tool] then return end
-    for attr, val in pairs(originalAttributes[tool]) do
-        tool:SetAttribute(attr, val)
-    end
-    originalAttributes[tool] = nil
-end
-
--- Infinite Ammo
-local function updateInfiniteAmmo()
-    local tool = getTool()
-    if tool then
-        if _G.infiniteAmmoEnabled then
-            saveOriginalAttributes(tool)
-            tool:SetAttribute("_ammo", 200)
-            tool:SetAttribute("magazineSize", 200)
-        else
-            restoreOriginalAttributes(tool)
-        end
-    end
-end
-
--- Instant Reload
-local function updateInstantReload()
-    local tool = getTool()
-    if tool then
-        if _G.instantReloadEnabled then
-            saveOriginalAttributes(tool)
-            tool:SetAttribute("reloadTime", 0)
-        else
-            restoreOriginalAttributes(tool)
-        end
-    end
-end
-
--- Fastshot
-local function updateFastShot()
-    local tool = getTool()
-    if tool then
-        if _G.fastShotEnabled then
-            saveOriginalAttributes(tool)
-            tool:SetAttribute("rateOfFire", 200)
-        else
-            restoreOriginalAttributes(tool)
-        end
-    end
-end
-
--- Auto Spread
-local function updateAutoSpread()
-    local tool = getTool()
-    if tool and _G.autoSpreadEnabled then
-        local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
-        local mouse = LocalPlayer:GetMouse()
-        if head and mouse and mouse.Hit then
-            local dist = (head.Position - mouse.Hit.Position).Magnitude
-            tool:SetAttribute("spread", 30 - dist/5)
-        end
-    end
-end
-
--- Atualiza atributos ao ativar/desativar
-local function onFlagChanged()
-    updateInfiniteAmmo()
-    updateInstantReload()
-    updateFastShot()
-end
-
--- Conecta os botões para atualizar ao clicar
-infiniteAmmoBtn.MouseButton1Click:Connect(onFlagChanged)
-instantReloadBtn.MouseButton1Click:Connect(onFlagChanged)
-fastShotBtn.MouseButton1Click:Connect(onFlagChanged)
-
--- Atualiza ao trocar de arma
-LocalPlayer.CharacterAdded:Connect(function(char)
-    char.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            task.wait(0.1)
-            onFlagChanged()
-        end
-    end)
-end)
-
--- Loop para manter Infinite Ammo e Auto Spread ativos
-RunService.RenderStepped:Connect(function()
-    if _G.infiniteAmmoEnabled then
-        local tool = getTool()
-        if tool then
-            tool:SetAttribute("_ammo", 200)
-        end
-    end
-    updateAutoSpread()
-end)
 
 -- ======= DESENHO DO FOV =======
 local fovCircle = Drawing.new("Circle")
