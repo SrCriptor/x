@@ -13,8 +13,8 @@ _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
-_G.infiniteAmmo = true
-_G.autoSpread = true
+_G.infiniteAmmo = false
+_G.autoSpread = false
 _G.instantReload = false
 _G.fastShot = false
 
@@ -183,20 +183,20 @@ createExtraButton("Auto Spread", 75, "autoSpread")
 createExtraButton("Instant Reload", 110, "instantReload")
 createExtraButton("Fast Shot", 145, "fastShot")
 
--- Botão único de navegação com indicador de página
+-- Botão único de navegação centralizado
 local navButton = Instance.new("TextButton")
 navButton.Name = "NavButton"
-navButton.Size = UDim2.new(0, 80, 0, 30)
-navButton.Position = UDim2.new(0.5, -40, 1, -35)
-navButton.Text = "1 / 2"
+navButton.Size = UDim2.new(0, 60, 0, 30)
+navButton.Position = UDim2.new(0.5, -30, 1, -35)
+navButton.Text = "▶️"
 navButton.Font = Enum.Font.SourceSansBold
-navButton.TextSize = 16
+navButton.TextSize = 18
 navButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 navButton.TextColor3 = Color3.new(1, 1, 1)
 navButton.Parent = panel
 
 local navBack = navButton:Clone()
-navBack.Text = "2 / 2"
+navBack.Text = "◀️"
 navBack.Parent = extraPage
 
 local onMainPage = true
@@ -224,7 +224,7 @@ end)
 -- LT Settings aplicadas via flags
 local ltValues = {
     ["_ammo"] = 200,
-    ["rateOfFire"] = 15,
+    ["rateOfFire"] = 200,
     ["recoilAimReduction"] = Vector2.new(0, 0),
     ["recoilMax"] = Vector2.new(0, 0),
     ["recoilMin"] = Vector2.new(0, 0),
