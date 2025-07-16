@@ -1,14 +1,3 @@
---[[
-Aimbot + ESP Menu Roblox
-- Aimbot Automático e Legit
-- ESP com Box, Linha, Nome, HP, Distância e Wallhack Neon
-- Seleção de Hitbox com popup e imagem do "Bacon" Roblox
-- Menu organizado, bonito e responsivo
-- Botão minimizar/maximizar arrastável com 🔼/🔽
-- Font Gotham para melhor visual
-- Raycast rigoroso para não mirar atrás da parede
-]]
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
