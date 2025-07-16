@@ -1,5 +1,3 @@
--- GUI e Sistema Aimbot + ESP + Página Extra com Infinite Ammo, Auto Spread, etc.
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -13,7 +11,7 @@ _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
-_G.infiniteAmmo = false
+_G.infiniteAmmo = true
 _G.autoSpread = false
 _G.instantReload = false
 _G.fastShot = false
@@ -155,16 +153,18 @@ local function createExtraButton(text, yPos, flagName)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -20, 0, 30)
     button.Position = UDim2.new(0, 10, 0, yPos)
-    button.Text = text .. ": OFF"
     button.Font = Enum.Font.SourceSansBold
     button.TextSize = 16
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     button.TextColor3 = Color3.new(1, 1, 1)
     button.Parent = extraPage
-    updateButtonText(button, text, _G[flagName])
+    local function update()
+        button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
+    end
+    update()
     button.MouseButton1Click:Connect(function()
         _G[flagName] = not _G[flagName]
-        updateButtonText(button, text, _G[flagName])
+        update()
     end)
 end
 
@@ -192,6 +192,7 @@ navBack.Parent = extraPage
 local onMainPage = true
 local function togglePages()
     onMainPage = not onMainPage
+    -- Visibilidade respeitando minimizado
     panel.Visible = onMainPage and not minimized
     extraPage.Visible = not onMainPage and not minimized
 end
@@ -199,7 +200,6 @@ end
 navButton.MouseButton1Click:Connect(togglePages)
 navBack.MouseButton1Click:Connect(togglePages)
 
--- Sincronizar posição, tamanho e visibilidade dos painéis
 panel:GetPropertyChangedSignal("Position"):Connect(function()
     extraPage.Position = panel.Position
 end)
@@ -207,14 +207,14 @@ panel:GetPropertyChangedSignal("Size"):Connect(function()
     extraPage.Size = panel.Size
 end)
 panel:GetPropertyChangedSignal("Visible"):Connect(function()
-    -- Mantém coerência com togglePages e minimized
     extraPage.Visible = not onMainPage and panel.Visible and not minimized
 end)
 
 -- Valores base para atributos do Tool
 local ltValues = {
     ["_ammo"] = 200,
-    ["rateOfFire"] = 100, -- 100ms = 10 tiros por segundo
+    ["rateOfFire"] = 100, -- Rápido: 100ms (10 tiros por segundo)
+    ["rateOfFireDefault"] = 300, -- Valor padrão mais lento (semi-auto)
     ["recoilAimReduction"] = Vector2.new(0, 0),
     ["recoilMax"] = Vector2.new(0, 0),
     ["recoilMin"] = Vector2.new(0, 0),
@@ -237,15 +237,15 @@ RunService.Heartbeat:Connect(function()
         tool:SetAttribute("magazineSize", ltValues["magazineSize"])
     end
 
-    -- Fast Shot
+    -- Fast Shot controla rateOfFire e recoil
     if _G.fastShot then
         tool:SetAttribute("rateOfFire", ltValues["rateOfFire"])
         tool:SetAttribute("recoilAimReduction", ltValues["recoilAimReduction"])
         tool:SetAttribute("recoilMax", ltValues["recoilMax"])
         tool:SetAttribute("recoilMin", ltValues["recoilMin"])
     else
-        -- Se fastShot desligado, resetar para valores padrão
-        tool:SetAttribute("rateOfFire", nil)
+        -- Quando desligado, coloca um valor padrão "semi-automático"
+        tool:SetAttribute("rateOfFire", ltValues["rateOfFireDefault"])
         tool:SetAttribute("recoilAimReduction", nil)
         tool:SetAttribute("recoilMax", nil)
         tool:SetAttribute("recoilMin", nil)
