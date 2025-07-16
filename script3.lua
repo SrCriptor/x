@@ -320,37 +320,8 @@ local function createFOVAdjustButton(text, yPos, delta)
     end)
 end
 
-local minimized = false
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 40, 0, 30)
-toggleButton.Position = UDim2.new(1, -50, 0, 5)
-toggleButton.Text = "🔽"
-toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.TextSize = 18
-toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-toggleButton.TextColor3 = Color3.new(1, 1, 1)
-toggleButton.Parent = panel
 
-toggleButton.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    toggleButton.Text = minimized and "🔼" or "🔽"
-
-    for _, v in pairs(panel:GetChildren()) do
-        if v:IsA("TextButton") and v ~= toggleButton then
-            v.Visible = not minimized
-        end
-    end
-
-    if minimized then
-        panel.Size = UDim2.new(0, 60, 0, 40)
-        panel.BackgroundTransparency = 1
-        toggleButton.Position = UDim2.new(0, 10, 0, 5)
-    else
-        panel.Size = UDim2.new(0, 220, 0, 240)
-        panel.BackgroundTransparency = 0.2
-        toggleButton.Position = UDim2.new(1, -50, 0, 5)
-    end
-end)
+-- Remover toggleButton duplicado e usar apenas minimizeBtn para minimizar/maximizar
 
 local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
 local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
