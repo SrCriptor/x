@@ -384,7 +384,7 @@ local function applyGunAttributes(tool)
     tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
     tool:SetAttribute("recoilMax", Vector2.new(0, 0))
     tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-    tool:SetAttribute("rateOfFire", 200)
+    tool:SetAttribute("rateOfFire", 250)
     tool:SetAttribute("zoom", 3)
 end
 
