@@ -1,245 +1,127 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
--- Criação do Menu GUI
-local player = game.Players.LocalPlayer
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CustomMenuGUI"
-screenGui.Parent = player:WaitForChild("PlayerGui")
+-- Configurações globais (flags)
+_G.FOV_RADIUS = 65
+_G.FOV_VISIBLE = true
+_G.aimbotAutoEnabled = false
+_G.aimbotManualEnabled = false
+_G.espEnemiesEnabled = true
+_G.espAlliesEnabled = false
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 200)
-frame.Position = UDim2.new(0.5, -150, 0.5, -100)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
-frame.Parent = screenGui
+local shooting = false
+local aiming = false
+local dragging = false
+local dragStart, startPos
+local currentTarget = nil
 
--- Página atual
+-- Referências aos botões mobile (ajuste conforme seu jogo)
+local aimButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
+    .Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("AimButton")
+local shootButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
+    .Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("ShootButton")
+
+-- Função para detectar se o jogo está em modo FFA (todos contra todos)
+local function isFFA()
+    local teams = {}
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Team then
+            teams[player.Team] = true
+        end
+    end
+    local count = 0
+    for _ in pairs(teams) do count = count + 1 end
+    return count <= 1
+end
+
+-- ======= INTERFACE =======
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "MobileAimbotGUI"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+
+local panel = Instance.new("Frame")
+panel.Size = UDim2.new(0, 220, 0, 240)
+panel.Position = UDim2.new(0, 20, 0.5, -120)
+panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+panel.BackgroundTransparency = 0.2
+panel.BorderSizePixel = 0
+panel.Active = true
+panel.Parent = gui
+
+-- Sistema de páginas
 local currentPage = 1
+local totalPages = 2
+local pageObjects = {{}, {}}
 
--- Função para limpar botões antigos
-local function clearButtons()
-    for _, child in ipairs(frame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
+local function setPage(page)
+    currentPage = page
+    for i, objs in ipairs(pageObjects) do
+        for _, obj in ipairs(objs) do
+            obj.Visible = (i == page)
         end
     end
 end
 
--- Função para criar botões da página 1
-local function createPage1()
-    clearButtons()
-    local btnNames = {"Infinite Ammo", "Auto Spread", "Instant Reload", "Fastshot"}
-    for i, name in ipairs(btnNames) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 260, 0, 35)
-        btn.Position = UDim2.new(0, 20, 0, 20 + (i-1)*45)
-        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        btn.TextColor3 = Color3.fromRGB(255,255,255)
-        btn.Text = name
-        btn.Font = Enum.Font.SourceSansBold
-        btn.TextSize = 20
-        btn.Parent = frame
-        -- Aqui você pode conectar as funções dos botões depois
-    end
-end
-
--- ======= MENU DE PÁGINAS E BOTÕES EXTRAS =======
-local currentPage = 1
-local pageButtons = {}
-
-local function clearPageButtons()
-    for _, btn in ipairs(pageButtons) do
-        if btn and btn.Parent then btn:Destroy() end
-    end
-    pageButtons = {}
-end
-
-local infiniteAmmoEnabled = false
-local autoSpreadEnabled = false
-local instantReloadEnabled = false
-local fastShotEnabled = false
-
-local function applyGunMods(tool)
-    if not tool then return end
-    if infiniteAmmoEnabled then
-        tool:SetAttribute("_ammo", 200)
-        tool:SetAttribute("magazineSize", 200)
-    end
-    if autoSpreadEnabled then
-        tool:SetAttribute("spread", 0)
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0,0))
-        tool:SetAttribute("recoilMax", Vector2.new(0,0))
-        tool:SetAttribute("recoilMin", Vector2.new(0,0))
-    end
-    if instantReloadEnabled then
-        tool:SetAttribute("reloadTime", 0)
-    end
-    if fastShotEnabled then
-        tool:SetAttribute("rateOfFire", 200)
-    end
-end
-
-local function resetGunMods(tool)
-    if not tool then return end
-    -- Aqui você pode colocar valores padrão do jogo, se souber
-    -- Exemplo:
-    -- tool:SetAttribute("_ammo", 30)
-    -- tool:SetAttribute("magazineSize", 30)
-    -- tool:SetAttribute("spread", 1)
-    -- tool:SetAttribute("recoilAimReduction", Vector2.new(0.1,0.1))
-    -- tool:SetAttribute("recoilMax", Vector2.new(1,1))
-    -- tool:SetAttribute("recoilMin", Vector2.new(0.5,0.5))
-    -- tool:SetAttribute("reloadTime", 1.5)
-    -- tool:SetAttribute("rateOfFire", 10)
-end
-
-local function updateGunMods()
-    local char = player.Character
-    if not char then return end
-    local tool = char:FindFirstChildWhichIsA("Tool")
-    if tool then
-        applyGunMods(tool)
-    end
-end
-
-player.CharacterAdded:Connect(function(char)
-    char.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            task.wait(0.1)
-            applyGunMods(child)
-        end
-    end)
-end)
-
-local function createPage1Buttons()
-    clearPageButtons()
-    -- Infinite Ammo
-    local btn1 = Instance.new("TextButton")
-    btn1.Size = UDim2.new(1, -20, 0, 30)
-    btn1.Position = UDim2.new(0, 10, 0, 40)
-    btn1.Text = "Infinite Ammo: OFF"
-    btn1.Font = Enum.Font.SourceSansBold
-    btn1.TextSize = 16
-    btn1.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    btn1.TextColor3 = Color3.new(1, 1, 1)
-    btn1.Parent = frame
-    btn1.MouseButton1Click:Connect(function()
-        infiniteAmmoEnabled = not infiniteAmmoEnabled
-        btn1.Text = "Infinite Ammo: "..(infiniteAmmoEnabled and "ON" or "OFF")
-        updateGunMods()
-    end)
-    table.insert(pageButtons, btn1)
-
-    -- Auto Spread
-    local btn2 = Instance.new("TextButton")
-    btn2.Size = UDim2.new(1, -20, 0, 30)
-    btn2.Position = UDim2.new(0, 10, 0, 75)
-    btn2.Text = "Auto Spread: OFF"
-    btn2.Font = Enum.Font.SourceSansBold
-    btn2.TextSize = 16
-    btn2.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    btn2.TextColor3 = Color3.new(1, 1, 1)
-    btn2.Parent = frame
-    btn2.MouseButton1Click:Connect(function()
-        autoSpreadEnabled = not autoSpreadEnabled
-        btn2.Text = "Auto Spread: "..(autoSpreadEnabled and "ON" or "OFF")
-        updateGunMods()
-    end)
-    table.insert(pageButtons, btn2)
-
-    -- Instant Reload
-    local btn3 = Instance.new("TextButton")
-    btn3.Size = UDim2.new(1, -20, 0, 30)
-    btn3.Position = UDim2.new(0, 10, 0, 110)
-    btn3.Text = "Instant Reload: OFF"
-    btn3.Font = Enum.Font.SourceSansBold
-    btn3.TextSize = 16
-    btn3.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    btn3.TextColor3 = Color3.new(1, 1, 1)
-    btn3.Parent = frame
-    btn3.MouseButton1Click:Connect(function()
-        instantReloadEnabled = not instantReloadEnabled
-        btn3.Text = "Instant Reload: "..(instantReloadEnabled and "ON" or "OFF")
-        updateGunMods()
-    end)
-    table.insert(pageButtons, btn3)
-
-    -- Fast Shot
-    local btn4 = Instance.new("TextButton")
-    btn4.Size = UDim2.new(1, -20, 0, 30)
-    btn4.Position = UDim2.new(0, 10, 0, 145)
-    btn4.Text = "Fast Shot: OFF"
-    btn4.Font = Enum.Font.SourceSansBold
-    btn4.TextSize = 16
-    btn4.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    btn4.TextColor3 = Color3.new(1, 1, 1)
-    btn4.Parent = frame
-    btn4.MouseButton1Click:Connect(function()
-        fastShotEnabled = not fastShotEnabled
-        btn4.Text = "Fast Shot: "..(fastShotEnabled and "ON" or "OFF")
-        updateGunMods()
-    end)
-    table.insert(pageButtons, btn4)
-end
-
-local function createPage2Buttons()
-    clearPageButtons()
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, -20, 0, 30)
-    info.Position = UDim2.new(0, 10, 0, 40)
-    info.BackgroundTransparency = 1
-    info.TextColor3 = Color3.fromRGB(200,200,200)
-    info.Text = "Página 2\n(Adicione mais funções aqui)"
-    info.Font = Enum.Font.SourceSans
-    info.TextSize = 18
-    info.Parent = frame
-    table.insert(pageButtons, info)
-end
-
-local function updatePage()
-    if currentPage == 1 then
-        createPage1Buttons()
-    elseif currentPage == 2 then
-        createPage2Buttons()
-    end
-end
-
--- Botão de avançar página ▶️
+-- Botões de navegação
 local nextBtn = Instance.new("TextButton")
 nextBtn.Size = UDim2.new(0, 30, 0, 30)
-nextBtn.Position = UDim2.new(1, -35, 1, -35)
-nextBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+nextBtn.Position = UDim2.new(1, -40, 1, -35)
 nextBtn.Text = "▶️"
 nextBtn.Font = Enum.Font.SourceSansBold
-nextBtn.TextSize = 20
-nextBtn.TextColor3 = Color3.fromRGB(255,255,255)
-nextBtn.Parent = frame
+nextBtn.TextSize = 18
+nextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+nextBtn.TextColor3 = Color3.new(1, 1, 1)
+nextBtn.Parent = panel
+table.insert(pageObjects[1], nextBtn)
+table.insert(pageObjects[2], nextBtn)
 
--- Botão de voltar página ◀️
 local prevBtn = Instance.new("TextButton")
 prevBtn.Size = UDim2.new(0, 30, 0, 30)
-prevBtn.Position = UDim2.new(0, 5, 1, -35)
-prevBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+prevBtn.Position = UDim2.new(0, 10, 1, -35)
 prevBtn.Text = "◀️"
 prevBtn.Font = Enum.Font.SourceSansBold
-prevBtn.TextSize = 20
-prevBtn.TextColor3 = Color3.fromRGB(255,255,255)
-prevBtn.Parent = frame
+prevBtn.TextSize = 18
+prevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+prevBtn.TextColor3 = Color3.new(1, 1, 1)
+prevBtn.Parent = panel
+table.insert(pageObjects[1], prevBtn)
+table.insert(pageObjects[2], prevBtn)
 
 nextBtn.MouseButton1Click:Connect(function()
-    if currentPage < 2 then
-        currentPage = currentPage + 1
-        updatePage()
-    end
+    if currentPage < totalPages then setPage(currentPage + 1) end
 end)
 prevBtn.MouseButton1Click:Connect(function()
-    if currentPage > 1 then
-        currentPage = currentPage - 1
-        updatePage()
+    if currentPage > 1 then setPage(currentPage - 1) end
+end)
+
+-- Drag da interface
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = panel.Position
     end
 end)
 
--- Inicializa na página 1
-updatePage()
+panel.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
 
 -- Função para criar botões toggle com exclusividade entre 2 flags
 local function createToggleButton(text, yPos, flagName, exclusiveFlag)
@@ -251,7 +133,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     button.TextSize = 16
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     button.TextColor3 = Color3.new(1, 1, 1)
-    button.Parent = frame
+    button.Parent = panel
 
     button.MouseButton1Click:Connect(function()
         _G[flagName] = not _G[flagName]
@@ -263,7 +145,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
 
         -- Atualiza botão irmão (exclusivo)
         if exclusiveFlag then
-            for _, sibling in pairs(frame:GetChildren()) do
+            for _, sibling in pairs(panel:GetChildren()) do
                 if sibling:IsA("TextButton") and sibling ~= button then
                     local siblingText = sibling.Text:lower()
                     local exclusiveFlagText = exclusiveFlag:gsub("([A-Z])", " %1"):lower()
@@ -278,63 +160,520 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     return button
 end
 
--- Função para criar botões da página 2 (exemplo, pode adicionar mais depois)
-local function createPage2()
-    clearButtons()
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, 0, 1, 0)
-    info.BackgroundTransparency = 1
-    info.TextColor3 = Color3.fromRGB(200,200,200)
-    info.Text = "Página 2\n(Adicione mais funções aqui)"
-    info.Font = Enum.Font.SourceSans
-    info.TextSize = 22
-    info.Parent = frame
+local function createFOVAdjustButton(text, yPos, delta)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0.5, -15, 0, 30)
+    button.Position = UDim2.new(text == "- FOV" and 0 or 0.5, 10, 0, yPos)
+    button.Text = text
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 16
+    button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Parent = panel
+    button.MouseButton1Click:Connect(function()
+        _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + delta, 10, 300)
+    end)
 end
 
--- Botão de avançar página ▶️
-local nextBtn = Instance.new("TextButton")
-nextBtn.Size = UDim2.new(0, 40, 0, 40)
-nextBtn.Position = UDim2.new(1, -45, 1, -45)
-nextBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-nextBtn.Text = "▶️"
-nextBtn.Font = Enum.Font.SourceSansBold
-nextBtn.TextSize = 24
-nextBtn.TextColor3 = Color3.fromRGB(255,255,255)
-nextBtn.Parent = frame
+local minimized = false
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 40, 0, 30)
+toggleButton.Position = UDim2.new(1, -50, 0, 5)
+toggleButton.Text = "🔽"
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 18
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Parent = panel
 
--- Botão de voltar página ◀️
-local prevBtn = Instance.new("TextButton")
-prevBtn.Size = UDim2.new(0, 40, 0, 40)
-prevBtn.Position = UDim2.new(0, 5, 1, -45)
-prevBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-prevBtn.Text = "◀️"
-prevBtn.Font = Enum.Font.SourceSansBold
-prevBtn.TextSize = 24
-prevBtn.TextColor3 = Color3.fromRGB(255,255,255)
-prevBtn.Parent = frame
+toggleButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    toggleButton.Text = minimized and "🔼" or "🔽"
 
--- Funções de navegação
-local function updatePage()
-    if currentPage == 1 then
-        createPage1()
-    elseif currentPage == 2 then
-        createPage2()
+    for _, v in pairs(panel:GetChildren()) do
+        if v:IsA("TextButton") and v ~= toggleButton then
+            v.Visible = not minimized
+        end
     end
-end
 
-nextBtn.MouseButton1Click:Connect(function()
-    if currentPage < 2 then
-        currentPage = currentPage + 1
-        updatePage()
+    if minimized then
+        panel.Size = UDim2.new(0, 60, 0, 40)
+        panel.BackgroundTransparency = 1
+        toggleButton.Position = UDim2.new(0, 10, 0, 5)
+    else
+        panel.Size = UDim2.new(0, 220, 0, 240)
+        panel.BackgroundTransparency = 0.2
+        toggleButton.Position = UDim2.new(1, -50, 0, 5)
     end
 end)
 
-prevBtn.MouseButton1Click:Connect(function()
-    if currentPage > 1 then
-        currentPage = currentPage - 1
-        updatePage()
+
+-- Página 1
+local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
+local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
+local espEnemiesBtn = createToggleButton("ESP Inimigos", 110, "espEnemiesEnabled")
+local espAlliesBtn = createToggleButton("ESP Aliados", 145, "espAlliesEnabled")
+local showFOVBtn = createToggleButton("Mostrar FOV", 180, "FOV_VISIBLE")
+createFOVAdjustButton("- FOV", 215, -5)
+createFOVAdjustButton("+ FOV", 215, 5)
+table.insert(pageObjects[1], aimbotAutoBtn)
+table.insert(pageObjects[1], aimbotManualBtn)
+table.insert(pageObjects[1], espEnemiesBtn)
+table.insert(pageObjects[1], espAlliesBtn)
+table.insert(pageObjects[1], showFOVBtn)
+for _, obj in ipairs(panel:GetChildren()) do
+    if obj:IsA("TextButton") and obj.Text:find("FOV") then
+        table.insert(pageObjects[1], obj)
+    end
+end
+
+-- Página 2: Novos botões
+local function createSimpleToggle(text, yPos, flagName)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 30)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.Text = text .. ": OFF"
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Parent = panel
+    btn.Visible = false
+    btn.MouseButton1Click:Connect(function()
+        _G[flagName] = not _G[flagName]
+        btn.Text = text .. (_G[flagName] and ": ON" or ": OFF")
+    end)
+    return btn
+end
+
+local infiniteAmmoBtn = createSimpleToggle("Infinite Ammo", 40, "infiniteAmmoEnabled")
+local autoSpreadBtn = createSimpleToggle("Auto Spread", 75, "autoSpreadEnabled")
+local instantReloadBtn = createSimpleToggle("Instant Reload", 110, "instantReloadEnabled")
+local fastShotBtn = createSimpleToggle("Fastshot", 145, "fastShotEnabled")
+table.insert(pageObjects[2], infiniteAmmoBtn)
+table.insert(pageObjects[2], autoSpreadBtn)
+table.insert(pageObjects[2], instantReloadBtn)
+table.insert(pageObjects[2], fastShotBtn)
+
+
+setPage(1)
+
+-- ======= FUNÇÕES DE MODIFICAÇÃO DE ARMA =======
+local originalAttributes = {}
+local function getTool()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    return char:FindFirstChildWhichIsA("Tool")
+end
+
+local function saveOriginalAttributes(tool)
+    if not tool or originalAttributes[tool] then return end
+    originalAttributes[tool] = {}
+    for _, attr in ipairs({"_ammo", "rateOfFire", "recoilAimReduction", "recoilMax", "recoilMin", "spread", "reloadTime", "zoom", "magazineSize"}) do
+        originalAttributes[tool][attr] = tool:GetAttribute(attr)
+    end
+end
+
+local function restoreOriginalAttributes(tool)
+    if not tool or not originalAttributes[tool] then return end
+    for attr, val in pairs(originalAttributes[tool]) do
+        tool:SetAttribute(attr, val)
+    end
+    originalAttributes[tool] = nil
+end
+
+-- Infinite Ammo
+local function updateInfiniteAmmo()
+    local tool = getTool()
+    if tool then
+        if _G.infiniteAmmoEnabled then
+            saveOriginalAttributes(tool)
+            tool:SetAttribute("_ammo", 200)
+            tool:SetAttribute("magazineSize", 200)
+        else
+            restoreOriginalAttributes(tool)
+        end
+    end
+end
+
+-- Instant Reload
+local function updateInstantReload()
+    local tool = getTool()
+    if tool then
+        if _G.instantReloadEnabled then
+            saveOriginalAttributes(tool)
+            tool:SetAttribute("reloadTime", 0)
+        else
+            restoreOriginalAttributes(tool)
+        end
+    end
+end
+
+-- Fastshot
+local function updateFastShot()
+    local tool = getTool()
+    if tool then
+        if _G.fastShotEnabled then
+            saveOriginalAttributes(tool)
+            tool:SetAttribute("rateOfFire", 200)
+        else
+            restoreOriginalAttributes(tool)
+        end
+    end
+end
+
+-- Auto Spread
+local function updateAutoSpread()
+    local tool = getTool()
+    if tool and _G.autoSpreadEnabled then
+        local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+        local mouse = LocalPlayer:GetMouse()
+        if head and mouse and mouse.Hit then
+            local dist = (head.Position - mouse.Hit.Position).Magnitude
+            tool:SetAttribute("spread", 30 - dist/5)
+        end
+    end
+end
+
+-- Atualiza atributos ao ativar/desativar
+local function onFlagChanged()
+    updateInfiniteAmmo()
+    updateInstantReload()
+    updateFastShot()
+end
+
+-- Conecta os botões para atualizar ao clicar
+infiniteAmmoBtn.MouseButton1Click:Connect(onFlagChanged)
+instantReloadBtn.MouseButton1Click:Connect(onFlagChanged)
+fastShotBtn.MouseButton1Click:Connect(onFlagChanged)
+
+-- Atualiza ao trocar de arma
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            task.wait(0.1)
+            onFlagChanged()
+        end
+    end)
+end)
+
+-- Loop para manter Infinite Ammo e Auto Spread ativos
+RunService.RenderStepped:Connect(function()
+    if _G.infiniteAmmoEnabled then
+        local tool = getTool()
+        if tool then
+            tool:SetAttribute("_ammo", 200)
+        end
+    end
+    updateAutoSpread()
+end)
+
+-- ======= DESENHO DO FOV =======
+local fovCircle = Drawing.new("Circle")
+fovCircle.Transparency = 0.2
+fovCircle.Thickness = 1.5
+fovCircle.Filled = false
+fovCircle.Color = Color3.new(1, 1, 1)
+
+RunService.RenderStepped:Connect(function()
+    fovCircle.Radius = _G.FOV_RADIUS
+    fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    fovCircle.Visible = _G.FOV_VISIBLE
+end)
+
+-- ======= ESP + CHAMS =======
+
+local espData = {}
+local highlights = {}
+
+local function isAlive(character)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health > 0
+end
+
+local function hasLineOfSight(targetPart)
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local raycastResult = workspace:Raycast(origin, direction, raycastParams)
+    if raycastResult then
+        local hitPart = raycastResult.Instance
+        if hitPart and hitPart:IsDescendantOf(targetPart.Parent) then
+            return true
+        else
+            return false
+        end
+    else
+        return true
+    end
+end
+
+local function updateHighlight(player, color)
+    if not player.Character then return end
+    local chams = highlights[player]
+    if not chams then
+        chams = Instance.new("Highlight")
+        chams.Parent = workspace
+        highlights[player] = chams
+    end
+    chams.Adornee = player.Character
+    chams.Enabled = true
+    chams.FillColor = color
+    chams.OutlineColor = Color3.new(0, 0, 0)
+    chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+end
+
+local function disableHighlight(player)
+    local chams = highlights[player]
+    if chams then
+        chams.Enabled = false
+    end
+end
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+
+    local box = Drawing.new("Square")
+    box.Thickness = 1.5
+    box.Filled = false
+    box.Visible = false
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Size = 14
+    nameTag.Center = true
+    nameTag.Outline = true
+    nameTag.Color = Color3.fromRGB(255, 255, 255)
+    nameTag.Visible = false
+
+    local healthBar = Drawing.new("Square")
+    healthBar.Filled = true
+    healthBar.Visible = false
+
+    espData[player] = {box = box, nameTag = nameTag, healthBar = healthBar}
+
+    RunService.RenderStepped:Connect(function()
+        local char = player.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChildOfClass("Humanoid") then
+            box.Visible = false
+            nameTag.Visible = false
+            healthBar.Visible = false
+            disableHighlight(player)
+            return
+        end
+
+        local ffa = isFFA()
+        if not ffa then
+            if player.Team == LocalPlayer.Team and not _G.espAlliesEnabled then
+                box.Visible = false
+                nameTag.Visible = false
+                healthBar.Visible = false
+                disableHighlight(player)
+                return
+            elseif player.Team ~= LocalPlayer.Team and not _G.espEnemiesEnabled then
+                box.Visible = false
+                nameTag.Visible = false
+                healthBar.Visible = false
+                disableHighlight(player)
+                return
+            end
+        else
+            if not _G.espEnemiesEnabled then
+                box.Visible = false
+                nameTag.Visible = false
+                healthBar.Visible = false
+                disableHighlight(player)
+                return
+            end
+        end
+
+        local hrp = char.HumanoidRootPart
+        local head = char:FindFirstChild("Head")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+        local topLeftPos, topLeftVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(-2, 3, 0))
+        local bottomRightPos, bottomRightVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(2, -3, 0))
+        local headPos, headVis = Camera:WorldToViewportPoint(head.Position)
+
+        if topLeftVis and bottomRightVis and headVis and topLeftPos.Z > 0 and bottomRightPos.Z > 0 and headPos.Z > 0 then
+            local width = bottomRightPos.X - topLeftPos.X
+            local height = bottomRightPos.Y - topLeftPos.Y
+            local x = topLeftPos.X
+            local y = topLeftPos.Y
+
+            box.Size = Vector2.new(width, height)
+            box.Position = Vector2.new(x, y)
+
+            -- Cor do ESP
+            if player == currentTarget then
+                box.Color = Color3.fromRGB(255, 255, 0) -- amarelo no alvo
+                updateHighlight(player, Color3.fromRGB(255, 255, 0))
+            else
+                if player.Team == LocalPlayer.Team and _G.espAlliesEnabled then
+                    box.Color = Color3.fromRGB(0, 150, 255) -- azul para aliados
+                    updateHighlight(player, Color3.fromRGB(0, 150, 255))
+                elseif player.Team ~= LocalPlayer.Team and _G.espEnemiesEnabled then
+                    box.Color = Color3.fromRGB(255, 0, 0) -- vermelho para inimigos
+                    updateHighlight(player, Color3.fromRGB(255, 0, 0))
+                else
+                    box.Color = Color3.fromRGB(255, 255, 255)
+                    disableHighlight(player)
+                end
+            end
+
+            box.Visible = true
+            nameTag.Text = player.Name
+            nameTag.Position = Vector2.new(headPos.X, headPos.Y - 20)
+
+            if player == currentTarget then
+                nameTag.Color = Color3.fromRGB(255, 255, 0) -- amarelo no alvo
+            else
+                if player.Team == LocalPlayer.Team and _G.espAlliesEnabled then
+                    nameTag.Color = Color3.fromRGB(0, 150, 255) -- azul aliados
+                elseif player.Team ~= LocalPlayer.Team and _G.espEnemiesEnabled then
+                    nameTag.Color = Color3.fromRGB(255, 255, 255) -- branco inimigos
+                else
+                    nameTag.Color = Color3.fromRGB(255, 255, 255)
+                end
+            end
+
+            nameTag.Visible = true
+
+            local healthPercent = humanoid.Health / humanoid.MaxHealth
+            local barHeight = height
+            local barWidth = 5
+            local barX = x - barWidth - 3
+            local barY = y + (height * (1 - healthPercent))
+
+            healthBar.Size = Vector2.new(barWidth, barHeight * healthPercent)
+            healthBar.Position = Vector2.new(barX, barY)
+            healthBar.Color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
+            healthBar.Visible = true
+        else
+            box.Visible = false
+            nameTag.Visible = false
+            healthBar.Visible = false
+            disableHighlight(player)
+        end
+    end)
+end
+
+-- Cria ESP para todos os jogadores
+for _, player in pairs(Players:GetPlayers()) do
+    createESP(player)
+end
+Players.PlayerAdded:Connect(createESP)
+
+-- ======= FUNÇÕES AUXILIARES =======
+
+local function isAliveCharacter(character)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health > 0
+end
+
+local function getClosestVisibleEnemy()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local shortestDistance = _G.FOV_RADIUS
+    local closestEnemy = nil
+    local ffa = isFFA()
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player == LocalPlayer or not player.Character then continue end
+        if not isAliveCharacter(player.Character) then continue end
+
+        if not ffa then
+            if player.Team == LocalPlayer.Team and not _G.espAlliesEnabled then continue end
+            if player.Team ~= LocalPlayer.Team and not _G.espEnemiesEnabled then continue end
+        else
+            if not _G.espEnemiesEnabled then continue end
+        end
+
+        local head = player.Character:FindFirstChild("Head")
+        if not head then continue end
+
+        local screenPos, visible = Camera:WorldToViewportPoint(head.Position)
+        if not visible then continue end
+
+        local distToCenter = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+        if distToCenter > shortestDistance then continue end
+
+        if not hasLineOfSight(head) then continue end
+
+        shortestDistance = distToCenter
+        closestEnemy = player
+    end
+
+    return closestEnemy
+end
+
+-- ======= CONTROLE DOS BOTÕES =======
+
+aimButton.MouseButton1Down:Connect(function()
+    aiming = true
+end)
+aimButton.MouseButton1Up:Connect(function()
+    aiming = false
+    currentTarget = nil
+end)
+shootButton.MouseButton1Down:Connect(function()
+    shooting = true
+end)
+shootButton.MouseButton1Up:Connect(function()
+    shooting = false
+end)
+
+-- ======= AIMBOT =======
+
+RunService.RenderStepped:Connect(function()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    -- Aimbot Automático
+    if _G.aimbotAutoEnabled then
+        local target = getClosestVisibleEnemy()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local head = target.Character.Head
+            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
+            if visible then
+                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
+                if dist <= _G.FOV_RADIUS then
+                    currentTarget = target
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                else
+                    currentTarget = nil
+                end
+            else
+                currentTarget = nil
+            end
+        else
+            currentTarget = nil
+        end
+    end
+
+    -- Aimbot Manual (só mira se estiver mirando e atirando)
+    if _G.aimbotManualEnabled and aiming and shooting then
+        local target = getClosestVisibleEnemy()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local head = target.Character.Head
+            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
+            if visible then
+                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
+                if dist <= _G.FOV_RADIUS then
+                    currentTarget = target
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                else
+                    currentTarget = nil
+                end
+            else
+                currentTarget = nil
+            end
+        else
+            currentTarget = nil
+        end
+    elseif not (_G.aimbotManualEnabled and aiming and shooting) and not _G.aimbotAutoEnabled then
+        currentTarget = nil
     end
 end)
 
--- Inicializa na página 1
-updatePage()
+return gui
