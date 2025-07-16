@@ -274,6 +274,8 @@ end)
 updatePageVisibility()
 
 -- ======= MODS DE ARMA (APLICAÇÃO) =======
+-- Salva o valor original do rateOfFire para restaurar ao desativar Fast Shot
+local originalRateOfFire = {}
 local function applyWeaponMods(tool)
     if not tool then return end
     -- Infinite Ammo
@@ -297,7 +299,14 @@ local function applyWeaponMods(tool)
     end
     -- Fast Shot
     if _G.modFastShot then
+        if not originalRateOfFire[tool] then
+            originalRateOfFire[tool] = tool:GetAttribute("rateOfFire")
+        end
         tool:SetAttribute("rateOfFire", 200)
+    elseif originalRateOfFire[tool] then
+        -- Restaurar valor original ao desativar
+        tool:SetAttribute("rateOfFire", originalRateOfFire[tool])
+        originalRateOfFire[tool] = nil
     end
     -- Zoom
     if _G.modZoom then
