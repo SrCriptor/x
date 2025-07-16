@@ -1,576 +1,213 @@
--- Settings
+-- Settings iniciais
 local Settings = {
-    -- Aimbot Settings
     AimbotOn = false,
     ShowFOV = true,
     TeamCheck = true,
     LockRadius = 100,
     FOVColor = Color3.fromRGB(255, 255, 255),
-    -- ESP Settings
     ESPOn = true,
     UseTeamColors = false,
     OwnTeamColor = Color3.fromRGB(0, 0, 255),
     OpponentTeamColor = Color3.fromRGB(255, 0, 0),
-    -- Gun Mod Settings
     InstantReload = false,
     InfiniteAmmo = false,
     NoRecoil = false,
     NoSpread = false,
     FastShoot = false,
-    -- Character Settings
     WalkspeedOn = false,
     WalkspeedValue = 50,
     JumpheightOn = false,
-    JumpheightValue = 25
+    JumpheightValue = 25,
 }
 
-local targetList = {
-    {Name = "Head", Label = "Player"},
-}
-
+-- Importa Rayfield
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+-- Cria janela simples, tema claro
 local MainWindow = Rayfield:CreateWindow({
-    Name = "Global Aimbot & Gun Mods",
-    Icon = 0,
-    LoadingTitle = "Loading...",
-    LoadingSubtitle = "by FM",
-    Theme = "Default",
-    DisableRayfieldPrompts = true,
-    DisableBuildWarnings = true,
+    Name = "Aimbot & Gun Mods",
+    LoadingTitle = "Carregando...",
+    LoadingSubtitle = "Por FM",
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = nil,
-        FileName = "GlobalAimbotAndGunMods"
-    }
+        FolderName = "ConfigAimbot",
+        FileName = "Config",
+    },
+    Theme = "Light",
+    DisableRayfieldPrompts = true,
+    DisableBuildWarnings = true,
 })
 
--- Força abrir o menu ao iniciar
-MainWindow:Open()
+-- Cria abas
+local AimbotTab = MainWindow:CreateTab("Aimbot")
+local ESPTab = MainWindow:CreateTab("ESP")
+local GunModTab = MainWindow:CreateTab("Gun Mods")
+local CharacterTab = MainWindow:CreateTab("Personagem")
 
--- Criar botão flutuante para abrir o menu manualmente no celular
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MobileMenuButtonGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
-
-local OpenMenuButton = Instance.new("TextButton")
-OpenMenuButton.Name = "OpenMenuButton"
-OpenMenuButton.Text = "📂 Menu"
-OpenMenuButton.Size = UDim2.new(0, 100, 0, 40)
-OpenMenuButton.Position = UDim2.new(0, 10, 0.5, -20)
-OpenMenuButton.AnchorPoint = Vector2.new(0, 0.5)
-OpenMenuButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-OpenMenuButton.TextColor3 = Color3.new(1,1,1)
-OpenMenuButton.TextScaled = true
-OpenMenuButton.Parent = ScreenGui
-OpenMenuButton.ZIndex = 50
-
-OpenMenuButton.MouseButton1Click:Connect(function()
-    MainWindow:Toggle()
-end)
--- Variáveis úteis
-local Workspace = game:GetService("Workspace")
-local Camera = Workspace.CurrentCamera
-local UIS = game:GetService("UserInputService")
-
--- Criar círculo do FOV
-local RadiusFrame = Instance.new("Frame")
-RadiusFrame.Size = UDim2.new(0, Settings.LockRadius * 2, 0, Settings.LockRadius * 2)
-RadiusFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-RadiusFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-RadiusFrame.BackgroundTransparency = 1
-RadiusFrame.Visible = Settings.ShowFOV
-RadiusFrame.ZIndex = 10
-RadiusFrame.Parent = ScreenGui
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(1, 0)
-UICorner.Parent = RadiusFrame
-
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 2
-UIStroke.Color = Settings.FOVColor
-UIStroke.Transparency = 0.2
-UIStroke.Parent = RadiusFrame
-
--- Função para encontrar o jogador mais próximo no FOV
-local function getNearestPlayer()
-    local closestPlayer = nil
-    local closestDistance = Settings.LockRadius
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            if Settings.TeamCheck and player.Team == LocalPlayer.Team then
-                continue
-            end
-
-            local head = player.Character.Head
-            local humanoid = player.Character:FindFirstChild("Humanoid")
-
-            if humanoid and humanoid.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-
-                if onScreen then
-                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                    if distance < closestDistance then
-                        closestDistance = distance
-                        closestPlayer = head
-                    end
-                end
-            end
-        end
-    end
-
-    return closestPlayer
-end
-
--- Tabela para guardar ESPs criados
-local createdESPs = {}
-
--- Função para criar ESP no alvo (nome + quadradinho)
-local function createESP(target)
-    local player = Players:GetPlayerFromCharacter(target.Parent)
-    if player == LocalPlayer or not player then
-        return
-    end
-
-    local teamColor
-    if Settings.UseTeamColors then
-        teamColor = player.TeamColor.Color
-    else
-        if player.Team == LocalPlayer.Team then
-            teamColor = Settings.OwnTeamColor
-        else
-            teamColor = Settings.OpponentTeamColor
-        end
-    end
-
-    local ESPBillboard = Instance.new("BillboardGui")
-    ESPBillboard.Name = "ESPBillboard"
-    ESPBillboard.Adornee = target
-    ESPBillboard.AlwaysOnTop = true
-    ESPBillboard.Size = UDim2.new(0, 100, 0, 100)
-    ESPBillboard.Parent = target
-
-    table.insert(createdESPs, ESPBillboard)
-
-    local ESPFrame = Instance.new("Frame")
-    ESPFrame.Parent = ESPBillboard
-    ESPFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    ESPFrame.BackgroundColor3 = teamColor
-    ESPFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    ESPFrame.Size = UDim2.new(0, 5, 0, 5)
-
-    local FrameUICorner = Instance.new("UICorner")
-    FrameUICorner.CornerRadius = UDim.new(1, 0)
-    FrameUICorner.Parent = ESPFrame
-
-    local FrameUIGradient = Instance.new("UIGradient")
-    FrameUIGradient.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(0.5, 0.5, 0.5))
-    FrameUIGradient.Rotation = 90
-    FrameUIGradient.Parent = ESPFrame
-
-    local FrameUIStroke = Instance.new("UIStroke")
-    FrameUIStroke.Thickness = 2.5
-    FrameUIStroke.Parent = ESPFrame
-
-    local ESPLabel = Instance.new("TextLabel")
-    ESPLabel.Parent = ESPBillboard
-    ESPLabel.AnchorPoint = Vector2.new(0, 0.5)
-    ESPLabel.BackgroundTransparency = 1
-    ESPLabel.Position = UDim2.new(0, 0, 0.5, 12)
-    ESPLabel.Size = UDim2.new(1, 0, 0.1, 0)
-    ESPLabel.Text = player and player.Name or "Unknown Player"
-    ESPLabel.TextColor3 = teamColor
-    ESPLabel.TextScaled = true
-
-    local TextUIStroke = Instance.new("UIStroke")
-    TextUIStroke.Thickness = 2.5
-    TextUIStroke.Parent = ESPLabel
-
-    if target.Parent and target.Parent:FindFirstChild("Humanoid") then
-        local humanoid = target.Parent:FindFirstChild("Humanoid")
-        humanoid.Died:Connect(function()
-            ESPBillboard:Destroy()
-            for i, esp in ipairs(createdESPs) do
-                if esp == ESPBillboard then
-                    table.remove(createdESPs, i)
-                    break
-                end
-            end
-        end)
-    end
-end
-
--- Função para remover todos os ESPs
-local function removeAllESPs()
-    for _, esp in ipairs(createdESPs) do
-        esp:Destroy()
-    end
-    createdESPs = {}
-end
-
--- Função para escanear o Workspace e aplicar ESP nos alvos
-local function scanAndApplyESP()
-    if not Settings.ESPOn then return end
-    for _, object in ipairs(Workspace:GetDescendants()) do
-        if object:IsA("BasePart") or object:IsA("Model") then
-            for _, target in ipairs(targetList) do
-                if object.Name == target.Name then
-                    local targetObject = findTarget(object, target.ChildName)
-                    if targetObject then
-                        createESP(targetObject)
-                    end
-                end
-            end
-        end
-    end
-end
-
--- Detectar adição de objetos no Workspace para aplicar ESP
-Workspace.DescendantAdded:Connect(function(descendant)
-    if Settings.ESPOn and (descendant:IsA("BasePart") or descendant:IsA("Model")) then
-        for _, target in ipairs(targetList) do
-            if descendant.Name == target.Name then
-                local targetObject = findTarget(descendant, target.ChildName)
-                if targetObject then
-                    createESP(targetObject)
-                end
-            end
-        end
-    end
-end)
-
--- Detectar quando o personagem local reaparece para reaplicar configs de velocidade/pulo
-LocalPlayer.CharacterAdded:Connect(function(char)
-    local humanoid = char:WaitForChild("Humanoid")
-
-    if Settings.WalkspeedOn then
-        humanoid.WalkSpeed = Settings.WalkspeedValue
-        humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if humanoid.WalkSpeed ~= Settings.WalkspeedValue and Settings.WalkspeedOn then
-                humanoid.WalkSpeed = Settings.WalkspeedValue
-            end
-        end)
-    end
-
-    if Settings.JumpheightOn then
-        humanoid.JumpHeight = Settings.JumpheightValue
-        humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(function()
-            if humanoid.JumpHeight ~= Settings.JumpheightValue and Settings.JumpheightOn then
-                humanoid.JumpHeight = Settings.JumpheightValue
-            end
-        end)
-    end
-end)
-
--- Ativar configurações caso o personagem já esteja presente
-if LocalPlayer.Character then
-    local humanoid = LocalPlayer.Character:WaitForChild("Humanoid")
-    if Settings.WalkspeedOn then
-        humanoid.WalkSpeed = Settings.WalkspeedValue
-        humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if humanoid.WalkSpeed ~= Settings.WalkspeedValue and Settings.WalkspeedOn then
-                humanoid.WalkSpeed = Settings.WalkspeedValue
-            end
-        end)
-    end
-    if Settings.JumpheightOn then
-        humanoid.JumpHeight = Settings.JumpheightValue
-        humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(function()
-            if humanoid.JumpHeight ~= Settings.JumpheightValue and Settings.JumpheightOn then
-                humanoid.JumpHeight = Settings.JumpheightValue
-            end
-        end)
-    end
-end
-
--- Variáveis para controlar o lock no aimbot
-local lockOn = false
-local lockedTarget = nil
-
--- Input para ativar/desativar o lock (botão direito do mouse)
-UIS.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        lockOn = true
-    end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        lockOn = false
-        lockedTarget = nil
-    end
-end)
-
--- Loop principal para aplicar as modificações a cada frame renderizado
-game:GetService("RunService").RenderStepped:Connect(function()
-    if Settings.InstantReload and workspace:FindFirstChild(LocalPlayer.Name) then
-        local gun = workspace[LocalPlayer.Name]:FindFirstChild(LocalPlayer.Name .. "CustomGun")
-        if gun then
-            gun:SetAttribute("reloadTime", 0)
-        end
-    end
-
-    if Settings.InfiniteAmmo and workspace:FindFirstChild(LocalPlayer.Name) then
-        local gun = workspace[LocalPlayer.Name]:FindFirstChild(LocalPlayer.Name .. "CustomGun")
-        if gun then
-            gun:SetAttribute("magazineSize", math.huge)
-        end
-    end
-
-    if Settings.NoRecoil and workspace:FindFirstChild(LocalPlayer.Name) then
-        local gun = workspace[LocalPlayer.Name]:FindFirstChild(LocalPlayer.Name .. "CustomGun")
-        if gun then
-            gun:SetAttribute("recoilMin", Vector2.new(0, 0))
-            gun:SetAttribute("recoilMax", Vector2.new(0, 0))
-            gun:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        end
-    end
-
-    if Settings.NoSpread and workspace:FindFirstChild(LocalPlayer.Name) then
-        local gun = workspace[LocalPlayer.Name]:FindFirstChild(LocalPlayer.Name .. "CustomGun")
-        if gun then
-            gun:SetAttribute("spread", 0)
-        end
-    end
-
-    if Settings.FastShoot and workspace:FindFirstChild(LocalPlayer.Name) then
-        local gun = workspace[LocalPlayer.Name]:FindFirstChild(LocalPlayer.Name .. "CustomGun")
-        if gun then
-            gun:SetAttribute("rateOfFire", math.huge)
-        end
-    end
-
-    if lockOn and Settings.AimbotOn then
-        lockedTarget = getNearestPlayer()
-        if lockedTarget then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, lockedTarget.Position)
-        end
-    end
-end)
-
--- Inicializa o ESP na execução
-scanAndApplyESP()
-
-local AimbotTab = MainWindow:CreateTab("Aimbot", 4483362458)
-
-local AimbotOnToggle = AimbotTab:CreateToggle({
-    Name = "Aimbot Enabled",
+-- Aimbot
+AimbotTab:CreateToggle({
+    Name = "Ativar Aimbot",
     CurrentValue = Settings.AimbotOn,
-    Flag = "aimboton",
-    Callback = function(Value)
-        Settings.AimbotOn = Value
+    Callback = function(value)
+        Settings.AimbotOn = value
     end,
 })
 
-local ShowFOVToggle = AimbotTab:CreateToggle({
-    Name = "Show FOV",
+AimbotTab:CreateToggle({
+    Name = "Mostrar FOV",
     CurrentValue = Settings.ShowFOV,
-    Flag = "fovtoggle",
-    Callback = function(Value)
-        Settings.ShowFOV = Value
-        RadiusFrame.Visible = Value
+    Callback = function(value)
+        Settings.ShowFOV = value
+        -- Atualize visibilidade do FOV aqui
     end,
 })
 
-local TeamCheckToggle = AimbotTab:CreateToggle({
-    Name = "Team Check",
+AimbotTab:CreateToggle({
+    Name = "Verificar Equipe",
     CurrentValue = Settings.TeamCheck,
-    Flag = "teamchecktoggle",
-    Callback = function(Value)
-        Settings.TeamCheck = Value
+    Callback = function(value)
+        Settings.TeamCheck = value
     end,
 })
 
-local Slider = AimbotTab:CreateSlider({
-    Name = "FOV Size",
+AimbotTab:CreateSlider({
+    Name = "Tamanho do FOV",
     Range = {1, 1000},
     Increment = 10,
-    Suffix = "",
     CurrentValue = Settings.LockRadius,
-    Flag = "FovValue",
-    Callback = function(Value)
-        Settings.LockRadius = Value
-        RadiusFrame.Size = UDim2.new(0, Value * 2, 0, Value * 2)
+    Callback = function(value)
+        Settings.LockRadius = value
+        -- Atualize tamanho do círculo de FOV aqui
     end,
 })
 
-local FOVColorPicker = AimbotTab:CreateColorPicker({
-    Name = "FOV Color",
+AimbotTab:CreateColorPicker({
+    Name = "Cor do FOV",
     Color = Settings.FOVColor,
-    Flag = "fovcolorpicker",
-    Callback = function(Value)
-        Settings.FOVColor = Value
-        UIStroke.Color = Settings.FOVColor
-    end
+    Callback = function(value)
+        Settings.FOVColor = value
+        -- Atualize a cor do círculo de FOV aqui
+    end,
 })
 
-local ESPTab = MainWindow:CreateTab("ESP", 4483362458)
-
-local ESPToggle = ESPTab:CreateToggle({
-    Name = "ESP Enable",
+-- ESP
+ESPTab:CreateToggle({
+    Name = "Ativar ESP",
     CurrentValue = Settings.ESPOn,
-    Flag = "esptoggle",
-    Callback = function(Value)
-        Settings.ESPOn = Value
-        if Value then
-            scanAndApplyESP()
-        else
-            removeAllESPs()
-        end
+    Callback = function(value)
+        Settings.ESPOn = value
+        -- Lógica para ativar/desativar ESP
     end,
 })
 
-local UseTeamColorsToggle = ESPTab:CreateToggle({
-    Name = "Use Team Colors",
+ESPTab:CreateToggle({
+    Name = "Usar Cores da Equipe",
     CurrentValue = Settings.UseTeamColors,
-    Flag = "usetmcolors",
-    Callback = function(Value)
-        Settings.UseTeamColors = Value
-        removeAllESPs()
-        scanAndApplyESP()
+    Callback = function(value)
+        Settings.UseTeamColors = value
+        -- Atualize ESP com as cores
     end,
 })
 
-local OwnTeamColorPicker = ESPTab:CreateColorPicker({
-    Name = "Own Team Color",
+ESPTab:CreateColorPicker({
+    Name = "Cor da Equipe Própria",
     Color = Settings.OwnTeamColor,
-    Flag = "ownteamcolorpicker",
-    Callback = function(Value)
-        Settings.OwnTeamColor = Value
-        removeAllESPs()
-        scanAndApplyESP()
-    end
+    Callback = function(value)
+        Settings.OwnTeamColor = value
+        -- Atualize cor do ESP para a equipe própria
+    end,
 })
 
-local OpponentTeamColorPicker = ESPTab:CreateColorPicker({
-    Name = "Opponent Team Color",
+ESPTab:CreateColorPicker({
+    Name = "Cor da Equipe Oponente",
     Color = Settings.OpponentTeamColor,
-    Flag = "opponentteamcolorpicker",
-    Callback = function(Value)
-        Settings.OpponentTeamColor = Value
-        removeAllESPs()
-        scanAndApplyESP()
-    end
+    Callback = function(value)
+        Settings.OpponentTeamColor = value
+        -- Atualize cor do ESP para oponente
+    end,
 })
 
-local GunModTab = MainWindow:CreateTab("Gun Mods", 4483362458)
-
-local InstantReloadToggle = GunModTab:CreateToggle({
-    Name = "Instant Reload",
+-- Gun Mods
+GunModTab:CreateToggle({
+    Name = "Recarga Instantânea",
     CurrentValue = Settings.InstantReload,
-    Flag = "instantreloadtoggle",
-    Callback = function(Value)
-        Settings.InstantReload = Value
+    Callback = function(value)
+        Settings.InstantReload = value
     end,
 })
 
-local InfiniteAmmoToggle = GunModTab:CreateToggle({
-    Name = "Infinite Ammo",
+GunModTab:CreateToggle({
+    Name = "Munição Infinita",
     CurrentValue = Settings.InfiniteAmmo,
-    Flag = "infiniteammotoggle",
-    Callback = function(Value)
-        Settings.InfiniteAmmo = Value
+    Callback = function(value)
+        Settings.InfiniteAmmo = value
     end,
 })
 
-local NoRecoilToggle = GunModTab:CreateToggle({
-    Name = "No Recoil",
+GunModTab:CreateToggle({
+    Name = "Sem Recuo",
     CurrentValue = Settings.NoRecoil,
-    Flag = "norecoil",
-    Callback = function(Value)
-        Settings.NoRecoil = Value
+    Callback = function(value)
+        Settings.NoRecoil = value
     end,
 })
 
-local NoSpreadToggle = GunModTab:CreateToggle({
-    Name = "No Spread",
+GunModTab:CreateToggle({
+    Name = "Sem Dispersão",
     CurrentValue = Settings.NoSpread,
-    Flag = "nospread",
-    Callback = function(Value)
-        Settings.NoSpread = Value
+    Callback = function(value)
+        Settings.NoSpread = value
     end,
 })
 
-local FastShootToggle = GunModTab:CreateToggle({
-    Name = "Fast Shoot",
+GunModTab:CreateToggle({
+    Name = "Tiro Rápido",
     CurrentValue = Settings.FastShoot,
-    Flag = "fastshoot",
-    Callback = function(Value)
-        Settings.FastShoot = Value
+    Callback = function(value)
+        Settings.FastShoot = value
     end,
 })
 
-local CharacterTab = MainWindow:CreateTab("Character", 4483362458)
-
-local WalkspeedToggle = CharacterTab:CreateToggle({
-    Name = "Walkspeed Enabled",
+-- Personagem
+CharacterTab:CreateToggle({
+    Name = "Velocidade Ligada",
     CurrentValue = Settings.WalkspeedOn,
-    Flag = "walkspeed",
-    Callback = function(Value)
-        Settings.WalkspeedOn = Value
+    Callback = function(value)
+        Settings.WalkspeedOn = value
+        -- Atualize a velocidade do personagem
     end,
 })
 
-local WalkspeedSlider = CharacterTab:CreateSlider({
-    Name = "Walkspeed",
+CharacterTab:CreateSlider({
+    Name = "Velocidade de Caminhada",
     Range = {1, 100},
     Increment = 1,
-    Suffix = "",
     CurrentValue = Settings.WalkspeedValue,
-    Flag = "speed",
-    Callback = function(Value)
-        Settings.WalkspeedValue = Value
-        local player = game.Players.LocalPlayer
-        if player and player.Character then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.WalkSpeed = Value
-            end
-        end
+    Callback = function(value)
+        Settings.WalkspeedValue = value
+        -- Atualize a velocidade do personagem
     end,
 })
 
-local JumppowerToggle = CharacterTab:CreateToggle({
-    Name = "Jumpheight Enabled",
+CharacterTab:CreateToggle({
+    Name = "Pular Alto",
     CurrentValue = Settings.JumpheightOn,
-    Flag = "jumpheight",
-    Callback = function(Value)
-        Settings.JumpheightOn = Value
+    Callback = function(value)
+        Settings.JumpheightOn = value
+        -- Atualize a altura do pulo
     end,
 })
 
-local JumpheightSlider = CharacterTab:CreateSlider({
-    Name = "Jumpheight",
+CharacterTab:CreateSlider({
+    Name = "Altura do Pulo",
     Range = {1, 100},
     Increment = 1,
-    Suffix = "",
     CurrentValue = Settings.JumpheightValue,
-    Flag = "height",
-    Callback = function(Value)
-        Settings.JumpheightValue = Value
-        local player = game.Players.LocalPlayer
-        if player and player.Character then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.JumpHeight = Value
-            end
-        end
+    Callback = function(value)
+        Settings.JumpheightValue = value
+        -- Atualize a altura do pulo
     end,
 })
 
--- Inicializa o menu
-Rayfield:LoadConfiguration()
-
--- Exibe o menu ao iniciar (opcional, pode comentar se quiser iniciar fechado)
+-- Mostrar menu
 MainWindow:Show()
-
--- Faz o scan inicial e aplica ESP nos alvos
-scanAndApplyESP()
