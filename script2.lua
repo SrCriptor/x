@@ -1,5 +1,4 @@
--- [INTERFACE COMPLETA ESTILO RAYCAST COM AIMBOT, HITBOX, WALLHACK RGB E MODS DE ARMA + HITBOX POPUP E VERIFICAÇÕES MELHORADAS]
-
+-- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -17,68 +16,46 @@ _G.hitboxSelection = _G.hitboxSelection or {
 }
 _G.FOV_RADIUS = _G.FOV_RADIUS or 200
 
--- GUI PRINCIPAL
+-- Valores para mods arma (rateOfFire, spread, zoom)
+_G.lt = _G.lt or {
+    rateOfFire = 200,
+    spread = 0,
+    zoom = 3,
+}
+
+-- Criação do GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "RaycastUI"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Main Frame
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 280, 0, 280)
-mainFrame.Position = UDim2.new(0, 20, 0.5, -140)
+mainFrame.Size = UDim2.new(0, 280, 0, 300)
+mainFrame.Position = UDim2.new(0, 20, 0.5, -150)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = gui
 
--- Drag Bar + Minimize Button
-local dragBar = Instance.new("Frame")
-dragBar.Size = UDim2.new(1, 0, 0, 25)
-dragBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-dragBar.Parent = mainFrame
+local dragButton = Instance.new("TextButton")
+dragButton.Size = UDim2.new(1, 0, 0, 25)
+dragButton.Position = UDim2.new(0, 0, 0, 0)
+dragButton.Text = "⮟ Menu"
+dragButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+dragButton.TextColor3 = Color3.new(1, 1, 1)
+dragButton.Font = Enum.Font.GothamBold
+dragButton.TextSize = 16
+dragButton.Parent = mainFrame
 
-local dragLabel = Instance.new("TextLabel")
-dragLabel.Text = "⮟ Menu"
-dragLabel.Font = Enum.Font.GothamBold
-dragLabel.TextSize = 14
-dragLabel.TextColor3 = Color3.new(1, 1, 1)
-dragLabel.BackgroundTransparency = 1
-dragLabel.Size = UDim2.new(0.8, 0, 1, 0)
-dragLabel.TextXAlignment = Enum.TextXAlignment.Left
-dragLabel.Position = UDim2.new(0, 10, 0, 0)
-dragLabel.Parent = dragBar
-
-local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Text = "–"
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.TextSize = 18
-minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-minimizeBtn.Size = UDim2.new(0, 30, 0, 25)
-minimizeBtn.Position = UDim2.new(1, -35, 0, 0)
-minimizeBtn.Parent = dragBar
-
-local minimized = false
-minimizeBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    for _, child in pairs(mainFrame:GetChildren()) do
-        if child ~= dragBar then
-            child.Visible = not minimized
-        end
-    end
-    dragLabel.Text = minimized and "⮝ Menu" or "⮟ Menu"
-end)
-
--- Drag Logic
+-- Dragging logic
 local dragging = false
 local dragInput, mousePos, framePos
 
-dragBar.InputBegan:Connect(function(input)
+dragButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
-        mousePos = UserInputService:GetMouseLocation()
-        framePos = Vector2.new(mainFrame.Position.X.Offset, mainFrame.Position.Y.Offset)
+        mousePos = input.Position
+        framePos = mainFrame.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
@@ -87,7 +64,7 @@ dragBar.InputBegan:Connect(function(input)
     end
 end)
 
-dragBar.InputChanged:Connect(function(input)
+dragButton.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement then
         dragInput = input
     end
@@ -95,59 +72,75 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
-        local delta = UserInputService:GetMouseLocation() - mousePos
-        mainFrame.Position = UDim2.new(0, framePos.X + delta.X, 0, framePos.Y + delta.Y)
+        local delta = input.Position - mousePos
+        mainFrame.Position = UDim2.new(
+            framePos.X.Scale,
+            framePos.X.Offset + delta.X,
+            framePos.Y.Scale,
+            framePos.Y.Offset + delta.Y
+        )
     end
 end)
 
--- Tab Buttons Frame
-local tabButtonsFrame = Instance.new("Frame")
-tabButtonsFrame.Size = UDim2.new(1, 0, 0, 30)
-tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-tabButtonsFrame.Position = UDim2.new(0, 0, 0, 25)
-tabButtonsFrame.Parent = mainFrame
+-- Minimize/Maximize
+local minimized = false
+dragButton.MouseButton2Click:Connect(function()
+    minimized = not minimized
+    for _, child in pairs(mainFrame:GetChildren()) do
+        if child ~= dragButton then
+            child.Visible = not minimized
+        end
+    end
+    dragButton.Text = minimized and "⮝ Menu" or "⮟ Menu"
+end)
 
 -- Tabs
+local tabButtonsFrame = Instance.new("Frame")
+tabButtonsFrame.Size = UDim2.new(1, 0, 0, 30)
+tabButtonsFrame.Position = UDim2.new(0, 0, 0, 25)
+tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+tabButtonsFrame.Parent = mainFrame
+
 local tabs = {
     Aimbot = Instance.new("Frame"),
     Hitbox = Instance.new("Frame"),
-    ModArma = Instance.new("Frame")
+    ModArma = Instance.new("Frame"),
 }
 
 local tabOrder = {"Aimbot", "Hitbox", "ModArma"}
 
-for _, name in ipairs(tabOrder) do
-    local frame = tabs[name]
+for _, tabName in ipairs(tabOrder) do
+    local frame = tabs[tabName]
     frame.Size = UDim2.new(1, 0, 1, -55)
     frame.Position = UDim2.new(0, 0, 0, 55)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     frame.Visible = false
     frame.Parent = mainFrame
 end
-
 tabs.Aimbot.Visible = true
 
--- Create Tab Buttons
-for index, name in ipairs(tabOrder) do
+local function createTabButton(name, index)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1/#tabOrder, -2, 1, 0)
-    btn.Position = UDim2.new((index-1)/#tabOrder, index > 1 and 2 or 0, 0, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Size = UDim2.new(1 / #tabOrder, -4, 1, 0)
+    btn.Position = UDim2.new((index - 1) / #tabOrder, 2, 0, 0)
+    btn.Text = name
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
-    btn.Text = name
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     btn.Parent = tabButtonsFrame
-
     btn.MouseButton1Click:Connect(function()
-        for _, frame in pairs(tabs) do
-            frame.Visible = false
-        end
+        for _, f in pairs(tabs) do f.Visible = false end
         tabs[name].Visible = true
     end)
+    return btn
 end
 
--- Função para criar toggle buttons no estilo raycast
+for i, name in ipairs(tabOrder) do
+    createTabButton(name, i)
+end
+
+-- Toggle Button creator
 local function createToggleRay(name, yOffset, globalName, parent)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 240, 0, 28)
@@ -155,7 +148,7 @@ local function createToggleRay(name, yOffset, globalName, parent)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
+    btn.TextSize = 15
     btn.Text = name .. ": OFF"
     btn.Parent = parent
 
@@ -166,30 +159,86 @@ local function createToggleRay(name, yOffset, globalName, parent)
     end
 
     btn.MouseButton1Click:Connect(function()
-        -- Exclusividade entre Aimbots
+        -- exclusividade entre aimbots autom. e legit
         if globalName == "aimbotAutoEnabled" then
             _G.aimbotLegitEnabled = false
         elseif globalName == "aimbotLegitEnabled" then
             _G.aimbotAutoEnabled = false
         end
-
         _G[globalName] = not _G[globalName]
         update()
     end)
 
     update()
+    return btn
 end
 
--- Abas Aimbot
+-- Sliders creator
+local function createSlider(labelText, yOffset, minValue, maxValue, step, globalTableKey, parent)
+    local label = Instance.new("TextLabel")
+    label.Text = labelText .. ": " .. tostring(_G.lt[globalTableKey])
+    label.Size = UDim2.new(0, 240, 0, 20)
+    label.Position = UDim2.new(0, 20, 0, yOffset)
+    label.TextColor3 = Color3.new(1,1,1)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.Parent = parent
+
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(0, 240, 0, 20)
+    sliderFrame.Position = UDim2.new(0, 20, 0, yOffset + 20)
+    sliderFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    sliderFrame.Parent = parent
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((_G.lt[globalTableKey] - minValue) / (maxValue - minValue), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+    fill.Parent = sliderFrame
+
+    local inputActive = false
+
+    sliderFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            inputActive = true
+        end
+    end)
+
+    sliderFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            inputActive = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and inputActive then
+            local relativeX = math.clamp(input.Position.X - sliderFrame.AbsolutePosition.X, 0, sliderFrame.AbsoluteSize.X)
+            local value = minValue + (relativeX / sliderFrame.AbsoluteSize.X) * (maxValue - minValue)
+            value = math.floor(value / step + 0.5) * step
+            _G.lt[globalTableKey] = value
+            label.Text = labelText .. ": " .. tostring(value)
+            fill.Size = UDim2.new((value - minValue) / (maxValue - minValue), 0, 1, 0)
+        end
+    end)
+
+    return label, sliderFrame, fill
+end
+
+-- Criar toggles da aba Aimbot
 createToggleRay("Aimbot Automático", 20, "aimbotAutoEnabled", tabs.Aimbot)
 createToggleRay("Aimbot Legit", 60, "aimbotLegitEnabled", tabs.Aimbot)
 
--- Abas Mods de Arma
-createToggleRay("Infinite Ammo", 20, "modInfiniteAmmo", tabs.ModArma)
-createToggleRay("No Recoil", 60, "modNoRecoil", tabs.ModArma)
-createToggleRay("Instant Reload", 100, "modInstantReload", tabs.ModArma)
+-- Criar toggles da aba ModArma
+createToggleRay("Infinite Ammo", 10, "modInfiniteAmmo", tabs.ModArma)
+createToggleRay("No Recoil", 50, "modNoRecoil", tabs.ModArma)
+createToggleRay("Instant Reload", 90, "modInstantReload", tabs.ModArma)
 
--- Hitbox Popup
+-- Criar sliders na aba ModArma
+createSlider("Rate of Fire", 140, 50, 500, 10, "rateOfFire", tabs.ModArma)
+createSlider("Spread", 190, 0, 50, 1, "spread", tabs.ModArma)
+createSlider("Zoom", 240, 1, 10, 0.1, "zoom", tabs.ModArma)
+
+-- Hitbox popup e botão
 local function createHitboxPopup()
     local popup = Instance.new("Frame")
     popup.Size = UDim2.new(0, 250, 0, 340)
@@ -205,7 +254,7 @@ local function createHitboxPopup()
     closeBtn.Size = UDim2.new(0, 70, 0, 25)
     closeBtn.Position = UDim2.new(1, -80, 0, 10)
     closeBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    closeBtn.Font = Enum.Font.SourceSansBold
+    closeBtn.Font = Enum.Font.GothamBold
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.TextSize = 14
     closeBtn.Parent = popup
@@ -256,7 +305,7 @@ hitboxBtn.Size = UDim2.new(0, 240, 0, 30)
 hitboxBtn.Position = UDim2.new(0, 20, 0, 20)
 hitboxBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 hitboxBtn.TextColor3 = Color3.new(1, 1, 1)
-hitboxBtn.Font = Enum.Font.SourceSansBold
+hitboxBtn.Font = Enum.Font.GothamBold
 hitboxBtn.TextSize = 14
 hitboxBtn.Parent = tabs.Hitbox
 
@@ -264,22 +313,20 @@ hitboxBtn.MouseButton1Click:Connect(function()
     hitboxPopup.Visible = not hitboxPopup.Visible
 end)
 
--- Função para verificar se pode atirar através do material
+-- Função para verificar se pode atirar através do material (glass, forcefield, fabric)
 local function canShootThrough(part)
     if not part then return false end
     local mat = part.Material
     return mat == Enum.Material.Glass or mat == Enum.Material.ForceField or mat == Enum.Material.Fabric
 end
 
--- Função para checar se a parte está visível por raycast
+-- Função para verificar visibilidade por raycast
 local function canSee(part)
-    if not part or not part.Parent then return false end
     local origin = Camera.CFrame.Position
     local direction = (part.Position - origin).Unit * 500
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-
     local result = workspace:Raycast(origin, direction, rayParams)
     if result then
         return result.Instance:IsDescendantOf(part.Parent) or canShootThrough(result.Instance)
@@ -287,134 +334,83 @@ local function canSee(part)
     return true
 end
 
--- Aplicar Mods na arma
-local function applyWeaponMods(tool)
-    if not tool then return end
-
-    if _G.modNoRecoil then
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-    end
-
-    if _G.modInfiniteAmmo then
-        local mag = tool:GetAttribute("magazineSize") or 200
-        tool:SetAttribute("_ammo", math.huge)
-        tool:SetAttribute("magazineSize", mag)
-
-        local display = tool:FindFirstChild("AmmoDisplay")
-        if display and display:IsA("TextLabel") then
-            display.Text = tostring(mag)
-        end
-    end
-
-    if _G.modInstantReload then
-        tool:SetAttribute("reloadTime", 0)
-    end
-end
-
--- Reaplicar mods no respawn
-local function onCharacterAdded(char)
-    local humanoid = char:WaitForChild("Humanoid")
-    humanoid.Died:Connect(function()
-        wait(2)
-        local newChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local tool = newChar:FindFirstChildWhichIsA("Tool")
-        if tool then
-            applyWeaponMods(tool)
-        end
-    end)
-
-    -- Também aplica mods assim que personagem for carregado
-    local tool = char:FindFirstChildWhichIsA("Tool")
-    if tool then
-        applyWeaponMods(tool)
-    end
-end
-
-LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
-if LocalPlayer.Character then
-    onCharacterAdded(LocalPlayer.Character)
-end
-
--- WALLHACK RGB + BORDA AMARELA GROSSA NO ALVO MIRADO
-local function getClosestTarget()
+-- Wallhack neon RGB + borda amarela grossa no alvo aimbot
+local function getTarget()
+    -- Exemplo simples: seleciona o player mais próximo dentro do FOV e visível
     local closestPlayer = nil
-    local closestDistance = _G.FOV_RADIUS
+    local closestDist = _G.FOV_RADIUS + 1
+    local mousePos = UserInputService:GetMouseLocation()
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local head = player.Character:FindFirstChild("Head")
-            if head and canSee(head) then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            local rootPart = plr.Character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
                 if onScreen then
-                    local mousePos = UserInputService:GetMouseLocation()
                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
-                    if dist < closestDistance then
-                        closestDistance = dist
-                        closestPlayer = player
+                    if dist < closestDist and dist <= _G.FOV_RADIUS and canSee(rootPart) then
+                        closestPlayer = plr
+                        closestDist = dist
                     end
                 end
             end
         end
     end
-
     return closestPlayer
 end
 
--- Atualiza wallhack com neon rgb e borda amarela no alvo mirado
 local neonHue = 0
-
 local function updateWallhack()
-    neonHue = (neonHue + 0.005) % 1
+    neonHue = (neonHue + 0.01) % 1
     local neonColor = Color3.fromHSV(neonHue, 1, 1)
-    local target = getClosestTarget()
+    local target = getTarget()
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            for _, part in ipairs(player.Character:GetChildren()) do
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            for _, part in pairs(plr.Character:GetChildren()) do
                 if part:IsA("BasePart") then
-                    -- Aplicar material neon RGB
-                    part.Material = Enum.Material.Neon
+                    part.Material = Enum.Material.ForceField
                     part.Color = neonColor
                     part.Transparency = 0.4
 
-                    -- Criar ou atualizar borda SelectionBox
-                    local sb = part:FindFirstChildOfClass("SelectionBox")
-                    if not sb then
-                        sb = Instance.new("SelectionBox")
-                        sb.Adornee = part
-                        sb.Parent = part
+                    local selBox = part:FindFirstChild("SelectionBox")
+                    if not selBox then
+                        selBox = Instance.new("SelectionBox")
+                        selBox.Adornee = part
+                        selBox.Parent = part
                     end
 
-                    if target and target.Character == player.Character then
-                        sb.Color3 = Color3.fromRGB(255, 255, 0)
-                        sb.LineThickness = 0.2
+                    if target and target.Character == plr.Character then
+                        selBox.Color3 = Color3.fromRGB(255, 255, 0) -- amarelo
+                        selBox.LineThickness = 0.2
+                        selBox.Visible = true
                     else
-                        sb.Color3 = Color3.new(1, 1, 1)
-                        sb.LineThickness = 0.05
+                        selBox.Color3 = Color3.fromHSV(neonHue, 1, 1) -- RGB neon
+                        selBox.LineThickness = 0.05
+                        selBox.Visible = true
                     end
-                    sb.Visible = true
                 end
             end
         end
     end
 end
 
--- Atualiza wallhack a cada frame se algum aimbot estiver ativo
 RunService.RenderStepped:Connect(function()
     if _G.aimbotAutoEnabled or _G.aimbotLegitEnabled then
         updateWallhack()
     else
-        -- Esconde bordas se wallhack desligado
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                for _, part in ipairs(player.Character:GetChildren()) do
+        -- Remove seleção se wallhack desligado
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                for _, part in pairs(plr.Character:GetChildren()) do
                     if part:IsA("BasePart") then
-                        local sb = part:FindFirstChildOfClass("SelectionBox")
-                        if sb then
-                            sb.Visible = false
+                        local selBox = part:FindFirstChild("SelectionBox")
+                        if selBox then
+                            selBox:Destroy()
                         end
+                        part.Material = Enum.Material.Plastic
+                        part.Transparency = 0
+                        part.Color = Color3.fromRGB(255, 255, 255)
                     end
                 end
             end
@@ -422,23 +418,62 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- FUNÇÃO PRINCIPAL DE AIMBOT SIMPLIFICADA PARA EXEMPLO (SUBSTITUIR PELO SEU RAYCAST AIMBOT)
-local function aimAt(target)
-    if not target or not target.Character then return end
-    local head = target.Character:FindFirstChild("Head")
-    if not head then return end
-    local origin = Camera.CFrame.Position
-    local direction = (head.Position - origin).Unit
-    local newCF = CFrame.new(origin, origin + direction)
-    Camera.CFrame = newCF
+-- Aplicar mods na arma equipada
+local function applyWeaponMods(tool)
+    if not tool then return end
+    if _G.modNoRecoil then
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
+    end
+    if _G.modInfiniteAmmo then
+        local mag = tool:GetAttribute("magazineSize") or 200
+        tool:SetAttribute("_ammo", math.huge)
+        tool:SetAttribute("magazineSize", mag)
+        local display = tool:FindFirstChild("AmmoDisplay")
+        if display and display:IsA("TextLabel") then
+            display.Text = tostring(mag)
+        end
+    end
+    if _G.modInstantReload then
+        tool:SetAttribute("reloadTime", 0)
+    end
 end
 
--- Exemplo simples de loop de mira automática (pode substituir pela lógica real)
-RunService.RenderStepped:Connect(function()
-    if _G.aimbotAutoEnabled then
-        local target = getClosestTarget()
-        if target then
-            aimAt(target)
+-- Aplicar valores rateOfFire, spread e zoom atualizados
+local mouse = LocalPlayer:GetMouse()
+local function applyLtAttributes(tool, headPos)
+    if not tool then return end
+    for k,v in pairs(_G.lt) do
+        tool:SetAttribute(k, v)
+    end
+    if headPos and mouse.Hit then
+        local dist = (headPos - mouse.Hit.p).Magnitude
+        local adjustedSpread = 30 - dist / 5
+        tool:SetAttribute("spread", math.clamp(adjustedSpread, 0, 50))
+    end
+end
+
+-- Atualizar arma quando personagem ou ferramenta mudar
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local tool
+    repeat
+        tool = char:FindFirstChildWhichIsA("Tool")
+        task.wait()
+    until tool
+    local head = char:WaitForChild("Head")
+    applyWeaponMods(tool)
+    applyLtAttributes(tool, head.Position)
+end)
+
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        local head = char:FindFirstChild("Head")
+        if tool and head then
+            applyWeaponMods(tool)
+            applyLtAttributes(tool, head.Position)
         end
     end
 end)
