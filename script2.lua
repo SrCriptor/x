@@ -381,6 +381,43 @@ label.TextSize = 16
 label.Text = "Configurações adicionais"
 label.Parent = tabs.Ajustes
 
+local scaleSlider = createSlider("Escala do Menu", tabs.Ajustes, 60, scaleOptions, "currentScaleIndex", 1, #scaleOptions, 1, currentScaleIndex)
+
+-- Atualizar função para o slider personalizado (por ser tabela e index)
+do
+    local frame = scaleSlider
+    local sliderBg = frame:FindFirstChildWhichIsA("Frame", true) or frame:FindFirstChildOfClass("Frame")
+    local sliderBtn = sliderBg and sliderBg:FindFirstChildOfClass("TextButton")
+    local sliderFill = sliderBg and sliderBg:FindFirstChildOfClass("Frame")
+
+    local label = frame:FindFirstChildOfClass("TextLabel")
+
+    local dragging = false
+
+    sliderBtn.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local relativeX = math.clamp(input.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+            local scale = relativeX / sliderBg.AbsoluteSize.X
+            sliderFill.Size = UDim2.new(scale, 0, 1, 0)
+            sliderBtn.Position = UDim2.new(scale, 0, 0.5, -7)
+
+            local val = math.floor(1 + ( #scaleOptions - 1 ) * scale + 0.5)
+            val = math.clamp(val, 1, #scaleOptions)
+            currentScaleIndex = val
+            label.Text = string.format("Escala do Menu: %.1f", scaleOptions[currentScaleIndex])
+            updateMenuSize()
+        end
+    end)
+end
+
 -- Botão para abrir popup hitbox
 local hitboxBtn = Instance.new("TextButton")
 hitboxBtn.Text = "Selecionar Hitbox"
