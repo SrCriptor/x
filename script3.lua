@@ -13,31 +13,13 @@ _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
-_G.infiniteAmmo = true
-_G.autoSpread = true
-_G.instantReload = true
-_G.fastShot = true
+_G.infiniteAmmo = false
+_G.autoSpread = false
+_G.instantReload = false
+_G.fastShot = false
 
-local shooting = false
-local aiming = false
 local dragging = false
 local dragStart, startPos
-local currentTarget = nil
-
-local aimButton = LocalPlayer.PlayerScripts:WaitForChild("Assets").Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("AimButton")
-local shootButton = LocalPlayer.PlayerScripts:WaitForChild("Assets").Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("ShootButton")
-
-local function isFFA()
-    local teams = {}
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Team then
-            teams[player.Team] = true
-        end
-    end
-    local count = 0
-    for _ in pairs(teams) do count = count + 1 end
-    return count <= 1
-end
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "MobileAimbotGUI"
@@ -75,11 +57,15 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
+local function updateButtonText(button, text, flag)
+    button.Text = text .. (flag and ": ON" or ": OFF")
+end
+
 local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -20, 0, 30)
     button.Position = UDim2.new(0, 10, 0, yPos)
-    button.Text = text .. ": OFF"
+    updateButtonText(button, text, _G[flagName])
     button.Font = Enum.Font.SourceSansBold
     button.TextSize = 16
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -88,16 +74,19 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
 
     button.MouseButton1Click:Connect(function()
         _G[flagName] = not _G[flagName]
-        if exclusiveFlag and _G[flagName] then _G[exclusiveFlag] = false end
-        button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
+        if exclusiveFlag and _G[flagName] then
+            _G[exclusiveFlag] = false
+        end
+        updateButtonText(button, text, _G[flagName])
+        -- Atualizar botões exclusivos relacionados
         if exclusiveFlag then
             for _, sibling in pairs(panel:GetChildren()) do
                 if sibling:IsA("TextButton") and sibling ~= button then
-                    local siblingText = sibling.Text:lower()
-                    local exclusiveFlagText = exclusiveFlag:gsub("([A-Z])", " %1"):lower()
-                    exclusiveFlagText = exclusiveFlagText:gsub("^%l", string.upper)
-                    if siblingText:find(exclusiveFlagText) then
-                        sibling.Text = sibling.Text:sub(1, sibling.Text:find(":")) .. (_G[exclusiveFlag] and " ON" or " OFF")
+                    local sibText = sibling.Text:lower()
+                    local exFlagText = exclusiveFlag:gsub("([A-Z])", " %1"):lower()
+                    exFlagText = exFlagText:gsub("^%l", string.upper)
+                    if sibText:find(exFlagText) then
+                        updateButtonText(sibling, sibling.Text:match("(.+):"), _G[exclusiveFlag])
                     end
                 end
             end
@@ -172,9 +161,10 @@ local function createExtraButton(text, yPos, flagName)
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     button.TextColor3 = Color3.new(1, 1, 1)
     button.Parent = extraPage
+    updateButtonText(button, text, _G[flagName])
     button.MouseButton1Click:Connect(function()
         _G[flagName] = not _G[flagName]
-        button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
+        updateButtonText(button, text, _G[flagName])
     end)
 end
 
@@ -202,29 +192,29 @@ navBack.Parent = extraPage
 local onMainPage = true
 local function togglePages()
     onMainPage = not onMainPage
-    panel.Visible = onMainPage
-    extraPage.Visible = not onMainPage
+    panel.Visible = onMainPage and not minimized
+    extraPage.Visible = not onMainPage and not minimized
 end
 
 navButton.MouseButton1Click:Connect(togglePages)
 navBack.MouseButton1Click:Connect(togglePages)
 
+-- Sincronizar posição, tamanho e visibilidade dos painéis
 panel:GetPropertyChangedSignal("Position"):Connect(function()
     extraPage.Position = panel.Position
 end)
-
 panel:GetPropertyChangedSignal("Size"):Connect(function()
     extraPage.Size = panel.Size
 end)
-
 panel:GetPropertyChangedSignal("Visible"):Connect(function()
-    extraPage.Visible = not onMainPage and panel.Visible
+    -- Mantém coerência com togglePages e minimized
+    extraPage.Visible = not onMainPage and panel.Visible and not minimized
 end)
 
--- LT Settings (valores base)
+-- Valores base para atributos do Tool
 local ltValues = {
     ["_ammo"] = 200,
-    ["rateOfFire"] = 100, -- taxa média: 100ms entre tiros (10 tiros por segundo)
+    ["rateOfFire"] = 100, -- 100ms = 10 tiros por segundo
     ["recoilAimReduction"] = Vector2.new(0, 0),
     ["recoilMax"] = Vector2.new(0, 0),
     ["recoilMin"] = Vector2.new(0, 0),
@@ -234,38 +224,55 @@ local ltValues = {
     ["magazineSize"] = 200
 }
 
--- Atualização dinâmica dos atributos do Tool conforme flags ativas
+-- Atualização dos atributos do Tool em tempo real conforme flags
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     local tool = char:FindFirstChildWhichIsA("Tool")
     if not tool then return end
 
+    -- Infinite Ammo
     if _G.infiniteAmmo then
         tool:SetAttribute("_ammo", ltValues["_ammo"])
         tool:SetAttribute("magazineSize", ltValues["magazineSize"])
     end
 
+    -- Fast Shot
     if _G.fastShot then
         tool:SetAttribute("rateOfFire", ltValues["rateOfFire"])
         tool:SetAttribute("recoilAimReduction", ltValues["recoilAimReduction"])
         tool:SetAttribute("recoilMax", ltValues["recoilMax"])
         tool:SetAttribute("recoilMin", ltValues["recoilMin"])
+    else
+        -- Se fastShot desligado, resetar para valores padrão
+        tool:SetAttribute("rateOfFire", nil)
+        tool:SetAttribute("recoilAimReduction", nil)
+        tool:SetAttribute("recoilMax", nil)
+        tool:SetAttribute("recoilMin", nil)
     end
 
+    -- Auto Spread
     if _G.autoSpread then
         local head = char:FindFirstChild("Head")
         if head then
             local hit = LocalPlayer:GetMouse().Hit
-            tool:SetAttribute("spread", 30 - (head.Position - hit.Position).Magnitude / 5)
+            if hit then
+                local dist = (head.Position - hit.Position).Magnitude
+                tool:SetAttribute("spread", math.clamp(30 - dist / 5, 0, 30))
+            end
         end
         tool:SetAttribute("recoilAimReduction", ltValues["recoilAimReduction"])
         tool:SetAttribute("recoilMax", ltValues["recoilMax"])
         tool:SetAttribute("recoilMin", ltValues["recoilMin"])
+    else
+        tool:SetAttribute("spread", nil)
     end
 
+    -- Instant Reload
     if _G.instantReload then
         tool:SetAttribute("reloadTime", ltValues["reloadTime"])
+    else
+        tool:SetAttribute("reloadTime", nil)
     end
 end)
 
