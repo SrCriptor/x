@@ -4,7 +4,6 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Configurações globais
 local Settings = {
     aimbotAutoEnabled = false,
     FOV_RADIUS = 200,
@@ -27,7 +26,6 @@ local Settings = {
     }
 }
 
--- Criar GUI principal
 local gui = Instance.new("ScreenGui")
 gui.Name = "SimpleAimbotESP"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
@@ -41,7 +39,6 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = gui
 
--- Criar frame para botões das abas
 local tabButtonsFrame = Instance.new("Frame")
 tabButtonsFrame.Size = UDim2.new(1, 0, 0, 30)
 tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -56,7 +53,6 @@ local tabs = {
 
 local tabOrder = {"Aimbot", "ESP", "Mods", "Hitbox"}
 
--- Configura frames das abas
 for _, tabName in ipairs(tabOrder) do
     local frame = tabs[tabName]
     frame.Size = UDim2.new(1, 0, 1, -30)
@@ -67,7 +63,6 @@ for _, tabName in ipairs(tabOrder) do
 end
 tabs.Aimbot.Visible = true
 
--- Criar botões das abas
 for i, tabName in ipairs(tabOrder) do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1/#tabOrder, -2, 1, 0)
@@ -87,7 +82,6 @@ for i, tabName in ipairs(tabOrder) do
     end)
 end
 
--- Funções auxiliares para criar toggles e sliders simples
 local function createToggle(text, parent, posY, settingKey)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, 30)
@@ -169,7 +163,24 @@ local function createSlider(text, parent, posY, settingKey, minVal, maxVal, step
     return frame
 end
 
--- Pop-up simples para seleção de hitbox
+-- Abas: Criar toggles e slider
+-- Aimbot
+createToggle("Aimbot Auto", tabs.Aimbot, 10, "aimbotAutoEnabled")
+createSlider("FOV Radius", tabs.Aimbot, 50, "FOV_RADIUS", 50, 400, 10)
+
+-- ESP
+createToggle("Enable ESP", tabs.ESP, 10, "espEnabled")
+createToggle("ESP Box", tabs.ESP, 50, "espBox")
+createToggle("ESP Name", tabs.ESP, 90, "espName")
+
+-- Mods
+createToggle("Infinite Ammo", tabs.Mods, 10, "modInfiniteAmmo")
+createToggle("No Recoil", tabs.Mods, 50, "modNoRecoil")
+createToggle("Instant Reload", tabs.Mods, 90, "modInstantReload")
+
+-- Hitbox aba só texto explicativo + botão abrir popup já criado
+
+-- Popup hitbox
 local hitboxPopup = Instance.new("Frame")
 hitboxPopup.Size = UDim2.new(0, 200, 0, 250)
 hitboxPopup.Position = UDim2.new(0.5, -100, 0.5, -125)
@@ -191,7 +202,6 @@ closeBtn.MouseButton1Click:Connect(function()
     hitboxPopup.Visible = false
 end)
 
--- Criar botões para partes do corpo
 local parts = {"Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
 for i, partName in ipairs(parts) do
     local btn = Instance.new("TextButton")
@@ -210,7 +220,6 @@ for i, partName in ipairs(parts) do
     end)
 end
 
--- Botão para abrir popup hitbox
 local hitboxBtn = Instance.new("TextButton")
 hitboxBtn.Text = "Selecionar Hitbox"
 hitboxBtn.Size = UDim2.new(1, -20, 0, 35)
@@ -225,6 +234,7 @@ hitboxBtn.MouseButton1Click:Connect(function()
     hitboxPopup.Visible = not hitboxPopup.Visible
 end)
 
+-- Função para achar inimigo mais próximo do mouse dentro do FOV
 local function getClosestEnemyToMouse()
     local closestDist = math.huge
     local closestPlayer = nil
@@ -253,7 +263,6 @@ RunService.RenderStepped:Connect(function()
         local target = getClosestEnemyToMouse()
         if target and target.Character then
             local hitPart
-            -- Prioridade para as hitboxes selecionadas
             for _, partName in ipairs(parts) do
                 if Settings.hitboxSelection[partName] then
                     local p = target.Character:FindFirstChild(partName)
@@ -264,78 +273,7 @@ RunService.RenderStepped:Connect(function()
                 end
             end
             if hitPart then
-                -- Ajusta a câmera para mirar no alvo
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, hitPart.Position)
-            end
-        end
-    end
-end)
-
-local espBoxes = {}
-local espNames = {}
-
-local function createESPBox(plr)
-    local box = Instance.new("BoxHandleAdornment")
-    box.Adornee = nil
-    box.AlwaysOnTop = true
-    box.ZIndex = 10
-    box.Size = Vector3.new(2, 5, 1)
-    box.Color3 = Color3.fromRGB(0, 255, 0)
-    box.Transparency = 0.5
-    box.Parent = Camera
-    return box
-end
-
-local function createESPName(plr)
-    local bill = Instance.new("BillboardGui")
-    bill.Size = UDim2.new(0, 100, 0, 25)
-    bill.Adornee = nil
-    bill.AlwaysOnTop = true
-    bill.Parent = Camera
-
-    local label = Instance.new("TextLabel")
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.GothamBold
-    label.TextStrokeTransparency = 0.5
-    label.Text = plr.Name
-    label.TextScaled = true
-    label.Parent = bill
-    return bill
-end
-
-RunService.RenderStepped:Connect(function()
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            local rootPart = plr.Character:FindFirstChild("HumanoidRootPart")
-            if rootPart then
-                if Settings.espEnabled and Settings.espBox then
-                    if not espBoxes[plr] then
-                        espBoxes[plr] = createESPBox(plr)
-                    end
-                    espBoxes[plr].Adornee = rootPart
-                    espBoxes[plr].Enabled = true
-                elseif espBoxes[plr] then
-                    espBoxes[plr].Enabled = false
-                end
-
-                if Settings.espEnabled and Settings.espName then
-                    if not espNames[plr] then
-                        espNames[plr] = createESPName(plr)
-                    end
-                    espNames[plr].Adornee = rootPart
-                    espNames[plr].Enabled = true
-                elseif espNames[plr] then
-                    espNames[plr].Enabled = false
-                end
-            end
-        else
-            if espBoxes[plr] then
-                espBoxes[plr].Enabled = false
-            end
-            if espNames[plr] then
-                espNames[plr].Enabled = false
             end
         end
     end
@@ -417,11 +355,104 @@ RunService.RenderStepped:Connect(function()
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool then return end
 
-    if Settings.modInfiniteAmmo then
-        tool:SetAttribute("InfiniteAmmo", true)
-    else
-        tool:SetAttribute("InfiniteAmmo", false)
+    tool:SetAttribute("InfiniteAmmo", Settings.modInfiniteAmmo)
+    tool:SetAttribute("NoRecoil", Settings.modNoRecoil)
+    tool:SetAttribute("InstantReload", Settings.modInstantReload)
+end)
+
+-- Tecla para abrir/fechar menu
+local menuOpen = true
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        menuOpen = not menuOpen
+        mainFrame.Visible = menuOpen
+        hitboxPopup.Visible = false -- fecha popup ao fechar menu
     end
+end)
+
+-- Criar círculo FOV (desenhado na tela)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Radius = Settings.FOV_RADIUS
+FOVCircle.Color = Color3.fromRGB(0, 255, 0)
+FOVCircle.Thickness = 2
+FOVCircle.Filled = false
+
+RunService.RenderStepped:Connect(function()
+    if menuOpen and Settings.aimbotAutoEnabled then
+        FOVCircle.Visible = true
+        FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+        FOVCircle.Radius = Settings.FOV_RADIUS
+    else
+        FOVCircle.Visible = false
+    end
+end)
+
+-- Controle de auto disparo e disparo automático correto
+
+local UIS = UserInputService
+local mouseDown = false
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        mouseDown = true
+    end
+end)
+UIS.InputEnded:Connect(function(input, processed)
+    if processed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        mouseDown = false
+    end
+end)
+
+-- Função para simular tiro automático (depende do jogo, ajuste se necessário)
+local function shootAt(targetPart)
+    -- Exemplo genérico: se a arma tiver um método Fire()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
+
+    if tool:FindFirstChild("Fire") and typeof(tool.Fire) == "RBXScriptSignal" then
+        -- Se o jogo usa eventos para disparo, você pode disparar o evento.
+        tool.Fire:FireServer(targetPart.Position)
+    elseif tool:FindFirstChild("Handle") then
+        -- Se for manual, pode tentar ativar o ClickDetector ou RemoteEvent do tool
+        -- Ajuste aqui para o seu jogo.
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if Settings.aimbotAutoEnabled and mouseDown then
+        local target = getClosestEnemyToMouse()
+        if target and target.Character then
+            local hitPart
+            for _, partName in ipairs(parts) do
+                if Settings.hitboxSelection[partName] then
+                    local p = target.Character:FindFirstChild(partName)
+                    if p then
+                        hitPart = p
+                        break
+                    end
+                end
+            end
+            if hitPart then
+                -- Mira no alvo
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, hitPart.Position)
+                -- Dispara (ajuste para seu sistema de armas)
+                shootAt(hitPart)
+            end
+        end
+    end
+end)
+
+-- Auto Spread (remover ou reduzir spread)
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
 
     if Settings.modNoRecoil then
         tool:SetAttribute("NoRecoil", true)
@@ -434,6 +465,14 @@ RunService.RenderStepped:Connect(function()
     else
         tool:SetAttribute("InstantReload", false)
     end
-end)
 
+    if Settings.modInfiniteAmmo then
+        tool:SetAttribute("InfiniteAmmo", true)
+    else
+        tool:SetAttribute("InfiniteAmmo", false)
+    end
+
+    -- Caso o sistema não suporte atributos, pode tentar ajustar variáveis internas ou eventos do jogo
+    -- Isso depende de como o jogo foi desenvolvido e pode exigir engenharia reversa.
+end)
 
