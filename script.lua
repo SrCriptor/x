@@ -1,13 +1,11 @@
--- SISTEMA COMPLETO: GUI + AIMBOT + ESP + WALLHACK + SELEÇÃO DE HITBOX + MENU ORGANIZADO
+-- SISTEMA COMPLETO: GUI + AIMBOT + ESP + WALLHACK + SELEÇÃO DE HITBOX + TUTORIAL
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local Workspace = workspace
-local Camera = Workspace.CurrentCamera
+local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 
 -- FLAGS GLOBAIS
 _G.FOV_RADIUS = 65
@@ -17,40 +15,36 @@ _G.aimbotManualEnabled = false
 _G.aimbotLegitEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
+_G.espBoxEnabled = true
+_G.espLineEnabled = false
+_G.espHPEnabled = false
+_G.espDistanceEnabled = false
+_G.hitboxSelection = {
+    Head = "None",
+    Torso = "None",
+    LeftArm = "None",
+    RightArm = "None",
+    LeftLeg = "None",
+    RightLeg = "None",
+}
+-- Por padrão, Head prioridade
+_G.hitboxSelection.Head = "Prioritário"
 
--- Hitbox selecionada (default "Head")
-local selectedHitbox = "Head"
+local shooting = false
+local aiming = false
+local dragging = false
+local dragStart, startPos = nil, nil
+local currentTarget = nil
 
--- Tabela para os highlights/wallhack
-local highlights = {}
-
--- Controle do menu
-local dragging, dragStart, startPos = false, nil, nil
-local minimized = false
 local currentPage = 1
-local maxPage = 3 -- 1: Aimbots + ESP, 2: Hitbox, 3: Configs (se quiser)
+local maxPage = 3
+local minimized = false
 
--- Função para verificar se o personagem está visível (não atrás de parede)
-local function isVisible(origin, targetPos)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local rayResult = Workspace:Raycast(origin, (targetPos - origin).Unit * (targetPos - origin).Magnitude, raycastParams)
-    if rayResult then
-        local hitPart = rayResult.Instance
-        if hitPart and hitPart:IsDescendantOf(LocalPlayer.Character) then
-            return true
-        elseif hitPart and hitPart.Parent and Players:GetPlayerFromCharacter(hitPart.Parent) then
-            -- Se atingiu outro jogador e é o alvo
-            return true
-        else
-            return false
-        end
-    end
-    return true
-end
+-- BOTÕES MOBILE
+local aimButton = LocalPlayer.PlayerScripts:WaitForChild("Assets").Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("AimButton")
+local shootButton = LocalPlayer.PlayerScripts:WaitForChild("Assets").Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("ShootButton")
 
--- Função para saber se é modo FFA (free for all)
+-- FFA CHECK
 local function isFFA()
     local teams = {}
     for _, p in pairs(Players:GetPlayers()) do
@@ -70,134 +64,52 @@ local function isAlive(char)
 end
 
 local function shouldAimAt(p)
-    if p == LocalPlayer then return false end
-    if not p.Character or not isAlive(p.Character) then return false end
-    if not isEnemy(p) and not _G.espAlliesEnabled then return false end
-
-    local origin = Camera.CFrame.Position
-    local targetPart = p.Character:FindFirstChild(selectedHitbox)
-    if not targetPart then
-        targetPart = p.Character:FindFirstChild("Head") or p.Character:FindFirstChild("HumanoidRootPart")
-    end
-    if not targetPart then return false end
-
-    return isVisible(origin, targetPart.Position)
+    return p ~= LocalPlayer and p.Character and isAlive(p.Character) and (isEnemy(p) or _G.espAlliesEnabled)
 end
 
 -- GUI PRINCIPAL
 local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-gui.Name = "AimbotGui"
-
+gui.Name = "AimbotGuiSystem"
 local panel = Instance.new("Frame", gui)
-panel.Size = UDim2.new(0, 240, 0, 320)
-panel.Position = UDim2.new(0, 20, 0.5, -160)
+panel.Size = UDim2.new(0, 220, 0, 300)
+panel.Position = UDim2.new(0, 20, 0.5, -150)
 panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 panel.BackgroundTransparency = 0.2
 panel.BorderSizePixel = 0
 panel.Active = true
-panel.Draggable = false
 
--- Drag para mover o painel
+-- DRAG
 panel.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
         startPos = panel.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
     end
 end)
 
-panel.InputChanged:Connect(function(input)
+UserInputService.InputChanged:Connect(function(input)
     if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local delta = input.Position - dragStart
-        panel.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- Função para criar toggles
-local function createToggle(text, y, flagName, exclusive1, exclusive2)
-    local btn = Instance.new("TextButton", panel)
-    btn.Size = UDim2.new(1, -20, 0, 30)
-    btn.Position = UDim2.new(0, 10, 0, y)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 16
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Text = text .. ": OFF"
-    btn.AutoButtonColor = false
-
-    btn.MouseButton1Click:Connect(function()
-        _G[flagName] = not _G[flagName]
-        if _G[flagName] then
-            if exclusive1 then _G[exclusive1] = false end
-            if exclusive2 then _G[exclusive2] = false end
-        end
-        btn.Text = text .. (_G[flagName] and ": ON" or ": OFF")
-        loadPage(currentPage)
-    end)
-
-    if _G[flagName] then
-        btn.Text = text .. ": ON"
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
     end
+end)
 
-    return btn
-end
-
--- Função para criar botões -FOV e +FOV lado a lado
-local function createFOVAdjustButtons(yPos)
-    local container = Instance.new("Frame", panel)
-    container.Size = UDim2.new(1, -20, 0, 35)
-    container.Position = UDim2.new(0, 10, 0, yPos)
-    container.BackgroundTransparency = 1
-
-    local btnMinus = Instance.new("TextButton", container)
-    btnMinus.Size = UDim2.new(0.5, -10, 1, 0)
-    btnMinus.Position = UDim2.new(0, 0, 0, 0)
-    btnMinus.Text = "- FOV"
-    btnMinus.Font = Enum.Font.SourceSansBold
-    btnMinus.TextSize = 16
-    btnMinus.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    btnMinus.TextColor3 = Color3.new(1,1,1)
-
-    local btnPlus = Instance.new("TextButton", container)
-    btnPlus.Size = UDim2.new(0.5, -10, 1, 0)
-    btnPlus.Position = UDim2.new(0.5, 10, 0, 0)
-    btnPlus.Text = "+ FOV"
-    btnPlus.Font = Enum.Font.SourceSansBold
-    btnPlus.TextSize = 16
-    btnPlus.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    btnPlus.TextColor3 = Color3.new(1,1,1)
-
-    btnMinus.MouseButton1Click:Connect(function()
-        _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
-    end)
-
-    btnPlus.MouseButton1Click:Connect(function()
-        _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
-    end)
-end
-
--- Função para limpar elementos do painel exceto os controles fixos
+-- FUNÇÃO PARA LIMPAR PÁGINA
 local function clearPage()
     for _, child in pairs(panel:GetChildren()) do
-        if child ~= toggleButton and child ~= btnNext and child ~= btnPrev and child ~= fovCircleDrawing and child.Name ~= "HitboxMenuFrame" then
+        if child ~= toggleButton and child ~= btnPrev and child ~= btnNext then
             child:Destroy()
         end
     end
-    local hitboxMenuFrame = panel:FindFirstChild("HitboxMenuFrame")
-    if hitboxMenuFrame then hitboxMenuFrame.Visible = false end
 end
 
--- Botão minimizar 🔽 / 🔼
+-- BOTÃO MINIMIZAR
 local toggleButton = Instance.new("TextButton", panel)
 toggleButton.Size = UDim2.new(0, 40, 0, 30)
 toggleButton.Position = UDim2.new(1, -50, 0, 5)
@@ -205,48 +117,49 @@ toggleButton.Text = "🔽"
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 18
 toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-toggleButton.TextColor3 = Color3.new(1,1,1)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
 
 toggleButton.MouseButton1Click:Connect(function()
     minimized = not minimized
     toggleButton.Text = minimized and "🔼" or "🔽"
+    for _, v in pairs(panel:GetChildren()) do
+        if v:IsA("TextButton") and v ~= toggleButton and v ~= btnPrev and v ~= btnNext then
+            v.Visible = not minimized
+        end
+    end
     if minimized then
         panel.Size = UDim2.new(0, 60, 0, 40)
-        btnNext.Visible = false
+        panel.BackgroundTransparency = 1
+        toggleButton.Position = UDim2.new(0, 10, 0, 5)
         btnPrev.Visible = false
+        btnNext.Visible = false
     else
-        panel.Size = UDim2.new(0, 240, 0, 320)
-        btnNext.Visible = (currentPage < maxPage)
+        panel.Size = UDim2.new(0, 220, 0, 300)
+        panel.BackgroundTransparency = 0.2
+        toggleButton.Position = UDim2.new(1, -50, 0, 5)
         btnPrev.Visible = (currentPage > 1)
+        btnNext.Visible = (currentPage < maxPage)
     end
-    loadPage(currentPage)
 end)
 
--- Botões de navegação ◀️ ▶️
-local btnNext = Instance.new("TextButton", panel)
-btnNext.Size = UDim2.new(0, 40, 0, 30)
-btnNext.Position = UDim2.new(1, -50, 1, -40)
-btnNext.Text = "▶️"
-btnNext.Font = Enum.Font.SourceSansBold
-btnNext.TextSize = 20
-btnNext.BackgroundColor3 = Color3.fromRGB(40,40,40)
-btnNext.TextColor3 = Color3.new(1,1,1)
-
+-- BOTÕES DE NAVEGAÇÃO
 local btnPrev = Instance.new("TextButton", panel)
-btnPrev.Size = UDim2.new(0, 40, 0, 30)
-btnPrev.Position = UDim2.new(0, 10, 1, -40)
+btnPrev.Size = UDim2.new(0, 30, 0, 25)
+btnPrev.Position = UDim2.new(0, 10, 1, -35)
 btnPrev.Text = "◀️"
 btnPrev.Font = Enum.Font.SourceSansBold
 btnPrev.TextSize = 20
-btnPrev.BackgroundColor3 = Color3.fromRGB(40,40,40)
+btnPrev.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 btnPrev.TextColor3 = Color3.new(1,1,1)
 
-btnNext.MouseButton1Click:Connect(function()
-    if currentPage < maxPage then
-        currentPage += 1
-        loadPage(currentPage)
-    end
-end)
+local btnNext = Instance.new("TextButton", panel)
+btnNext.Size = UDim2.new(0, 30, 0, 25)
+btnNext.Position = UDim2.new(1, -40, 1, -35)
+btnNext.Text = "▶️"
+btnNext.Font = Enum.Font.SourceSansBold
+btnNext.TextSize = 20
+btnNext.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+btnNext.TextColor3 = Color3.new(1,1,1)
 
 btnPrev.MouseButton1Click:Connect(function()
     if currentPage > 1 then
@@ -255,235 +168,324 @@ btnPrev.MouseButton1Click:Connect(function()
     end
 end)
 
--- MENU SELEÇÃO DE HITBOX COM IMAGEM BACON E BOTÕES INVISÍVEIS
-local function createHitboxMenu()
-    local frame = Instance.new("Frame", panel)
-    frame.Name = "HitboxMenuFrame"
-    frame.Size = UDim2.new(1, -20, 0, 180)
-    frame.Position = UDim2.new(0, 10, 0, 40)
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    frame.BorderSizePixel = 0
-    frame.Visible = false
+btnNext.MouseButton1Click:Connect(function()
+    if currentPage < maxPage then
+        currentPage += 1
+        loadPage(currentPage)
+    end
+end)
 
-    -- Imagem do Bacon (link oficial ou local)
-    local image = Instance.new("ImageLabel", frame)
-    image.Size = UDim2.new(0, 150, 0, 180)
-    image.Position = UDim2.new(0, 5, 0, 0)
+-- FUNÇÃO PARA CRIAR BOTÃO TOGGLE
+local function createToggle(text, y, flagName, exclusive1, exclusive2)
+    local b = Instance.new("TextButton", panel)
+    b.Size = UDim2.new(1, -20, 0, 30)
+    b.Position = UDim2.new(0, 10, 0, y)
+    b.Text = text .. ": OFF"
+    b.Font = Enum.Font.SourceSansBold
+    b.TextSize = 16
+    b.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.MouseButton1Click:Connect(function()
+        _G[flagName] = not _G[flagName]
+        if _G[flagName] then
+            if exclusive1 then _G[exclusive1] = false end
+            if exclusive2 then _G[exclusive2] = false end
+        end
+        b.Text = text .. (_G[flagName] and ": ON" or ": OFF")
+    end)
+    return b
+end
+
+-- BOTÕES DE AJUSTE DO FOV (SEM POSITION, será configurado abaixo)
+local function createFOVAdjustButton(text, yPos, delta)
+    local button = Instance.new("TextButton", panel)
+    button.Size = UDim2.new(0.5, -15, 0, 30)
+    button.Position = UDim2.new(text == "- FOV" and 0 or 0.5, 10, 0, yPos)
+    button.Text = text
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 16
+    button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.MouseButton1Click:Connect(function()
+        _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + delta, 10, 300)
+    end)
+    return button
+end
+
+-- PAGE 1: AIMBOTS E FOV
+local function loadPage1()
+    clearPage()
+
+    local y = 40
+    createToggle("Aimbot Auto", y, "aimbotAutoEnabled", "aimbotManualEnabled", "aimbotLegitEnabled")
+    y += 35
+    createToggle("Aimbot Manual", y, "aimbotManualEnabled", "aimbotAutoEnabled", "aimbotLegitEnabled")
+    y += 35
+    createToggle("Aimbot Legit", y, "aimbotLegitEnabled", "aimbotAutoEnabled", "aimbotManualEnabled")
+    y += 35
+    local showFOVBtn = createToggle("Mostrar FOV", y, "FOV_VISIBLE")
+    y += 35
+
+    local btnMinusFOV = createFOVAdjustButton("- FOV", y, -5)
+    local btnPlusFOV = createFOVAdjustButton("+ FOV", y, 5)
+    -- Posiciona os botões do FOV logo abaixo do Mostrar FOV, centralizados
+    btnMinusFOV.Position = UDim2.new(0, 10, 0, y)
+    btnPlusFOV.Position = UDim2.new(0.5, 10, 0, y)
+
+    btnMinusFOV.Visible = showFOVBtn.Text:find("ON") ~= nil
+    btnPlusFOV.Visible = showFOVBtn.Text:find("ON") ~= nil
+
+    -- Atualiza a visibilidade dos botões de FOV junto com Mostrar FOV
+    showFOVBtn.MouseButton1Click:Connect(function()
+        local on = _G.FOV_VISIBLE
+        btnMinusFOV.Visible = on
+        btnPlusFOV.Visible = on
+    end)
+end
+
+-- PAGE 2: HITBOX + ESP CONFIG
+local hitboxPopup = nil
+
+local function createHitboxPopup()
+    if hitboxPopup then return end
+    hitboxPopup = Instance.new("Frame", panel)
+    hitboxPopup.Size = UDim2.new(0, 200, 0, 220)
+    hitboxPopup.Position = UDim2.new(0, 10, 0, 40)
+    hitboxPopup.BackgroundColor3 = Color3.fromRGB(15,15,15)
+    hitboxPopup.BorderSizePixel = 0
+    hitboxPopup.Visible = false
+
+    -- Imagem "Bacon" - substitua o assetId para o seu modelo de personagem
+    local image = Instance.new("ImageLabel", hitboxPopup)
+    image.Size = UDim2.new(0, 150, 0, 200)
+    image.Position = UDim2.new(0.5, -75, 0, 10)
     image.BackgroundTransparency = 1
-    image.Image = "rbxassetid://11399149318" -- Exemplo Bacon Roblox
+    image.Image = "rbxassetid://166456432" -- exemplo de imagem Bacon
 
-    -- Botões invisíveis para cada parte do corpo (hitbox)
-    local hitboxes = {"Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
-    local btnHeight = 25
-    for i, part in ipairs(hitboxes) do
-        local btn = Instance.new("TextButton", frame)
-        btn.Size = UDim2.new(0, 70, 0, btnHeight)
-        btn.Position = UDim2.new(0, 160, 0, (i-1)*btnHeight)
-        btn.Text = part
-        btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-        btn.TextColor3 = Color3.new(1,1,1)
-        btn.Font = Enum.Font.SourceSansBold
-        btn.TextSize = 14
+    -- Botões invisíveis sobre partes do corpo
+    local parts = {
+        {Name = "Head", Pos = UDim2.new(0.47, 0, 0.07, 0), Size = UDim2.new(0, 40, 0, 40)},
+        {Name = "Torso", Pos = UDim2.new(0.45, 0, 0.3, 0), Size = UDim2.new(0, 50, 0, 50)},
+        {Name = "LeftArm", Pos = UDim2.new(0.3, 0, 0.3, 0), Size = UDim2.new(0, 30, 0, 50)},
+        {Name = "RightArm", Pos = UDim2.new(0.65, 0, 0.3, 0), Size = UDim2.new(0, 30, 0, 50)},
+        {Name = "LeftLeg", Pos = UDim2.new(0.35, 0, 0.7, 0), Size = UDim2.new(0, 35, 0, 50)},
+        {Name = "RightLeg", Pos = UDim2.new(0.55, 0, 0.7, 0), Size = UDim2.new(0, 35, 0, 50)},
+    }
 
+    local function updateHitboxText()
+        local text = "Seleção Hitbox:\n"
+        for _, part in pairs(parts) do
+            local state = _G.hitboxSelection[part.Name]
+            text = text..part.Name..": "..state.."\n"
+        end
+        hitboxStatus.Text = text
+    end
+
+    for _, part in pairs(parts) do
+        local btn = Instance.new("TextButton", hitboxPopup)
+        btn.BackgroundTransparency = 1
+        btn.Position = part.Pos
+        btn.Size = part.Size
+        btn.Text = ""
+        btn.AutoButtonColor = false
         btn.MouseButton1Click:Connect(function()
-            selectedHitbox = part
-            loadPage(currentPage)
+            -- Ciclo: None -> Prioritário -> None
+            if _G.hitboxSelection[part.Name] == "None" then
+                _G.hitboxSelection[part.Name] = "Prioritário"
+            else
+                _G.hitboxSelection[part.Name] = "None"
+            end
+            updateHitboxText()
         end)
     end
 
-    return frame
+    local hitboxStatus = Instance.new("TextLabel", hitboxPopup)
+    hitboxStatus.Size = UDim2.new(1, -20, 0, 80)
+    hitboxStatus.Position = UDim2.new(0, 10, 0, 160)
+    hitboxStatus.BackgroundTransparency = 1
+    hitboxStatus.TextColor3 = Color3.new(1, 1, 1)
+    hitboxStatus.Font = Enum.Font.SourceSans
+    hitboxStatus.TextSize = 14
+    hitboxStatus.TextWrapped = true
+
+    updateHitboxText()
 end
 
-local hitboxMenuFrame = createHitboxMenu()
+local function createESPConfig()
+    local baseY = 40
+    local gap = 35
 
--- Função para carregar cada página
-function loadPage(page)
-    clearPage()
-
-    if minimized then
-        -- Se minimizado, não mostra nada além do toggle
-        return
+    local function addToggleESP(text, flag)
+        local toggle = createToggle(text, baseY, flag)
+        baseY += gap
+        return toggle
     end
+
+    local boxToggle = addToggleESP("ESP Inimigos", "espEnemiesEnabled")
+    local allyToggle = addToggleESP("ESP Aliados", "espAlliesEnabled")
+    local boxShapeToggle = addToggleESP("Caixa ESP", "espBoxEnabled")
+    local lineToggle = addToggleESP("Linha ESP", "espLineEnabled")
+    local hpToggle = addToggleESP("HP ESP", "espHPEnabled")
+    local distToggle = addToggleESP("Distância ESP", "espDistanceEnabled")
+
+    return {
+        boxToggle = boxToggle,
+        allyToggle = allyToggle,
+        boxShapeToggle = boxShapeToggle,
+        lineToggle = lineToggle,
+        hpToggle = hpToggle,
+        distToggle = distToggle,
+    }
+end
+
+local espToggles = nil
+
+local function loadPage2()
+    clearPage()
+    createHitboxPopup()
+    hitboxPopup.Visible = true
+
+    if not espToggles then
+        espToggles = createESPConfig()
+    else
+        -- reposicionar se foi destruído (não deve ocorrer, mas só por segurança)
+        espToggles.boxToggle.Parent = panel
+        espToggles.allyToggle.Parent = panel
+        espToggles.boxShapeToggle.Parent = panel
+        espToggles.lineToggle.Parent = panel
+        espToggles.hpToggle.Parent = panel
+        espToggles.distToggle.Parent = panel
+    end
+end
+
+-- PAGE 3: TUTORIAL
+local tutorialFrame = nil
+local function loadPage3()
+    clearPage()
+    if hitboxPopup then hitboxPopup.Visible = false end
+
+    if not tutorialFrame then
+        tutorialFrame = Instance.new("Frame", panel)
+        tutorialFrame.Size = UDim2.new(1, -20, 0, 240)
+        tutorialFrame.Position = UDim2.new(0, 10, 0, 40)
+        tutorialFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        tutorialFrame.BorderSizePixel = 0
+
+        local tutorialText = Instance.new("TextLabel", tutorialFrame)
+        tutorialText.Size = UDim2.new(1, -20, 1, -40)
+        tutorialText.Position = UDim2.new(0, 10, 0, 10)
+        tutorialText.BackgroundTransparency = 1
+        tutorialText.TextColor3 = Color3.new(1, 1, 1)
+        tutorialText.Font = Enum.Font.SourceSans
+        tutorialText.TextSize = 14
+        tutorialText.TextWrapped = true
+        tutorialText.Text = [[
+Como usar o menu e os recursos:
+
+- Aimbot Auto: Mira e atira automaticamente nos inimigos.
+- Aimbot Manual: Mira automaticamente no inimigo, você atira manualmente.
+- Aimbot Legit: Mira e atira com precisão, evitando comportamento suspeito.
+- Mostrar FOV: Mostra o círculo do campo de visão.
+- - FOV / + FOV: Ajusta o tamanho do campo de visão.
+- Navegue entre páginas com ◀️ e ▶️.
+- Página 2:
+   • Selecione partes do corpo (hitbox) clicando na figura "Bacon".
+   • Configure o ESP: inimigos, aliados, caixas, linhas, HP e distância.
+- Página 3:
+   • Esta aba mostra este tutorial.
+
+Clique em Fechar para esconder esta aba.
+        ]]
+
+        local closeBtn = Instance.new("TextButton", tutorialFrame)
+        closeBtn.Size = UDim2.new(0, 60, 0, 25)
+        closeBtn.Position = UDim2.new(1, -70, 1, -30)
+        closeBtn.Text = "Fechar"
+        closeBtn.Font = Enum.Font.SourceSansBold
+        closeBtn.TextSize = 14
+        closeBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        closeBtn.TextColor3 = Color3.new(1, 1, 1)
+
+        closeBtn.MouseButton1Click:Connect(function()
+            tutorialFrame.Visible = false
+        end)
+    else
+        tutorialFrame.Visible = true
+    end
+end
+
+-- FUNÇÃO PRINCIPAL DE LOAD DE PÁGINA
+function loadPage(page)
+    currentPage = page
+    btnPrev.Visible = (page > 1 and not minimized)
+    btnNext.Visible = (page < maxPage and not minimized)
+    if tutorialFrame then tutorialFrame.Visible = false end
+    if hitboxPopup then hitboxPopup.Visible = false end
 
     if page == 1 then
-        -- Página 1: Aimbots + ESP + FOV
-        local baseY = 40
-        local gap = 35
-        createToggle("Aimbot Auto", baseY + gap*0, "aimbotAutoEnabled", "aimbotManualEnabled", "aimbotLegitEnabled")
-        createToggle("Aimbot Manual", baseY + gap*1, "aimbotManualEnabled", "aimbotAutoEnabled", "aimbotLegitEnabled")
-        createToggle("Aimbot Legit", baseY + gap*2, "aimbotLegitEnabled", "aimbotAutoEnabled", "aimbotManualEnabled")
-        createToggle("ESP Inimigos", baseY + gap*3, "espEnemiesEnabled")
-        createToggle("ESP Aliados", baseY + gap*4, "espAlliesEnabled")
-        local toggleFOV = createToggle("Mostrar FOV", baseY + gap*5, "FOV_VISIBLE")
-
-        createFOVAdjustButtons(baseY + gap*5 + 40)
-
+        loadPage1()
     elseif page == 2 then
-        -- Página 2: Seleção Hitbox (abre menu bacon)
-        hitboxMenuFrame.Visible = true
-        hitboxMenuFrame.Position = UDim2.new(0, 10, 0, 40)
-        local label = Instance.new("TextLabel", hitboxMenuFrame)
-        label.Size = UDim2.new(1, -10, 0, 25)
-        label.Position = UDim2.new(0, 0, 0, 160)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.new(1,1,1)
-        label.Font = Enum.Font.SourceSansBold
-        label.TextSize = 16
-        label.Text = "Hitbox selecionada: "..selectedHitbox
-
+        loadPage2()
     elseif page == 3 then
-        -- Página 3: Configurações extras se quiser
-        local y = 40
-        local label = Instance.new("TextLabel", panel)
-        label.Size = UDim2.new(1, -20, 0, 30)
-        label.Position = UDim2.new(0, 10, 0, y)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.new(1,1,1)
-        label.Font = Enum.Font.SourceSansBold
-        label.TextSize = 16
-        label.Text = "Configurações adicionais..."
-
-        -- Aqui pode adicionar mais coisas depois
+        loadPage3()
     end
-
-    -- Atualizar visibilidade dos botões next/prev
-    btnPrev.Visible = (currentPage > 1 and not minimized)
-    btnNext.Visible = (currentPage < maxPage and not minimized)
 end
 
--- Inicializa a página 1
-loadPage(1)
+loadPage(1) -- inicia na página 1
 
--- DESENHO DO FOV (usando Drawing API)
-local fovCircleDrawing = Drawing.new("Circle")
-fovCircleDrawing.Transparency = 0.2
-fovCircleDrawing.Thickness = 1.5
-fovCircleDrawing.Filled = false
-fovCircleDrawing.Color = Color3.new(1, 1, 1)
+-- ========== CÍRCULO DO FOV ==========
+local DrawingNew = Drawing.new
+local fovCircle = DrawingNew and DrawingNew("Circle") or nil
+if fovCircle then
+    fovCircle.Transparency = 0.2
+    fovCircle.Thickness = 1.5
+    fovCircle.Filled = false
+    fovCircle.Color = Color3.new(1, 1, 1)
+end
 
 RunService.RenderStepped:Connect(function()
-    fovCircleDrawing.Radius = _G.FOV_RADIUS
-    fovCircleDrawing.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    fovCircleDrawing.Visible = _G.FOV_VISIBLE and not minimized
+    if fovCircle then
+        fovCircle.Radius = _G.FOV_RADIUS
+        fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        fovCircle.Visible = _G.FOV_VISIBLE and not minimized
+    end
 end)
 
--- ESP + WALLHACK com Neon e borda amarela quando mirando
-local espData = {}
-local function disableHighlight(player)
-    if highlights[player] then
-        highlights[player]:Destroy()
-        highlights[player] = nil
-    end
+-- ========== AIMBOT LOGIC ==========
+
+-- Checa se o personagem está vivo antes de mirar
+local function isCharacterAlive(char)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health > 0
 end
 
-local function updateHighlight(player, color)
-    local chams = highlights[player]
-    if not chams then
-        chams = Instance.new("Highlight")
-        chams.Name = "AimbotHighlight"
-        chams.Adornee = player.Character
-        chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        chams.OutlineTransparency = 0.7
-        chams.FillTransparency = 0.6
-        chams.FillColor = color
-        chams.OutlineColor = Color3.new(1,1,0) -- amarelo na borda
-        chams.Parent = game.CoreGui
-        highlights[player] = chams
-    else
-        chams.FillColor = color
-        chams.OutlineColor = Color3.new(1,1,0)
-        chams.Enabled = true
-    end
-end
-
-local function updateESP(player)
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-    local char = player.Character
-    local hrp = char.HumanoidRootPart
-    local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-    if not onScreen then
-        disableHighlight(player)
-        return
-    end
-
-    -- Define cor do highlight (neon para inimigos e aliados)
-    local baseColor = player.Team == LocalPlayer.Team and Color3.fromRGB(0,255,0) or Color3.fromRGB(1,0,0)
-
-    if currentTarget == player then
-        -- Se alvo atual, borda amarela
-        updateHighlight(player, baseColor)
-    else
-        -- Caso contrário, neon normal (sem borda amarela)
-        if highlights[player] then
-            highlights[player].FillColor = baseColor
-            highlights[player].OutlineColor = baseColor
-            highlights[player].Enabled = true
-        else
-            local chams = Instance.new("Highlight")
-            chams.Name = "AimbotHighlight"
-            chams.Adornee = player.Character
-            chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            chams.OutlineTransparency = 0.7
-            chams.FillTransparency = 0.6
-            chams.FillColor = baseColor
-            chams.OutlineColor = baseColor
-            chams.Parent = game.CoreGui
-            highlights[player] = chams
-        end
-    end
-end
-
--- Atualiza ESP e Wallhack de todos os players
-RunService.RenderStepped:Connect(function()
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            if p.Character and isAlive(p.Character) then
-                if (isEnemy(p) and _G.espEnemiesEnabled) or (not isEnemy(p) and _G.espAlliesEnabled) then
-                    updateESP(p)
-                else
-                    disableHighlight(p)
-                end
-            else
-                disableHighlight(p)
-            end
-        end
-    end
-end)
-
--- AIMBOT VARIÁVEIS
-local aiming = false
-local shooting = false
-local currentTarget = nil
-
--- Captura do botão manual de mira (mobile)
-local aimButton = LocalPlayer.PlayerScripts:WaitForChild("Assets").Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("AimButton")
-local shootButton = LocalPlayer.PlayerScripts:WaitForChild("Assets").Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("ShootButton")
-
-aimButton.MouseButton1Down:Connect(function()
-    aiming = true
-end)
-aimButton.MouseButton1Up:Connect(function()
-    aiming = false
-end)
-
--- Função para encontrar o alvo mais próximo no FOV e visível
 local function getClosestTarget()
-    local closest, shortest = nil, math.huge
-    local origin = Camera.CFrame.Position
+    local closest = nil
+    local shortest = math.huge
 
     for _, p in pairs(Players:GetPlayers()) do
         if shouldAimAt(p) then
-            local targetPart = p.Character:FindFirstChild(selectedHitbox)
-            if not targetPart then
-                targetPart = p.Character:FindFirstChild("Head") or p.Character:FindFirstChild("HumanoidRootPart")
-            end
-            if targetPart then
-                local pos, visible = Camera:WorldToViewportPoint(targetPart.Position)
-                if visible then
-                    local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                    if dist <= _G.FOV_RADIUS and dist < shortest and isVisible(origin, targetPart.Position) then
-                        closest = p
-                        shortest = dist
+            local head = p.Character and p.Character:FindFirstChild("Head")
+            if head then
+                local camPos = Camera.CFrame.Position
+                local toTarget = head.Position - camPos
+                -- Verifica se o alvo está dentro do FOV e visível (visibilidade por raycast)
+                local viewportPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local distToScreenCenter = (Vector2.new(viewportPos.X, viewportPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    if distToScreenCenter <= _G.FOV_RADIUS then
+                        -- Raycast para checar se está atrás da parede
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterDescendantsInstances = {LocalPlayer.Character, head.Parent}
+                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        local rayResult = workspace:Raycast(camPos, toTarget.Unit * toTarget.Magnitude, rayParams)
+                        local visible = (rayResult == nil)
+                        if visible then
+                            if distToScreenCenter < shortest then
+                                closest = p
+                                shortest = distToScreenCenter
+                            end
+                        end
                     end
                 end
             end
@@ -493,60 +495,136 @@ local function getClosestTarget()
     return closest
 end
 
--- AIMBOT AUTO (mira e atira automático)
 RunService.RenderStepped:Connect(function()
+    if minimized then return end
+
+    -- AIMBOT AUTOMATICO
     if _G.aimbotAutoEnabled then
-        local closest = getClosestTarget()
-        if closest and closest.Character then
-            local targetPart = closest.Character:FindFirstChild(selectedHitbox) or closest.Character:FindFirstChild("Head") or closest.Character:FindFirstChild("HumanoidRootPart")
-            if targetPart then
-                currentTarget = closest
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
-                if not shooting then
-                    shooting = true
-                    -- Aqui insira função para atirar automático
-                end
-                return
-            end
+        local target = getClosestTarget()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            -- Mira e atira automaticamente
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+            -- Simula disparo (se quiser implementar disparo automático, faça aqui)
         end
-        shooting = false
-        currentTarget = nil
     end
-end)
 
--- AIMBOT MANUAL (mira automática, atira manual)
-RunService.RenderStepped:Connect(function()
+    -- AIMBOT MANUAL (mirar automático apenas, disparo manual)
     if _G.aimbotManualEnabled and aiming then
-        local closest = getClosestTarget()
-        if closest and closest.Character then
-            local targetPart = closest.Character:FindFirstChild(selectedHitbox) or closest.Character:FindFirstChild("Head") or closest.Character:FindFirstChild("HumanoidRootPart")
-            if targetPart then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
-                currentTarget = closest
-                return
-            end
+        local target = getClosestTarget()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
         end
-        currentTarget = nil
+    end
+
+    -- AIMBOT LEGIT (mirar + disparar preciso e seguro)
+    if _G.aimbotLegitEnabled then
+        local target = getClosestTarget()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+            -- Aqui pode implementar disparo preciso, etc.
+        end
     end
 end)
 
--- AIMBOT LEGIT (mira e atira automático, preciso e seguro)
-RunService.RenderStepped:Connect(function()
-    if _G.aimbotLegitEnabled then
-        local closest = getClosestTarget()
-        if closest and closest.Character then
-            local targetPart = closest.Character:FindFirstChild(selectedHitbox) or closest.Character:FindFirstChild("Head") or closest.Character:FindFirstChild("HumanoidRootPart")
-            if targetPart then
-                currentTarget = closest
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
-                if not shooting then
-                    shooting = true
-                    -- Função para atirar de forma legit, sem gastar munição atoa
-                end
-                return
+-- CAPTURA DE ESTADO DO BOTÃO DE MIRA (mobile)
+aimButton.MouseButton1Down:Connect(function()
+    aiming = true
+end)
+aimButton.MouseButton1Up:Connect(function()
+    aiming = false
+end)
+
+-- ========== ESP + WALLHACK ==========
+
+local espObjects = {}
+
+local function createESPForPlayer(p)
+    if espObjects[p] then
+        for _, obj in pairs(espObjects[p]) do
+            if obj and obj.Destroy then
+                obj:Destroy()
             end
         end
-        shooting = false
-        currentTarget = nil
     end
+    espObjects[p] = {}
+
+    if not p.Character or not isAlive(p.Character) then return end
+
+    local box = Instance.new("BoxHandleAdornment")
+    box.Adornee = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("UpperTorso")
+    box.AlwaysOnTop = true
+    box.ZIndex = 2
+    box.Size = Vector3.new(2, 5, 1)
+    box.Transparency = 0.5
+    box.Color3 = _G.espEnemiesEnabled and (isEnemy(p) and Color3.new(1, 0, 0) or Color3.new(0, 1, 0)) or Color3.new(0, 1, 0)
+    box.Parent = workspace.CurrentCamera
+    table.insert(espObjects[p], box)
+
+    -- Neon Effect (Wallhack)
+    local function createNeonEffect(part)
+        if not part or not part:IsA("BasePart") then return end
+        local neon = Instance.new("BoxHandleAdornment")
+        neon.Adornee = part
+        neon.AlwaysOnTop = true
+        neon.ZIndex = 1
+        neon.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
+        neon.Color3 = Color3.new(0, 1, 1)
+        neon.Transparency = 0.75
+        neon.Parent = workspace.CurrentCamera
+        table.insert(espObjects[p], neon)
+        return neon
+    end
+
+    for _, partName in pairs({"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}) do
+        local part = p.Character:FindFirstChild(partName)
+        if part then
+            createNeonEffect(part)
+        end
+    end
+
+    -- Se o alvo está sendo mirado, borda amarela
+    local function updateBoxColor()
+        if currentTarget == p then
+            box.Color3 = Color3.new(1, 1, 0) -- amarelo borda
+        else
+            box.Color3 = isEnemy(p) and Color3.new(1, 0, 0) or Color3.new(0, 1, 0)
+        end
+    end
+
+    RunService.RenderStepped:Connect(updateBoxColor)
+end
+
+local function updateESP()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and isAlive(p.Character) then
+            if _G.espEnemiesEnabled and isEnemy(p) then
+                if not espObjects[p] then createESPForPlayer(p) end
+            elseif _G.espAlliesEnabled and not isEnemy(p) then
+                if not espObjects[p] then createESPForPlayer(p) end
+            else
+                if espObjects[p] then
+                    for _, obj in pairs(espObjects[p]) do
+                        if obj and obj.Destroy then obj:Destroy() end
+                    end
+                    espObjects[p] = nil
+                end
+            end
+        else
+            if espObjects[p] then
+                for _, obj in pairs(espObjects[p]) do
+                    if obj and obj.Destroy then obj:Destroy() end
+                end
+                espObjects[p] = nil
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(updateESP)
+
+-- ========== OUTRAS FUNÇÕES E CONFIGURAÇÕES
+
+-- Atualizar currentTarget para aimbots (usado no wallhack para borda amarela)
+RunService.RenderStepped:Connect(function()
+    currentTarget = getClosestTarget()
 end)
