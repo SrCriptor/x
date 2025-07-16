@@ -4,52 +4,29 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Configurações globais (flags)
+-- Flags globais ativadas para teste
 _G.FOV_RADIUS = 65
 _G.FOV_VISIBLE = true
 _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
-_G.infiniteAmmo = true      -- ativado por padrão para teste
-_G.instantReload = true     -- ativado por padrão para teste
-_G.noRecoil = true          -- ativado por padrão para teste
-_G.noSpread = true          -- ativado por padrão para teste
+_G.infiniteAmmo = true
+_G.instantReload = true
+_G.noRecoil = true
+_G.noSpread = true
 _G.fastShoot = false
 
-local shooting = false
-local aiming = false
 local dragging = false
 local dragStart, startPos
-local currentTarget = nil
 local currentPage = 1
-
--- Referências aos botões mobile (ajuste conforme seu jogo)
-local aimButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
-    .Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("AimButton")
-local shootButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
-    .Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("ShootButton")
-
--- Função para detectar se o jogo está em modo FFA (todos contra todos)
-local function isFFA()
-    local teams = {}
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Team then
-            teams[player.Team] = true
-        end
-    end
-    local count = 0
-    for _ in pairs(teams) do count = count + 1 end
-    return count <= 1
-end
-
--- ======= INTERFACE =======
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "MobileAimbotGUI"
-gui.IgnoreGuiInset = true
-gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Enabled = true -- importante para garantir que esteja ativo
 
 local panel = Instance.new("Frame")
 panel.Size = UDim2.new(0, 220, 0, 280)
@@ -58,8 +35,8 @@ panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 panel.BackgroundTransparency = 0.2
 panel.BorderSizePixel = 0
 panel.Active = true
-panel.Visible = true  -- garantir visibilidade inicial
 panel.Parent = gui
+panel.Visible = true
 
 -- Drag da interface
 panel.InputBegan:Connect(function(input)
@@ -90,7 +67,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag, page)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -20, 0, 30)
     button.Position = UDim2.new(0, 10, 0, yPos)
-    button.Text = text .. (_G[flagName] and ": ON" or ": OFF") -- estado inicial
+    button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
     button.Font = Enum.Font.SourceSansBold
     button.TextSize = 16
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -133,8 +110,6 @@ local function updatePage(page)
     for _, b in pairs(buttonsPage2) do b.Visible = page == 2 end
 end
 
--- Toggle minimizar
-local minimized = false
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 40, 0, 30)
 toggleButton.Position = UDim2.new(1, -50, 0, 5)
@@ -145,7 +120,6 @@ toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 toggleButton.TextColor3 = Color3.new(1, 1, 1)
 toggleButton.Parent = panel
 
--- Botões de navegação de página
 local page1Btn = Instance.new("TextButton")
 page1Btn.Size = UDim2.new(0.5, -10, 0, 30)
 page1Btn.Position = UDim2.new(0, 10, 1, -35)
@@ -169,54 +143,58 @@ page2Btn.Parent = panel
 page1Btn.MouseButton1Click:Connect(function()
     updatePage(1)
 end)
+
 page2Btn.MouseButton1Click:Connect(function()
     updatePage(2)
 end)
 
 toggleButton.MouseButton1Click:Connect(function()
-    minimized = not minimized
+    local minimized = toggleButton.Text == "🔽"
     toggleButton.Text = minimized and "🔼" or "🔽"
-
-    for _, v in pairs(panel:GetChildren()) do
-        if v:IsA("TextButton") and v ~= toggleButton then
-            v.Visible = not minimized and ((currentPage == 1 and table.find(buttonsPage1, v)) or (currentPage == 2 and table.find(buttonsPage2, v)))
-        end
-    end
-
     if minimized then
         panel.Size = UDim2.new(0, 60, 0, 40)
         panel.BackgroundTransparency = 1
         toggleButton.Position = UDim2.new(0, 10, 0, 5)
+        for _, v in pairs(panel:GetChildren()) do
+            if v:IsA("TextButton") and v ~= toggleButton then
+                v.Visible = false
+            end
+        end
     else
         panel.Size = UDim2.new(0, 220, 0, 280)
         panel.BackgroundTransparency = 0.2
         toggleButton.Position = UDim2.new(1, -50, 0, 5)
+        updatePage(currentPage)
     end
 end)
 
--- Página 1
 local y = 40
 local spacing = 35
-createToggleButton("Aimbot Auto", y, "aimbotAutoEnabled", "aimbotManualEnabled", 1) y += spacing
-createToggleButton("Aimbot Manual", y, "aimbotManualEnabled", "aimbotAutoEnabled", 1) y += spacing
-createToggleButton("ESP Inimigos", y, "espEnemiesEnabled", nil, 1) y += spacing
-createToggleButton("ESP Aliados", y, "espAlliesEnabled", nil, 1) y += spacing
-createToggleButton("Mostrar FOV", y, "FOV_VISIBLE", nil, 1) y += spacing
+createToggleButton("Aimbot Auto", y, "aimbotAutoEnabled", "aimbotManualEnabled", 1)
+y = y + spacing
+createToggleButton("Aimbot Manual", y, "aimbotManualEnabled", "aimbotAutoEnabled", 1)
+y = y + spacing
+createToggleButton("ESP Inimigos", y, "espEnemiesEnabled", nil, 1)
+y = y + spacing
+createToggleButton("ESP Aliados", y, "espAlliesEnabled", nil, 1)
+y = y + spacing
+createToggleButton("Mostrar FOV", y, "FOV_VISIBLE", nil, 1)
 createFOVAdjustButton("- FOV", y, -5)
 createFOVAdjustButton("+ FOV", y, 5)
 
--- Página 2
 local y2 = 40
-createToggleButton("Infinite Ammo", y2, "infiniteAmmo", nil, 2) y2 += spacing
-createToggleButton("Instant Reload", y2, "instantReload", nil, 2) y2 += spacing
-createToggleButton("No Recoil", y2, "noRecoil", nil, 2) y2 += spacing
-createToggleButton("No Spread", y2, "noSpread", nil, 2) y2 += spacing
+createToggleButton("Infinite Ammo", y2, "infiniteAmmo", nil, 2)
+y2 = y2 + spacing
+createToggleButton("Instant Reload", y2, "instantReload", nil, 2)
+y2 = y2 + spacing
+createToggleButton("No Recoil", y2, "noRecoil", nil, 2)
+y2 = y2 + spacing
+createToggleButton("No Spread", y2, "noSpread", nil, 2)
+y2 = y2 + spacing
 createToggleButton("Fast Shoot", y2, "fastShoot", nil, 2)
 
--- FORÇA A VISIBILIDADE DOS BOTÕES DA PÁGINA INICIAL AO ABRIR
 updatePage(currentPage)
 
--- FUNÇÕES DE DISPARO MODIFICADAS
 RunService.RenderStepped:Connect(function()
     if _G.infiniteAmmo then
         local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
@@ -233,8 +211,6 @@ RunService.RenderStepped:Connect(function()
     end
 
     if _G.noRecoil then
-        -- Geralmente o recoil é tratado pela alteração da câmera no disparo,
-        -- aqui só mantemos a câmera fixa para tentar evitar recoil
         Camera.CFrame = Camera.CFrame
     end
 
@@ -244,9 +220,4 @@ RunService.RenderStepped:Connect(function()
             tool.FireRate.Value = 0.01
         end
     end
-
-    -- No spread não tem implementação exata sem saber como o jogo trata,
-    -- aqui você pode inserir a lógica que remove o spread da arma, se souber.
 end)
-
-return gui
