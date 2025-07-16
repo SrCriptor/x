@@ -11,11 +11,11 @@ _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
-_G.infiniteAmmo = false
-_G.instantReload = false
-_G.noRecoil = false
-_G.noSpread = false
-_G.fastShoot = false
+_G.infiniteAmmo = true
+_G.instantReload = true
+_G.noRecoil = true
+_G.noSpread = true
+_G.fastShoot = true
 
 local shooting = false
 local aiming = false
