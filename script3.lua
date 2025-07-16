@@ -226,10 +226,11 @@ local showFOVBtn = createToggleButton("Mostrar FOV", 180, "FOV_VISIBLE", nil, 1)
 createFOVAdjustButton("- FOV", 215, -5, 1)
 createFOVAdjustButton("+ FOV", 215, 5, 1)
 
--- Botão para ir para página de mods
+
+-- Botão para ir para página de mods (centralizado entre -FOV e +FOV)
 local outrosBtn = Instance.new("TextButton")
-outrosBtn.Size = UDim2.new(0, 80, 0, 30)
-outrosBtn.Position = UDim2.new(1, -90, 1, -35)
+outrosBtn.Size = UDim2.new(0, 100, 0, 30)
+outrosBtn.Position = UDim2.new(0.5, -50, 1, -35)
 outrosBtn.Text = "Outros >"
 outrosBtn.Font = Enum.Font.SourceSansBold
 outrosBtn.TextSize = 16
@@ -252,10 +253,11 @@ createToggleButton("Instant Reload", 145, "modInstantReload", nil, 2)
 createToggleButton("Fast Shot", 180, "modFastShot", nil, 2)
 createToggleButton("Zoom", 215, "modZoom", nil, 2)
 
--- Botão para voltar ao menu principal
+
+-- Botão para voltar ao menu principal (centralizado entre -FOV e +FOV)
 local voltarBtn = Instance.new("TextButton")
-voltarBtn.Size = UDim2.new(0, 80, 0, 30)
-voltarBtn.Position = UDim2.new(0, 10, 1, -35)
+voltarBtn.Size = UDim2.new(0, 100, 0, 30)
+voltarBtn.Position = UDim2.new(0.5, -50, 1, -35)
 voltarBtn.Text = "< Voltar"
 voltarBtn.Font = Enum.Font.SourceSansBold
 voltarBtn.TextSize = 16
@@ -303,17 +305,24 @@ local function applyWeaponMods(tool)
     end
 end
 
--- Sempre manter infinite ammo em 200
-local function maintainInfiniteAmmo(tool)
-    if _G.modInfiniteAmmo and tool then
+
+-- Sempre manter infinite ammo em 200 (usando Heartbeat para garantir atualização)
+local function maintainInfiniteAmmo()
+    RunService.Heartbeat:Connect(function()
+        if not _G.modInfiniteAmmo then return end
+        local char = LocalPlayer.Character
+        if not char then return end
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if not tool then return end
         if tool:GetAttribute("_ammo") ~= 200 then
             tool:SetAttribute("_ammo", 200)
         end
         if tool:GetAttribute("magazineSize") ~= 200 then
             tool:SetAttribute("magazineSize", 200)
         end
-    end
+    end)
 end
+
 
 -- Atualiza mods ao trocar de arma ou respawnar
 local function setupToolMods(char)
@@ -321,17 +330,10 @@ local function setupToolMods(char)
     while not tool and task.wait() do tool = char:FindFirstChildWhichIsA("Tool") end
     if tool then
         applyWeaponMods(tool)
-        -- Loop para manter infinite ammo
-        coroutine.wrap(function()
-            while tool.Parent == char and _G.modInfiniteAmmo do
-                maintainInfiniteAmmo(tool)
-                task.wait(0.2)
-            end
-        end)()
     end
 end
 
--- Ao respawnar
+
 LocalPlayer.CharacterAdded:Connect(function(char)
     setupToolMods(char)
     char.ChildAdded:Connect(function(child)
@@ -342,7 +344,10 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end)
 end)
 
--- Se já está vivo
+-- Iniciar manutenção de infinite ammo
+maintainInfiniteAmmo()
+
+
 if LocalPlayer.Character then
     setupToolMods(LocalPlayer.Character)
     LocalPlayer.Character.ChildAdded:Connect(function(child)
