@@ -174,14 +174,11 @@ local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled",
 local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
 local espEnemiesBtn = createToggleButton("ESP Inimigos", 110, "espEnemiesEnabled")
 local espAlliesBtn = createToggleButton("ESP Aliados", 145, "espAlliesEnabled")
+local instantReloadBtn = createToggleButton("Instant Reload", 250, "modInstantReload")
+local noRecoilBtn = createToggleButton("No Recoil", 285, "modNoRecoil")
 local showFOVBtn = createToggleButton("Mostrar FOV", 180, "FOV_VISIBLE")
 createFOVAdjustButton("- FOV", 215, -5)
 createFOVAdjustButton("+ FOV", 215, 5)
-
--- Botão Instant Reload
-local instantReloadBtn = createToggleButton("Instant Reload", 250, "modInstantReload")
--- Botão No Recoil (avançado)
-local noRecoilBtn = createToggleButton("No Recoil", 285, "modNoRecoil")
 
 -- ======= MODS DE ARMA (APLICAÇÃO) =======
 local function applyWeaponMods(tool)
