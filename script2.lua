@@ -242,9 +242,14 @@ local function createHitboxPopup(parent)
     return popup
 end
 
+local function updateMenuSize()
+    local scale = scaleOptions[currentScaleIndex]
+    mainFrame.Size = UDim2.new(0, baseWidth * scale, 0, baseHeight * scale)
+end
+
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 280, 0, 360)
-mainFrame.Position = UDim2.new(0, 20, 0.5, -180)
+mainFrame.Size = UDim2.new(0, baseWidth, 0, baseHeight)
+mainFrame.Position = UDim2.new(0, 20, 0.5, -baseHeight/2)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = gui
@@ -275,6 +280,7 @@ for _, tabName in ipairs(tabOrder) do
 end
 
 tabs.Aimbot.Visible = true
+tabs.Aimbot.BackgroundColor3 = Color3.fromRGB(40,40,40)
 
 -- Criar botões das tabs
 for i, tabName in ipairs(tabOrder) do
@@ -289,8 +295,12 @@ for i, tabName in ipairs(tabOrder) do
     btn.Parent = tabButtonsFrame
 
     btn.MouseButton1Click:Connect(function()
-        for _, f in pairs(tabs) do f.Visible = false end
+        for _, f in pairs(tabs) do
+            f.Visible = false
+            f.BackgroundColor3 = Color3.fromRGB(25,25,25) -- fundo cinza padrão para as abas
+        end
         tabs[tabName].Visible = true
+        tabs[tabName].BackgroundColor3 = Color3.fromRGB(40,40,40) -- destaque aba ativa
     end)
 end
 
