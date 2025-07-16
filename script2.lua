@@ -1,13 +1,3 @@
---[[
-Mobile Aimbot GUI
-- Painel arrastável: pela borda (maximizado) ou pelo toggle button (minimizado)
-- Botão ⚙️ para trocar tamanho do menu entre 3 alturas fixas
-- Toggle para minimizar/maximizar
-- Botões toggle para opções do aimbot, esp, etc
-- Círculo FOV e ESP visual
-- Aimbot automático simplificado
---]]
-
 -- Serviços principais
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -67,136 +57,25 @@ panel.BorderSizePixel = 0
 panel.Active = true
 panel.Parent = gui
 
--- Estado menu
-local minimized = false
-local scaleIndex = 2
-local scales = {120, 180, 240}
-
--- BOTÃO minimizar/maximizar (setinha)
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 40, 0, 30)
-toggleButton.Position = UDim2.new(1, -50, 0, 5)
-toggleButton.Text = "🔽"
-toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.TextSize = 18
-toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-toggleButton.TextColor3 = Color3.new(1, 1, 1)
-toggleButton.Parent = panel
-
-toggleButton.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    toggleButton.Text = minimized and "🔼" or "🔽"
-    for _, v in pairs(panel:GetChildren()) do
-        if v:IsA("TextButton") and v ~= toggleButton and v ~= gearButton then
-            v.Visible = not minimized
-        end
-    end
-    if minimized then
-        panel.Size = UDim2.new(0, 60, 0, 40)
-        panel.BackgroundTransparency = 1
-        toggleButton.Position = UDim2.new(0, 10, 0, 5)
-        gearButton.Visible = false
-    else
-        panel.BackgroundTransparency = 0.2
-        toggleButton.Position = UDim2.new(1, -50, 0, 5)
-        gearButton.Visible = true
-        panel.Size = UDim2.new(0, 220, 0, scales[scaleIndex])
-    end
-end)
-
--- BOTÃO engrenagem para alternar tamanhos predefinidos do painel
-local gearButton = Instance.new("TextButton")
-gearButton.Size = UDim2.new(0, 30, 0, 30)
-gearButton.Position = UDim2.new(1, -90, 0, 5)
-gearButton.Text = "⚙️"
-gearButton.Font = Enum.Font.SourceSansBold
-gearButton.TextSize = 18
-gearButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-gearButton.TextColor3 = Color3.new(1, 1, 1)
-gearButton.Parent = panel
-
-gearButton.MouseButton1Click:Connect(function()
-    scaleIndex = scaleIndex + 1
-    if scaleIndex > #scales then
-        scaleIndex = 1
-    end
-    panel.Size = UDim2.new(0, 220, 0, scales[scaleIndex])
-end)
-
--- ARRASTAR painel segurando a BORDAS (10px) quando maximizado
-local draggingBorder = false
-local borderDragStart, borderStartPos
-local borderSize = 10 -- margem das bordas para detectar drag
-
+--[[ 
+-- Arrastar painel desativado para ser feito somente segurando a setinha (toggleButton)
 panel.InputBegan:Connect(function(input)
-    if minimized then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        local pos = input.Position
-        local absPos = panel.AbsolutePosition
-        local absSize = panel.AbsoluteSize
-
-        local xRel = pos.X - absPos.X
-        local yRel = pos.Y - absPos.Y
-
-        if xRel <= borderSize or xRel >= absSize.X - borderSize or yRel <= borderSize or yRel >= absSize.Y - borderSize then
-            draggingBorder = true
-            borderDragStart = pos
-            borderStartPos = panel.Position
-            input:Capture()
-        end
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = panel.Position
     end
 end)
-
 panel.InputChanged:Connect(function(input)
-    if draggingBorder and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - borderDragStart
-        panel.Position = UDim2.new(borderStartPos.X.Scale, borderStartPos.X.Offset + delta.X, borderStartPos.Y.Scale, borderStartPos.Y.Offset + delta.Y)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
+]]
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingBorder = false
-    end
-end)
-
--- ARRASTAR painel segurando o BOTÃO toggle (setinha) quando minimizado
-local draggingToggle = false
-local toggleDragStart, toggleStartPos
-local dragThreshold = 10 -- distância mínima para iniciar drag
-local draggingConfirmed = false
-
-toggleButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingConfirmed = false
-        toggleDragStart = input.Position
-        toggleStartPos = panel.Position
-        input:Capture()
-    end
-end)
-
-toggleButton.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if not draggingConfirmed then
-            local delta = input.Position - toggleDragStart
-            if delta.Magnitude > dragThreshold then
-                draggingConfirmed = true
-                draggingToggle = true
-            end
-        end
-        if draggingToggle then
-            local delta = input.Position - toggleDragStart
-            panel.Position = UDim2.new(toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X, toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y)
-        end
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingToggle = false
-        draggingConfirmed = false
-    end
-end)
+-- Arrastar painel segurando o botão da setinha (toggleButton)
+toggleButton = nil -- placeholder para declarar antes
 
 -- Função para aplicar mods na arma
 local function applyWeaponMods(tool)
@@ -205,7 +84,7 @@ local function applyWeaponMods(tool)
     if _G.instareload then
         tool:SetAttribute("reloadTime", 0)
     else
-        tool:SetAttribute("reloadTime", 1)
+        tool:SetAttribute("reloadTime", 1) -- valor padrão, ajuste se precisar
     end
 
     if _G.noRecol then
@@ -288,6 +167,127 @@ local function createFOVAdjustButton(text, yPos, delta)
     end)
 end
 
+-- Estado menu
+local minimized = false
+local scaleIndex = 2
+local scales = {120, 180, 240}
+
+-- Botão engrenagem para tamanho do menu
+local gearButton = Instance.new("TextButton")
+gearButton.Size = UDim2.new(0, 30, 0, 30)
+gearButton.Position = UDim2.new(1, -90, 0, 5)
+gearButton.Text = "⚙️"
+gearButton.Font = Enum.Font.SourceSansBold
+gearButton.TextSize = 18
+gearButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+gearButton.TextColor3 = Color3.new(1, 1, 1)
+gearButton.Parent = panel
+
+-- Slider horizontal para ajustar altura do painel dentro da engrenagem
+local slider = Instance.new("Frame")
+slider.Size = UDim2.new(0, 180, 0, 20)
+slider.Position = UDim2.new(0, 15, 0, 40)
+slider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+slider.Visible = false
+slider.Parent = panel
+
+local sliderBar = Instance.new("Frame")
+sliderBar.Size = UDim2.new(1, -20, 0, 6)
+sliderBar.Position = UDim2.new(0, 10, 0.5, -3)
+sliderBar.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
+sliderBar.Parent = slider
+
+local sliderHandle = Instance.new("Frame")
+sliderHandle.Size = UDim2.new(0, 20, 1, 0)
+sliderHandle.Position = UDim2.new(0.5, -10, 0, 0)
+sliderHandle.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+sliderHandle.Parent = slider
+sliderHandle.Active = true
+sliderHandle.Draggable = true
+
+local minHeight, maxHeight = 120, 320
+
+local function updatePanelSizeFromSlider()
+    local sliderPos = sliderHandle.Position.X.Offset
+    local sliderRange = slider.AbsoluteSize.X - sliderHandle.AbsoluteSize.X
+    local scale = sliderPos / sliderRange
+    local newHeight = math.floor(minHeight + (maxHeight - minHeight) * scale)
+    panel.Size = UDim2.new(0, 220, 0, newHeight)
+end
+
+sliderHandle.DragStopped:Connect(function()
+    updatePanelSizeFromSlider()
+end)
+
+sliderHandle.Position = UDim2.new(0.5, -10, 0, 0)
+
+gearButton.MouseButton1Click:Connect(function()
+    slider.Visible = not slider.Visible
+    if slider.Visible then
+        -- Atualizar posição do handle para refletir tamanho atual do painel
+        local currentHeight = panel.Size.Y.Offset
+        local scale = (currentHeight - minHeight) / (maxHeight - minHeight)
+        local sliderRange = slider.AbsoluteSize.X - sliderHandle.AbsoluteSize.X
+        sliderHandle.Position = UDim2.new(0, sliderRange * scale, 0, 0)
+    end
+end)
+
+-- Botão minimizar
+toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 40, 0, 30)
+toggleButton.Position = UDim2.new(1, -50, 0, 5)
+toggleButton.Text = "🔽"
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 18
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Parent = panel
+
+toggleButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    toggleButton.Text = minimized and "🔼" or "🔽"
+    for _, v in pairs(panel:GetChildren()) do
+        if v:IsA("TextButton") and v ~= toggleButton and v ~= gearButton then
+            v.Visible = not minimized
+        end
+    end
+    if minimized then
+        panel.Size = UDim2.new(0, 60, 0, 40)
+        panel.BackgroundTransparency = 1
+        toggleButton.Position = UDim2.new(0, 10, 0, 5)
+        gearButton.Visible = false
+        slider.Visible = false
+    else
+        panel.BackgroundTransparency = 0.2
+        toggleButton.Position = UDim2.new(1, -50, 0, 5)
+        gearButton.Visible = true
+        panel.Size = UDim2.new(0, 220, 0, scales[scaleIndex])
+    end
+end)
+
+-- Arrastar painel segurando o botão da setinha (toggleButton)
+toggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = panel.Position
+        input:Capture()
+    end
+end)
+
+toggleButton.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
 -- Criação dos botões toggle
 local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
 local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
@@ -308,6 +308,7 @@ RunService.RenderStepped:Connect(function()
     local tool = char:FindFirstChildWhichIsA("Tool")
     if not tool then return end
 
+    -- Exibir 200 mesmo com munição infinita
     if _G.infiniteAmmo then
         local hud = tool:FindFirstChild("AmmoDisplay")
         if hud and hud:IsA("TextLabel") then
@@ -438,6 +439,7 @@ local function createESP(player)
         end
 
         local hrp = char.HumanoidRootPart
+        local head = char:FindFirstChild("Head")
         local humanoid = char:FindFirstChildOfClass("Humanoid")
 
         local topLeftPos, topLeftVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(-1, 3, 0))
@@ -466,6 +468,7 @@ local function createESP(player)
         healthBar.Color = Color3.fromRGB(0, 255, 0)
         healthBar.Visible = true
 
+        -- Highlight para melhorar visual (opcional)
         if player.Team == LocalPlayer.Team then
             if _G.espAlliesEnabled then
                 updateHighlight(player, Color3.fromRGB(0, 255, 0))
@@ -530,12 +533,15 @@ local function getClosestTarget()
     return target
 end
 
+-- Exemplo de disparo automático simplificado
 RunService.RenderStepped:Connect(function()
     if _G.aimbotAutoEnabled then
         currentTarget = getClosestTarget()
         if currentTarget and not shooting then
+            -- Simula disparo automático
             shooting = true
-            -- Código para disparar depende do jogo
+            -- Código para disparar aqui, depende do jogo, exemplo:
+            -- fireclickdetector, remote events etc.
             wait(0.1)
             shooting = false
         end
