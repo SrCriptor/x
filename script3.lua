@@ -17,6 +17,7 @@ _G.infiniteAmmo = true
 _G.instantReload = true
 _G.noRecoil = true
 _G.noSpread = true
+_G.fastShoot = false
 
 local shooting = false
 local aiming = false
@@ -51,8 +52,8 @@ gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 220, 0, 240)
-panel.Position = UDim2.new(0, 20, 0.5, -120)
+panel.Size = UDim2.new(0, 220, 0, 400)
+panel.Position = UDim2.new(0, 20, 0.5, -200)
 panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 panel.BackgroundTransparency = 0.2
 panel.BorderSizePixel = 0
@@ -84,7 +85,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -20, 0, 30)
     button.Position = UDim2.new(0, 10, 0, yPos)
-    button.Text = text .. ": " .. ( _G[flagName] and "ON" or "OFF" )
+    button.Text = text .. ": " .. (_G[flagName] and "ON" or "OFF")
     button.Font = Enum.Font.SourceSansBold
     button.TextSize = 16
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -96,8 +97,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
         if exclusiveFlag and _G[flagName] then
             _G[exclusiveFlag] = false
         end
-        button.Text = text .. ": " .. ( _G[flagName] and "ON" or "OFF" )
-        -- Atualiza botão irmão (exclusivo)
+        button.Text = text .. ": " .. (_G[flagName] and "ON" or "OFF")
         if exclusiveFlag then
             for _, sibling in pairs(panel:GetChildren()) do
                 if sibling:IsA("TextButton") and sibling ~= button then
@@ -143,29 +143,36 @@ toggleButton.Parent = panel
 toggleButton.MouseButton1Click:Connect(function()
     minimized = not minimized
     toggleButton.Text = minimized and "🔼" or "🔽"
-
     for _, v in pairs(panel:GetChildren()) do
         if v:IsA("TextButton") and v ~= toggleButton then
             v.Visible = not minimized
         end
     end
-
     if minimized then
         panel.Size = UDim2.new(0, 60, 0, 40)
         panel.BackgroundTransparency = 1
         toggleButton.Position = UDim2.new(0, 10, 0, 5)
     else
-        panel.Size = UDim2.new(0, 220, 0, 240)
+        panel.Size = UDim2.new(0, 220, 0, 400)
         panel.BackgroundTransparency = 0.2
         toggleButton.Position = UDim2.new(1, -50, 0, 5)
     end
 end)
 
+-- Botões de toggles principais
 local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
 local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
 local espEnemiesBtn = createToggleButton("ESP Inimigos", 110, "espEnemiesEnabled")
 local espAlliesBtn = createToggleButton("ESP Aliados", 145, "espAlliesEnabled")
 local showFOVBtn = createToggleButton("Mostrar FOV", 180, "FOV_VISIBLE")
+
+-- Botões extras para armas
+local infiniteAmmoBtn = createToggleButton("Infinite Ammo", 215, "infiniteAmmo")
+local instantReloadBtn = createToggleButton("Instant Reload", 250, "instantReload")
+local noRecoilBtn = createToggleButton("No Recoil", 285, "noRecoil")
+local noSpreadBtn = createToggleButton("No Spread", 320, "noSpread")
+local fastShootBtn = createToggleButton("Fast Shoot", 355, "fastShoot")
+
 createFOVAdjustButton("- FOV", 215, -5)
 createFOVAdjustButton("+ FOV", 215, 5)
 
@@ -405,97 +412,3 @@ local function getClosestVisibleEnemy()
 
     return closestEnemy
 end
-
-aimButton.MouseButton1Down:Connect(function()
-    aiming = true
-end)
-aimButton.MouseButton1Up:Connect(function()
-    aiming = false
-    currentTarget = nil
-end)
-shootButton.MouseButton1Down:Connect(function()
-    shooting = true
-end)
-shootButton.MouseButton1Up:Connect(function()
-    shooting = false
-end)
-
-RunService.RenderStepped:Connect(function()
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    -- Aimbot Automático
-    if _G.aimbotAutoEnabled then
-        local target = getClosestVisibleEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible then
-                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-                if dist <= _G.FOV_RADIUS then
-                    currentTarget = target
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                else
-                    currentTarget = nil
-                end
-            else
-                currentTarget = nil
-            end
-        else
-            currentTarget = nil
-        end
-    end
-
-    -- Aimbot Manual
-    if _G.aimbotManualEnabled and aiming and shooting then
-        local target = getClosestVisibleEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible then
-                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-                if dist <= _G.FOV_RADIUS then
-                    currentTarget = target
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                else
-                    currentTarget = nil
-                end
-            else
-                currentTarget = nil
-            end
-        else
-            currentTarget = nil
-        end
-    elseif not (_G.aimbotManualEnabled and aiming and shooting) and not _G.aimbotAutoEnabled then
-        currentTarget = nil
-    end
-
-    -- === Funcionalidades extras ativadas ===
-
-    if _G.infiniteAmmo then
-        -- Exemplo: resetar munição para máximo - substitua pelo código do seu jogo para municao
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Ammo") then
-            LocalPlayer.Character.Ammo.Value = math.huge
-        end
-    end
-
-    if _G.instantReload then
-        -- Exemplo: terminar o reload imediatamente - adapte conforme seu jogo
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Reloading") then
-            LocalPlayer.Character.Reloading.Value = false
-        end
-    end
-
-    if _G.noRecoil then
-        -- Exemplo simples: zerar recoil - adapte conforme seu jogo
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Recoil") then
-            LocalPlayer.Character.Recoil.Value = 0
-        end
-    end
-
-    if _G.noSpread then
-        -- Exemplo simples: zerar spread - adapte conforme seu jogo
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Spread") then
-            LocalPlayer.Character.Spread.Value = 0
-        end
-    end
-end)
