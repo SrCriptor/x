@@ -11,17 +11,18 @@ _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
-_G.infiniteAmmo = true
-_G.instantReload = true
-_G.noRecoil = true
-_G.noSpread = true
-_G.fastShoot = true
+_G.infiniteAmmo = false
+_G.instantReload = false
+_G.noRecoil = false
+_G.noSpread = false
+_G.fastShoot = false
 
 local shooting = false
 local aiming = false
 local dragging = false
 local dragStart, startPos
 local currentTarget = nil
+local currentPage = 1
 
 -- Referências aos botões mobile (ajuste conforme seu jogo)
 local aimButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
@@ -51,8 +52,8 @@ gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 220, 0, 420)
-panel.Position = UDim2.new(0, 20, 0.5, -210)
+panel.Size = UDim2.new(0, 220, 0, 280)
+panel.Position = UDim2.new(0, 20, 0.5, -140)
 panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 panel.BackgroundTransparency = 0.2
 panel.BorderSizePixel = 0
@@ -81,8 +82,10 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Função para criar botões toggle com exclusividade entre 2 flags
-local function createToggleButton(text, yPos, flagName, exclusiveFlag)
+local buttonsPage1 = {}
+local buttonsPage2 = {}
+
+local function createToggleButton(text, yPos, flagName, exclusiveFlag, page)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -20, 0, 30)
     button.Position = UDim2.new(0, 10, 0, yPos)
@@ -91,7 +94,10 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     button.TextSize = 16
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     button.TextColor3 = Color3.new(1, 1, 1)
+    button.Visible = page == 1
     button.Parent = panel
+
+    table.insert(page == 1 and buttonsPage1 or buttonsPage2, button)
 
     button.MouseButton1Click:Connect(function()
         _G[flagName] = not _G[flagName]
@@ -99,21 +105,7 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
             _G[exclusiveFlag] = false
         end
         button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
-
-        if exclusiveFlag then
-            for _, sibling in pairs(panel:GetChildren()) do
-                if sibling:IsA("TextButton") and sibling ~= button then
-                    local siblingText = sibling.Text:lower()
-                    local exclusiveFlagText = exclusiveFlag:gsub("([A-Z])", " %1"):lower()
-                    exclusiveFlagText = exclusiveFlagText:gsub("^%l", string.upper)
-                    if siblingText:find(exclusiveFlagText) then
-                        sibling.Text = sibling.Text:sub(1, sibling.Text:find(":")) .. (_G[exclusiveFlag] and " ON" or " OFF")
-                    end
-                end
-            end
-        end
     end)
-    return button
 end
 
 local function createFOVAdjustButton(text, yPos, delta)
@@ -125,12 +117,22 @@ local function createFOVAdjustButton(text, yPos, delta)
     button.TextSize = 16
     button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
     button.TextColor3 = Color3.new(1, 1, 1)
+    button.Visible = currentPage == 1
     button.Parent = panel
+    table.insert(buttonsPage1, button)
+
     button.MouseButton1Click:Connect(function()
         _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + delta, 10, 300)
     end)
 end
 
+local function updatePage(page)
+    currentPage = page
+    for _, b in pairs(buttonsPage1) do b.Visible = page == 1 end
+    for _, b in pairs(buttonsPage2) do b.Visible = page == 2 end
+end
+
+-- Toggle minimizar
 local minimized = false
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 40, 0, 30)
@@ -142,13 +144,41 @@ toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 toggleButton.TextColor3 = Color3.new(1, 1, 1)
 toggleButton.Parent = panel
 
+-- Botões de navegação de página
+local page1Btn = Instance.new("TextButton")
+page1Btn.Size = UDim2.new(0.5, -10, 0, 30)
+page1Btn.Position = UDim2.new(0, 10, 1, -35)
+page1Btn.Text = "1/2"
+page1Btn.Font = Enum.Font.SourceSansBold
+page1Btn.TextSize = 16
+page1Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+page1Btn.TextColor3 = Color3.new(1, 1, 1)
+page1Btn.Parent = panel
+
+local page2Btn = Instance.new("TextButton")
+page2Btn.Size = UDim2.new(0.5, -10, 0, 30)
+page2Btn.Position = UDim2.new(0.5, 0, 1, -35)
+page2Btn.Text = "2/2"
+page2Btn.Font = Enum.Font.SourceSansBold
+page2Btn.TextSize = 16
+page2Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+page2Btn.TextColor3 = Color3.new(1, 1, 1)
+page2Btn.Parent = panel
+
+page1Btn.MouseButton1Click:Connect(function()
+    updatePage(1)
+end)
+page2Btn.MouseButton1Click:Connect(function()
+    updatePage(2)
+end)
+
 toggleButton.MouseButton1Click:Connect(function()
     minimized = not minimized
     toggleButton.Text = minimized and "🔼" or "🔽"
 
     for _, v in pairs(panel:GetChildren()) do
         if v:IsA("TextButton") and v ~= toggleButton then
-            v.Visible = not minimized
+            v.Visible = not minimized and ((currentPage == 1 and table.find(buttonsPage1, v)) or (currentPage == 2 and table.find(buttonsPage2, v)))
         end
     end
 
@@ -157,26 +187,30 @@ toggleButton.MouseButton1Click:Connect(function()
         panel.BackgroundTransparency = 1
         toggleButton.Position = UDim2.new(0, 10, 0, 5)
     else
-        panel.Size = UDim2.new(0, 220, 0, 420)
+        panel.Size = UDim2.new(0, 220, 0, 280)
         panel.BackgroundTransparency = 0.2
         toggleButton.Position = UDim2.new(1, -50, 0, 5)
     end
 end)
 
+-- Página 1
 local y = 40
 local spacing = 35
-createToggleButton("Aimbot Auto", y, "aimbotAutoEnabled", "aimbotManualEnabled") y += spacing
-createToggleButton("Aimbot Manual", y, "aimbotManualEnabled", "aimbotAutoEnabled") y += spacing
-createToggleButton("ESP Inimigos", y, "espEnemiesEnabled") y += spacing
-createToggleButton("ESP Aliados", y, "espAlliesEnabled") y += spacing
-createToggleButton("Mostrar FOV", y, "FOV_VISIBLE") y += spacing
+createToggleButton("Aimbot Auto", y, "aimbotAutoEnabled", "aimbotManualEnabled", 1) y += spacing
+createToggleButton("Aimbot Manual", y, "aimbotManualEnabled", "aimbotAutoEnabled", 1) y += spacing
+createToggleButton("ESP Inimigos", y, "espEnemiesEnabled", nil, 1) y += spacing
+createToggleButton("ESP Aliados", y, "espAlliesEnabled", nil, 1) y += spacing
+createToggleButton("Mostrar FOV", y, "FOV_VISIBLE", nil, 1) y += spacing
 createFOVAdjustButton("- FOV", y, -5)
-createFOVAdjustButton("+ FOV", y, 5) y += spacing
-createToggleButton("Infinite Ammo", y, "infiniteAmmo") y += spacing
-createToggleButton("Instant Reload", y, "instantReload") y += spacing
-createToggleButton("No Recoil", y, "noRecoil") y += spacing
-createToggleButton("No Spread", y, "noSpread") y += spacing
-createToggleButton("Fast Shoot", y, "fastShoot")
+createFOVAdjustButton("+ FOV", y, 5)
+
+-- Página 2
+local y2 = 40
+createToggleButton("Infinite Ammo", y2, "infiniteAmmo", nil, 2) y2 += spacing
+createToggleButton("Instant Reload", y2, "instantReload", nil, 2) y2 += spacing
+createToggleButton("No Recoil", y2, "noRecoil", nil, 2) y2 += spacing
+createToggleButton("No Spread", y2, "noSpread", nil, 2) y2 += spacing
+createToggleButton("Fast Shoot", y2, "fastShoot", nil, 2)
 
 -- FUNÇÕES DE DISPARO MODIFICADAS
 RunService.RenderStepped:Connect(function()
@@ -196,10 +230,6 @@ RunService.RenderStepped:Connect(function()
 
     if _G.noRecoil then
         Camera.CFrame = Camera.CFrame
-    end
-
-    if _G.noSpread then
-        -- Idealmente, o código do jogo deve ser interceptado aqui
     end
 
     if _G.fastShoot then
