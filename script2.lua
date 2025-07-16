@@ -136,211 +136,241 @@ end
 
 -- Frame principal do menu
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 260, 0, 400)
-mainFrame.Position = UDim2.new(0, 20, 0.5, -200)
+mainFrame.Size = UDim2.new(0, 280, 0, 440)
+mainFrame.Position = UDim2.new(0, 20, 0.5, -220)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = gui
+mainFrame.Active = true
+mainFrame.Draggable = false -- Usaremos drag manual para poder fazer só no título
 
 -- Título do menu
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+titleBar.Parent = mainFrame
+
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Text = "Raycast Menu"
 titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 20
+titleLabel.TextSize = 22
 titleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Size = UDim2.new(1, 0, 0, 30)
-titleLabel.Position = UDim2.new(0, 0, 0, 0)
-titleLabel.Parent = mainFrame
+titleLabel.Size = UDim2.new(0.7, 0, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+-- Botão minimizar/maximizar
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Text = "−"
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 28
+minimizeBtn.TextColor3 = Color3.new(1,1,1)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -70, 0, 5)
+minimizeBtn.AutoButtonColor = false
+minimizeBtn.Parent = titleBar
+
+-- Botão fechar
+local closeBtn = Instance.new("TextButton")
+closeBtn.Text = "✕"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 22
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.AutoButtonColor = false
+closeBtn.Parent = titleBar
 
 -- Container para botões e sliders
 local contentFrame = Instance.new("Frame")
-contentFrame.Size = UDim2.new(1, 0, 1, -30)
-contentFrame.Position = UDim2.new(0, 0, 0, 30)
+contentFrame.Size = UDim2.new(1, 0, 1, -40)
+contentFrame.Position = UDim2.new(0, 0, 0, 40)
 contentFrame.BackgroundTransparency = 1
 contentFrame.Parent = mainFrame
 
--- Tab Buttons
+-- Barra de abas
 local tabs = {"Aimbot", "Hitbox", "Mods"}
 local tabFrames = {}
 local tabButtonsFrame = Instance.new("Frame")
-tabButtonsFrame.Size = UDim2.new(1, 0, 0, 30)
+tabButtonsFrame.Size = UDim2.new(1, 0, 0, 36)
 tabButtonsFrame.Position = UDim2.new(0, 0, 0, 0)
 tabButtonsFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+tabButtonsFrame.BorderSizePixel = 0
 tabButtonsFrame.Parent = contentFrame
 
+-- Criar botões de abas com espaçamento e estilo
 local function createTabButton(name, idx)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1/#tabs, -4, 1, 0)
-    btn.Position = UDim2.new((idx-1)/#tabs, 2, 0, 0)
+    btn.Size = UDim2.new(0, 85, 0, 32)
+    btn.Position = UDim2.new(0, (idx - 1) * 90 + 10, 0, 2)
     btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     btn.Text = name
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 15
-    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 16
+    btn.TextColor3 = Color3.new(1, 1, 1)
     btn.AutoButtonColor = false
     btn.Parent = tabButtonsFrame
     return btn
 end
 
 for i, tabName in ipairs(tabs) do
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, -30)
-    frame.Position = UDim2.new(0, 0, 0, 30)
+    local frame = Instance.new("ScrollingFrame")
+    frame.Size = UDim2.new(1, 0, 1, -36)
+    frame.Position = UDim2.new(0, 0, 0, 36)
     frame.BackgroundTransparency = 1
+    frame.CanvasSize = UDim2.new(0, 0, 3, 0)
+    frame.ScrollBarThickness = 5
     frame.Visible = i == 1 -- Só a primeira aba fica visível inicialmente
     frame.Parent = contentFrame
     tabFrames[tabName] = frame
 end
 
--- Lógica para trocar abas
+-- Atualizar visual do botão ativo
+local function setActiveTab(activeName)
+    for name, frame in pairs(tabFrames) do
+        frame.Visible = name == activeName
+    end
+    for _, btn in pairs(tabButtonsFrame:GetChildren()) do
+        if btn:IsA("TextButton") then
+            btn.BackgroundColor3 = (btn.Text == activeName) and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(50, 50, 50)
+        end
+    end
+end
+
+-- Criar botões e conectar troca de abas
 for i, btn in ipairs(tabButtonsFrame:GetChildren()) do
     if btn:IsA("TextButton") then
         btn.MouseButton1Click:Connect(function()
-            for _, frame in pairs(tabFrames) do
-                frame.Visible = false
-            end
-            tabFrames[btn.Text].Visible = true
-            for _, b in pairs(tabButtonsFrame:GetChildren()) do
-                if b:IsA("TextButton") then
-                    b.BackgroundColor3 = Color3.fromRGB(50,50,50)
-                end
-            end
-            btn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+            setActiveTab(btn.Text)
         end)
     end
 end
 
--- Criar os botões e sliders da aba Aimbot
-local aimbotFrame = tabFrames["Aimbot"]
-local aimbotAutoToggle = createToggleButton("Aimbot Automático", aimbotFrame, UDim2.new(0, 20, 0, 20), _G.aimbotAutoEnabled, function(val) _G.aimbotAutoEnabled = val if val then _G.aimbotLegitEnabled = false end end)
-local aimbotLegitToggle = createToggleButton("Aimbot Legit", aimbotFrame, UDim2.new(0, 20, 0, 70), _G.aimbotLegitEnabled, function(val) _G.aimbotLegitEnabled = val if val then _G.aimbotAutoEnabled = false end end)
+setActiveTab("Aimbot")
 
--- Criar botão para abrir popup hitbox
-local hitboxPopupBtn = createToggleButton("Selecionar Hitbox", tabFrames["Hitbox"], UDim2.new(0, 20, 0, 20), false)
-
--- Popup para seleção de hitbox
-local hitboxPopup = Instance.new("Frame")
-hitboxPopup.Size = UDim2.new(0, 280, 0, 360)
-hitboxPopup.Position = UDim2.new(0.5, -140, 0.5, -180)
-hitboxPopup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-hitboxPopup.BorderSizePixel = 0
-hitboxPopup.Visible = false
-hitboxPopup.Parent = gui
-
-local popupTitle = createLabel("Selecionar Hitbox", hitboxPopup, UDim2.new(1, 0, 0, 30), UDim2.new(0, 10, 0, 10))
-
-local closePopupBtn = Instance.new("TextButton")
-closePopupBtn.Text = "Fechar"
-closePopupBtn.Font = Enum.Font.GothamBold
-closePopupBtn.TextSize = 16
-closePopupBtn.TextColor3 = Color3.new(1,1,1)
-closePopupBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-closePopupBtn.Size = UDim2.new(0, 70, 0, 30)
-closePopupBtn.Position = UDim2.new(1, -80, 0, 10)
-closePopupBtn.Parent = hitboxPopup
-
-closePopupBtn.MouseButton1Click:Connect(function()
-    hitboxPopup.Visible = false
-    hitboxPopupBtn.Text = "Selecionar Hitbox: OFF"
-    hitboxPopupBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-end)
-
-hitboxPopupBtn.MouseButton1Click:Connect(function()
-    hitboxPopup.Visible = not hitboxPopup.Visible
-    if hitboxPopup.Visible then
-        hitboxPopupBtn.Text = "Selecionar Hitbox: ON"
-        hitboxPopupBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-    else
-        hitboxPopupBtn.Text = "Selecionar Hitbox: OFF"
-        hitboxPopupBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    end
-end)
-
-local hitboxParts = {
-    {Name = "Head", Position = UDim2.new(0.45, 0, 0.05, 0), Size = UDim2.new(0, 50, 0, 50)},
-    {Name = "Torso", Position = UDim2.new(0.4, 0, 0.3, 0), Size = UDim2.new(0, 60, 0, 80)},
-    {Name = "LeftArm", Position = UDim2.new(0.2, 0, 0.3, 0), Size = UDim2.new(0, 40, 0, 80)},
-    {Name = "RightArm", Position = UDim2.new(0.75, 0, 0.3, 0), Size = UDim2.new(0, 40, 0, 80)},
-    {Name = "LeftLeg", Position = UDim2.new(0.4, 0, 0.75, 0), Size = UDim2.new(0, 40, 0, 80)},
-    {Name = "RightLeg", Position = UDim2.new(0.55, 0, 0.75, 0), Size = UDim2.new(0, 40, 0, 80)},
+-- Função para criar botões toggle dentro das abas e chamar callback
+local function createToggleInFrame(text, frame, yPos, default, cb)
+    return createToggleButton(text, frame, UDim2.new(0,
+-- Variáveis e sliders para controle fino de arma
+_G.lt = _G.lt or {
+	["rateOfFire"] = 200,
+	["spread"] = 0,
+	["zoom"] = 3,
 }
 
-for _, part in ipairs(hitboxParts) do
-    local btn = Instance.new("TextButton")
-    btn.Name = part.Name
-    btn.Text = ""
-    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    btn.BackgroundTransparency = 0.5
-    btn.Size = part.Size
-    btn.Position = part.Position
-    btn.Parent = hitboxPopup
-
-    local border = Instance.new("UIStroke")
-    border.Thickness = 3
-    border.Color = _G.hitboxSelection[part.Name] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(100, 100, 100)
-    border.Parent = btn
-
-    btn.MouseButton1Click:Connect(function()
-        _G.hitboxSelection[part.Name] = not _G.hitboxSelection[part.Name]
-        border.Color = _G.hitboxSelection[part.Name] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(100, 100, 100)
-    end)
+local function applyWeaponAttributes(tool)
+	for key, value in pairs(_G.lt) do
+		tool:SetAttribute(key, value)
+	end
 end
 
--- Criar botões toggles da aba Mods
-local modsFrame = tabFrames["Mods"]
-
-local infAmmoToggle = createToggleButton("Infinite Ammo", modsFrame, UDim2.new(0, 20, 0, 20), _G.modInfiniteAmmo, function(val) _G.modInfiniteAmmo = val end)
-local noRecoilToggle = createToggleButton("No Recoil", modsFrame, UDim2.new(0, 20, 0, 70), _G.modNoRecoil, function(val) _G.modNoRecoil = val end)
-local instantReloadToggle = createToggleButton("Instant Reload", modsFrame, UDim2.new(0, 20, 0, 120), _G.modInstantReload, function(val) _G.modInstantReload = val end)
-
--- Sliders para rateOfFire, spread e zoom
-local rateOfFireSlider = createSlider("Rate Of Fire", modsFrame, UDim2.new(0, 20, 0, 180), 50, 1000, 10, _G.lt.rateOfFire, function(val) _G.lt.rateOfFire = val end)
-local spreadSlider = createSlider("Spread", modsFrame, UDim2.new(0, 20, 0, 240), 0, 50, 1, _G.lt.spread, function(val) _G.lt.spread = val end)
-local zoomSlider = createSlider("Zoom", modsFrame, UDim2.new(0, 20, 0, 300), 1, 10, 0.1, _G.lt.zoom, function(val) _G.lt.zoom = val end)
-
--- Função para aplicar mods na arma equipada
-local function applyWeaponMods(tool)
-    if not tool then return end
-    if _G.modNoRecoil then
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-    end
-    if _G.modInfiniteAmmo then
-        local mag = tool:GetAttribute("magazineSize") or 200
-        tool:SetAttribute("_ammo", math.huge)
-        tool:SetAttribute("magazineSize", mag)
-        local display = tool:FindFirstChild("AmmoDisplay")
-        if display and display:IsA("TextLabel") then
-            display.Text = tostring(mag)
-        end
-    end
-    if _G.modInstantReload then
-        tool:SetAttribute("reloadTime", 0)
-    end
-    -- Aplicar rateOfFire, spread e zoom da _G.lt
-    for k, v in pairs(_G.lt) do
-        tool:SetAttribute(k, v)
-    end
-end
-
--- Aplicar mods e valores ao equipar arma
+-- Aplica ao equipar arma
 LocalPlayer.CharacterAdded:Connect(function(char)
-    local tool
-    repeat
-        tool = char:FindFirstChildWhichIsA("Tool")
-        task.wait()
-    until tool
-    applyWeaponMods(tool)
+	char:WaitForChild("HumanoidRootPart")
+	local tool
+	repeat
+		tool = char:FindFirstChildWhichIsA("Tool")
+		RunService.RenderStepped:Wait()
+	until tool
+	applyWeaponAttributes(tool)
 end)
 
-RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    if char then
-        local tool = char:FindFirstChildWhichIsA("Tool")
-        if tool then
-            applyWeaponMods(tool)
-        end
-    end
+-- Atualiza spread com base na distância do mouse (dispersão adaptativa)
+RunService.RenderStepped:Connect(function()
+	local char = LocalPlayer.Character
+	local mouse = LocalPlayer:GetMouse()
+	if char and mouse and mouse.Hit then
+		local tool = char:FindFirstChildWhichIsA("Tool")
+		local head = char:FindFirstChild("Head")
+		if tool and head then
+			local dist = (head.Position - mouse.Hit.Position).Magnitude
+			local spread = math.clamp(30 - dist / 5, 0, 30)
+			tool:SetAttribute("spread", spread)
+		end
+	end
 end)
+
+-- Criar sliders na aba de Mods
+local function createSlider(label, defaultValue, minVal, maxVal, step, posY, parent, key)
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(0, 240, 0, 40)
+	container.Position = UDim2.new(0, 20, 0, posY)
+	container.BackgroundTransparency = 1
+	container.Parent = parent
+
+	local labelTxt = Instance.new("TextLabel")
+	labelTxt.Size = UDim2.new(1, 0, 0, 20)
+	labelTxt.Position = UDim2.new(0, 0, 0, 0)
+	labelTxt.Text = label .. ": " .. tostring(defaultValue)
+	labelTxt.TextColor3 = Color3.fromRGB(255, 255, 255)
+	labelTxt.Font = Enum.Font.Gotham
+	labelTxt.TextSize = 14
+	labelTxt.BackgroundTransparency = 1
+	labelTxt.TextXAlignment = Enum.TextXAlignment.Left
+	labelTxt.Parent = container
+
+	local sliderBack = Instance.new("Frame")
+	sliderBack.Size = UDim2.new(1, 0, 0, 10)
+	sliderBack.Position = UDim2.new(0, 0, 0, 25)
+	sliderBack.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+	sliderBack.BorderSizePixel = 0
+	sliderBack.Parent = container
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new((defaultValue - minVal) / (maxVal - minVal), 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+	fill.Parent = sliderBack
+
+	local dragging = false
+
+	local function updateSlider(x)
+		local relative = math.clamp(x - sliderBack.AbsolutePosition.X, 0, sliderBack.AbsoluteSize.X)
+		local percent = relative / sliderBack.AbsoluteSize.X
+		local value = math.floor((minVal + percent * (maxVal - minVal)) / step + 0.5) * step
+		_G.lt[key] = value
+		labelTxt.Text = label .. ": " .. tostring(value)
+		fill.Size = UDim2.new((value - minVal) / (maxVal - minVal), 0, 1, 0)
+	end
+
+	sliderBack.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			updateSlider(input.Position.X)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			updateSlider(input.Position.X)
+		end
+	end)
+end
+
+-- Achar aba de mods pelo nome
+local modTab
+for _, child in ipairs(gui:GetDescendants()) do
+	if child:IsA("TextButton") and child.Text == "ModArma" then
+		child.MouseButton1Click:Connect(function()
+			modTab.Visible = true
+		end)
+	end
+	if child:IsA("Frame") and child.Name == "ModArma" then
+		modTab = child
+	end
+end
+
+if modTab then
+	createSlider("Rate Of Fire", _G.lt.rateOfFire, 50, 1000, 10, 140, modTab, "rateOfFire")
+	createSlider("Spread", _G.lt.spread, 0, 30, 1, 190, modTab, "spread")
+	createSlider("Zoom", _G.lt.zoom, 1, 10, 0.1, 240, modTab, "zoom")
+end
