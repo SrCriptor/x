@@ -1,10 +1,11 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- FLAGS GLOBAIS
+-- FLAGS GLOBAIS (estado das funções)
 _G.FOV_RADIUS = 65
 _G.FOV_VISIBLE = true
 _G.aimbotAutoEnabled = false
@@ -17,8 +18,6 @@ _G.espLineEnabled = false
 _G.espDistanceEnabled = false
 _G.espHealthBarEnabled = true
 _G.espNameEnabled = true
-
--- Hitbox padrão
 _G.hitboxSelection = {
     Head = "Prioritário",
     Torso = "Nenhum",
@@ -28,531 +27,738 @@ _G.hitboxSelection = {
     RightLeg = "Nenhum",
 }
 
+-- Estado da interface
+local currentPage = 1
+local totalPages = 3
+
+-- Criação do ScreenGui principal
 local gui = Instance.new("ScreenGui")
-gui.Name = "AimbotGUI"
-gui.IgnoreGuiInset = true
+gui.Name = "AimbotESPGui"
 gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Container principal do menu
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 250, 0, 280)
-panel.Position = UDim2.new(0, 20, 0.5, -140)
+panel.Size = UDim2.new(0, 250, 0, 320)
+panel.Position = UDim2.new(0, 20, 0.5, -160)
 panel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 panel.BackgroundTransparency = 0.2
 panel.BorderSizePixel = 0
 panel.Active = true
 panel.Parent = gui
 
--- Variáveis de estado para drag
-local dragging = false
-local dragStart
-local startPos
-
--- Drag no painel
-panel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = panel.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-panel.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- Botão minimizar/maximizar
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 40, 0, 30)
-toggleButton.Position = UDim2.new(1, -50, 0, 5)
-toggleButton.Text = "🔽"
-toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.TextSize = 20
-toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-toggleButton.TextColor3 = Color3.new(1, 1, 1)
-toggleButton.Parent = panel
-
-local toggleDragging = false
-local toggleDragStart
-local toggleStartPos
-
--- Drag do toggleButton independente do painel
-toggleButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        toggleDragging = true
-        toggleDragStart = input.Position
-        toggleStartPos = toggleButton.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                toggleDragging = false
-            end
-        end)
-    end
-end)
-
-toggleButton.InputChanged:Connect(function(input)
-    if toggleDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - toggleDragStart
-        toggleButton.Position = UDim2.new(toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X, toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y)
-    end
-end)
-
-local minimized = false
-toggleButton.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    toggleButton.Text = minimized and "🔼" or "🔽"
-
-    if minimized then
-        panel.Size = UDim2.new(0, 60, 0, 40)
-        panel.BackgroundTransparency = 1
-        -- Esconder todos os botões exceto toggle e navegação
-        for _, child in pairs(panel:GetChildren()) do
-            if child:IsA("TextButton") and child ~= toggleButton and child ~= prevPageBtn and child ~= nextPageBtn then
-                child.Visible = false
-            end
-        end
-    else
-        panel.Size = UDim2.new(0, 250, 0, 280)
-        panel.BackgroundTransparency = 0.2
-        updatePage()
-    end
-end)
-
--- Controle de páginas
-local currentPage = 1
-local totalPages = 3
-
-local prevPageBtn = Instance.new("TextButton")
-prevPageBtn.Size = UDim2.new(0, 40, 0, 30)
-prevPageBtn.Position = UDim2.new(0, 10, 1, -40)
-prevPageBtn.Text = "◀️"
-prevPageBtn.Font = Enum.Font.SourceSansBold
-prevPageBtn.TextSize = 20
-prevPageBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-prevPageBtn.TextColor3 = Color3.new(1, 1, 1)
-prevPageBtn.Parent = panel
-
-local nextPageBtn = Instance.new("TextButton")
-nextPageBtn.Size = UDim2.new(0, 40, 0, 30)
-nextPageBtn.Position = UDim2.new(1, -50, 1, -40)
-nextPageBtn.Text = "▶️"
-nextPageBtn.Font = Enum.Font.SourceSansBold
-nextPageBtn.TextSize = 20
-nextPageBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-nextPageBtn.TextColor3 = Color3.new(1, 1, 1)
-nextPageBtn.Parent = panel
-
--- Containers por página
-local page1Container = Instance.new("Frame")
-page1Container.Size = UDim2.new(1, -20, 1, -70)
-page1Container.Position = UDim2.new(0, 10, 0, 40)
-page1Container.BackgroundTransparency = 1
-page1Container.Parent = panel
-
-local page2Container = Instance.new("Frame")
-page2Container.Size = page1Container.Size
-page2Container.Position = page1Container.Position
-page2Container.BackgroundTransparency = 1
-page2Container.Parent = panel
-
-local page3Container = Instance.new("Frame")
-page3Container.Size = page1Container.Size
-page3Container.Position = page1Container.Position
-page3Container.BackgroundTransparency = 1
-page3Container.Parent = panel
-
--- FUNÇÃO PARA ATUALIZAR PÁGINAS
-local function updatePage()
-    prevPageBtn.Visible = currentPage > 1 and not minimized
-    nextPageBtn.Visible = currentPage < totalPages and not minimized
-
-    page1Container.Visible = (currentPage == 1 and not minimized)
-    page2Container.Visible = (currentPage == 2 and not minimized)
-    page3Container.Visible = (currentPage == 3 and not minimized)
+-- Função para criar botão padrão
+local function createButton(text, positionY, parent)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 30)
+    btn.Position = UDim2.new(0, 10, 0, positionY)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    btn.Text = text
+    btn.Parent = parent
+    return btn
 end
 
-prevPageBtn.MouseButton1Click:Connect(function()
-    if currentPage > 1 then
-        currentPage = currentPage - 1
-        updatePage()
-    end
-end)
-
-nextPageBtn.MouseButton1Click:Connect(function()
-    if currentPage < totalPages then
-        currentPage = currentPage + 1
-        updatePage()
-    end
-end)
-
-updatePage()
-
--- ======= Conteúdo da página 1 =======
-
-local aimbotAutoBtn = Instance.new("TextButton")
-aimbotAutoBtn.Size = UDim2.new(1, 0, 0, 30)
-aimbotAutoBtn.Position = UDim2.new(0, 0, 0, 0)
-aimbotAutoBtn.Text = "Aimbot Auto: OFF"
-aimbotAutoBtn.Font = Enum.Font.SourceSansBold
-aimbotAutoBtn.TextSize = 18
-aimbotAutoBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-aimbotAutoBtn.TextColor3 = Color3.new(1, 1, 1)
-aimbotAutoBtn.Parent = page1Container
-
-local aimbotManualBtn = Instance.new("TextButton")
-aimbotManualBtn.Size = aimbotAutoBtn.Size
-aimbotManualBtn.Position = UDim2.new(0, 0, 0, 40)
-aimbotManualBtn.Text = "Aimbot Manual: OFF"
-aimbotManualBtn.Font = aimbotAutoBtn.Font
-aimbotManualBtn.TextSize = aimbotAutoBtn.TextSize
-aimbotManualBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-aimbotManualBtn.TextColor3 = aimbotAutoBtn.TextColor3
-aimbotManualBtn.Parent = page1Container
-
-local aimbotLegitBtn = Instance.new("TextButton")
-aimbotLegitBtn.Size = aimbotAutoBtn.Size
-aimbotLegitBtn.Position = UDim2.new(0, 0, 0, 80)
-aimbotLegitBtn.Text = "Aimbot Legit: OFF"
-aimbotLegitBtn.Font = aimbotAutoBtn.Font
-aimbotLegitBtn.TextSize = aimbotAutoBtn.TextSize
-aimbotLegitBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-aimbotLegitBtn.TextColor3 = aimbotAutoBtn.TextColor3
-aimbotLegitBtn.Parent = page1Container
-
-local showFOVBtn = Instance.new("TextButton")
-showFOVBtn.Size = aimbotAutoBtn.Size
-showFOVBtn.Position = UDim2.new(0, 0, 0, 120)
-showFOVBtn.Text = "Mostrar FOV: OFF"
-showFOVBtn.Font = aimbotAutoBtn.Font
-showFOVBtn.TextSize = aimbotAutoBtn.TextSize
-showFOVBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-showFOVBtn.TextColor3 = aimbotAutoBtn.TextColor3
-showFOVBtn.Parent = page1Container
-
-local minusFOVBtn = Instance.new("TextButton")
-minusFOVBtn.Size = UDim2.new(0.5, -10, 0, 30)
-minusFOVBtn.Position = UDim2.new(0, 0, 0, 160)
-minusFOVBtn.Text = "- FOV"
-minusFOVBtn.Font = aimbotAutoBtn.Font
-minusFOVBtn.TextSize = 18
-minusFOVBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-minusFOVBtn.TextColor3 = Color3.new(1,1,1)
-minusFOVBtn.Parent = page1Container
-
-local plusFOVBtn = Instance.new("TextButton")
-plusFOVBtn.Size = minusFOVBtn.Size
-plusFOVBtn.Position = UDim2.new(0.5, 10, 0, 160)
-plusFOVBtn.Text = "+ FOV"
-plusFOVBtn.Font = minusFOVBtn.Font
-plusFOVBtn.TextSize = minusFOVBtn.TextSize
-plusFOVBtn.BackgroundColor3 = minusFOVBtn.BackgroundColor3
-plusFOVBtn.TextColor3 = minusFOVBtn.TextColor3
-plusFOVBtn.Parent = page1Container
-
--- Funções toggle para aimbot
-local function toggleButton(btn, flagName, exclusiveFlags)
-    btn.MouseButton1Click:Connect(function()
+-- Função para criar toggle button (liga/desliga)
+local function createToggleButton(text, yPos, flagName, exclusiveFlag)
+    local button = createButton(text .. ": OFF", yPos, panel)
+    button.MouseButton1Click:Connect(function()
         _G[flagName] = not _G[flagName]
-        if exclusiveFlags then
-            for _, flag in pairs(exclusiveFlags) do
-                if flag ~= flagName then
-                    _G[flag] = false
+        if exclusiveFlag and _G[flagName] then
+            _G[exclusiveFlag] = false
+        end
+        button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
+        -- Atualiza botão irmão exclusivo
+        if exclusiveFlag then
+            for _, child in pairs(panel:GetChildren()) do
+                if child:IsA("TextButton") and child ~= button then
+                    local childText = child.Text:lower()
+                    local exFlagText = exclusiveFlag:gsub("([A-Z])", " %1"):lower()
+                    exFlagText = exFlagText:gsub("^%l", string.upper)
+                    if childText:find(exFlagText) then
+                        child.Text = child.Text:sub(1, child.Text:find(":")) .. (_G[exclusiveFlag] and " ON" or " OFF")
+                    end
                 end
             end
         end
-        btn.Text = btn.Text:match("^(.-):") .. ": " .. (_G[flagName] and "ON" or "OFF")
-        updatePage() -- garante atualização visual
     end)
+    return button
 end
 
-toggleButton(aimbotAutoBtn, "aimbotAutoEnabled", {"aimbotManualEnabled", "aimbotLegitEnabled"})
-toggleButton(aimbotManualBtn, "aimbotManualEnabled", {"aimbotAutoEnabled", "aimbotLegitEnabled"})
-toggleButton(aimbotLegitBtn, "aimbotLegitEnabled", {"aimbotAutoEnabled", "aimbotManualEnabled"})
-toggleButton(showFOVBtn, "FOV_VISIBLE")
+-- Criação dos botões da página 1
+local aimbotAutoBtn = createToggleButton("Aimbot Auto", 40, "aimbotAutoEnabled", "aimbotManualEnabled")
+local aimbotManualBtn = createToggleButton("Aimbot Manual", 75, "aimbotManualEnabled", "aimbotAutoEnabled")
+local aimbotLegitBtn = createToggleButton("Aimbot Legit", 110, "aimbotLegitEnabled")
+local espEnemiesBtn = createToggleButton("ESP Inimigos", 145, "espEnemiesEnabled")
+local espAlliesBtn = createToggleButton("ESP Aliados", 180, "espAlliesEnabled")
+local showFOVBtn = createToggleButton("Mostrar FOV", 215, "FOV_VISIBLE")
 
-minusFOVBtn.MouseButton1Click:Connect(function()
-    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
-end)
+-- Botões para ajustar FOV abaixo do Mostrar FOV
+local function createFOVAdjustButton(text, yPos, delta)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.5, -15, 0, 30)
+    btn.Position = UDim2.new(text == "- FOV" and 0 or 0.5, 10, 0, yPos)
+    btn.Text = text
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Parent = panel
+    btn.MouseButton1Click:Connect(function()
+        _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + delta, 10, 300)
+    end)
+    return btn
+end
 
-plusFOVBtn.MouseButton1Click:Connect(function()
-    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
-end)
+local fovMinusBtn = createFOVAdjustButton("- FOV", 255, -5)
+local fovPlusBtn = createFOVAdjustButton("+ FOV", 255, 5)
 
--- ======= Conteúdo da página 2 =======
+-- Botões de navegação de páginas ▶️ e ◀️
+local btnNext = createButton("▶️", 290, panel)
+local btnBack = createButton("◀️", 290, panel)
+btnBack.Position = UDim2.new(0, 10, 0, 290)
+btnNext.Position = UDim2.new(1, -40, 0, 290)
 
-local espEnemiesBtn = Instance.new("TextButton")
-espEnemiesBtn.Size = aimbotAutoBtn.Size
-espEnemiesBtn.Position = UDim2.new(0, 0, 0, 0)
-espEnemiesBtn.Text = "ESP Inimigos: ON"
-espEnemiesBtn.Font = aimbotAutoBtn.Font
-espEnemiesBtn.TextSize = aimbotAutoBtn.TextSize
-espEnemiesBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-espEnemiesBtn.TextColor3 = aimbotAutoBtn.TextColor3
-espEnemiesBtn.Parent = page2Container
+btnBack.Visible = false -- começa na página 1, sem voltar
 
-local espAlliesBtn = Instance.new("TextButton")
-espAlliesBtn.Size = aimbotAutoBtn.Size
-espAlliesBtn.Position = UDim2.new(0, 0, 0, 40)
-espAlliesBtn.Text = "ESP Aliados: OFF"
-espAlliesBtn.Font = aimbotAutoBtn.Font
-espAlliesBtn.TextSize = aimbotAutoBtn.TextSize
-espAlliesBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-espAlliesBtn.TextColor3 = aimbotAutoBtn.TextColor3
-espAlliesBtn.Parent = page2Container
-
-local espBoxBtn = Instance.new("TextButton")
-espBoxBtn.Size = aimbotAutoBtn.Size
-espBoxBtn.Position = UDim2.new(0, 0, 0, 80)
-espBoxBtn.Text = "Box ESP: ON"
-espBoxBtn.Font = aimbotAutoBtn.Font
-espBoxBtn.TextSize = aimbotAutoBtn.TextSize
-espBoxBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-espBoxBtn.TextColor3 = aimbotAutoBtn.TextColor3
-espBoxBtn.Parent = page2Container
-
-local espLineBtn = Instance.new("TextButton")
-espLineBtn.Size = aimbotAutoBtn.Size
-espLineBtn.Position = UDim2.new(0, 0, 0, 120)
-espLineBtn.Text = "Linha ESP: OFF"
-espLineBtn.Font = aimbotAutoBtn.Font
-espLineBtn.TextSize = aimbotAutoBtn.TextSize
-espLineBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-espLineBtn.TextColor3 = aimbotAutoBtn.TextColor3
-espLineBtn.Parent = page2Container
-
-local espHPBtn = Instance.new("TextButton")
-espHPBtn.Size = aimbotAutoBtn.Size
-espHPBtn.Position = UDim2.new(0, 0, 0, 160)
-espHPBtn.Text = "HP ESP: ON"
-espHPBtn.Font = aimbotAutoBtn.Font
-espHPBtn.TextSize = aimbotAutoBtn.TextSize
-espHPBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-espHPBtn.TextColor3 = aimbotAutoBtn.TextColor3
-espHPBtn.Parent = page2Container
-
-local espDistBtn = Instance.new("TextButton")
-espDistBtn.Size = aimbotAutoBtn.Size
-espDistBtn.Position = UDim2.new(0, 0, 0, 200)
-espDistBtn.Text = "Distância ESP: OFF"
-espDistBtn.Font = aimbotAutoBtn.Font
-espDistBtn.TextSize = aimbotAutoBtn.TextSize
-espDistBtn.BackgroundColor3 = aimbotAutoBtn.BackgroundColor3
-espDistBtn.TextColor3 = aimbotAutoBtn.TextColor3
-espDistBtn.Parent = page2Container
-
--- Toggle para ESPs
-toggleButton(espEnemiesBtn, "espEnemiesEnabled")
-toggleButton(espAlliesBtn, "espAlliesEnabled")
-toggleButton(espBoxBtn, "espBoxEnabled")
-toggleButton(espLineBtn, "espLineEnabled")
-toggleButton(espHPBtn, "espHealthBarEnabled")
-toggleButton(espDistBtn, "espDistanceEnabled")
-
--- ======= Conteúdo da página 3 (Tutorial) =======
-
-local tutorialText = [[
-Como usar o menu:
-
-Página 1: Controle dos Aimbots e FOV
-- Aimbot Auto: Mira e atira automaticamente
-- Aimbot Manual: Mira automática, você atira
-- Aimbot Legit: Mira e atira precisos e seguros
-- Mostrar FOV: Exibe o círculo do campo de visão
-- +FOV / -FOV: Ajusta o tamanho do círculo do FOV
-
-Página 2: ESP e Wallhack
-- Ative/desative ESP para inimigos e aliados
-- Escolha exibir box, linha, HP e distância dos jogadores
-
-Página 3: Tutorial
-- Esta página mostra informações sobre o uso do menu
-- Clique no botão para fechar este tutorial
-]]
-
-local tutorialLabel = Instance.new("TextLabel")
-tutorialLabel.Size = UDim2.new(1, -20, 1, -40)
-tutorialLabel.Position = UDim2.new(0, 10, 0, 10)
-tutorialLabel.BackgroundTransparency = 1
-tutorialLabel.TextColor3 = Color3.new(1,1,1)
-tutorialLabel.Font = Enum.Font.SourceSans
-tutorialLabel.TextSize = 16
-tutorialLabel.TextWrapped = true
-tutorialLabel.Text = tutorialText
-tutorialLabel.Parent = page3Container
-
-local closeTutorialBtn = Instance.new("TextButton")
-closeTutorialBtn.Size = UDim2.new(0, 80, 0, 30)
-closeTutorialBtn.Position = UDim2.new(1, -90, 1, -40)
-closeTutorialBtn.Text = "Fechar"
-closeTutorialBtn.Font = Enum.Font.SourceSansBold
-closeTutorialBtn.TextSize = 16
-closeTutorialBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-closeTutorialBtn.TextColor3 = Color3.new(1,1,1)
-closeTutorialBtn.Parent = page3Container
-
-closeTutorialBtn.MouseButton1Click:Connect(function()
-    page3Container.Visible = false
-end)
-
--- Inicializa página 3 invisível (abre só clicando em tutorial)
-page3Container.Visible = false
-
--- Botão para abrir tutorial (sempre visível no painel)
-local openTutorialBtn = Instance.new("TextButton")
-openTutorialBtn.Size = UDim2.new(1, 0, 0, 30)
-openTutorialBtn.Position = UDim2.new(0, 0, 1, -40)
-openTutorialBtn.Text = "Abrir Tutorial"
-openTutorialBtn.Font = Enum.Font.SourceSansBold
-openTutorialBtn.TextSize = 18
-openTutorialBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-openTutorialBtn.TextColor3 = Color3.new(1,1,1)
-openTutorialBtn.Parent = panel
-
-openTutorialBtn.MouseButton1Click:Connect(function()
-    page3Container.Visible = true
-end)
-
--- Função para atualizar visibilidade após abrir tutorial
-local oldUpdatePage = updatePage
-updatePage = function()
-    if minimized then
-        prevPageBtn.Visible = false
-        nextPageBtn.Visible = false
-        page1Container.Visible = false
-        page2Container.Visible = false
-        page3Container.Visible = false
-        openTutorialBtn.Visible = false
-    else
-        -- Se tutorial aberto, esconde páginas normais
-        if page3Container.Visible then
-            prevPageBtn.Visible = false
-            nextPageBtn.Visible = false
-            page1Container.Visible = false
-            page2Container.Visible = false
-            openTutorialBtn.Visible = false
-        else
-            prevPageBtn.Visible = currentPage > 1
-            nextPageBtn.Visible = currentPage < totalPages
-            page1Container.Visible = currentPage == 1
-            page2Container.Visible = currentPage == 2
-            page3Container.Visible = false
-            openTutorialBtn.Visible = true
+-- Função para esconder todos botões (será usado para trocar páginas)
+local function hideAllButtons()
+    for _, child in pairs(panel:GetChildren()) do
+        if child:IsA("TextButton") then
+            child.Visible = false
         end
     end
 end
 
-updatePage()
+-- Função para mostrar página 1 (Aimbots e ESP básico)
+local function showPage1()
+    hideAllButtons()
+    aimbotAutoBtn.Visible = true
+    aimbotManualBtn.Visible = true
+    aimbotLegitBtn.Visible = true
+    espEnemiesBtn.Visible = true
+    espAlliesBtn.Visible = true
+    showFOVBtn.Visible = true
+    fovMinusBtn.Visible = true
+    fovPlusBtn.Visible = true
+    btnNext.Visible = true
+    btnBack.Visible = false
+end
 
--- CONTINUAÇÃO: Popup seleção de hitbox (menu Bacon)
+btnNext.MouseButton1Click:Connect(function()
+    if currentPage == 1 then
+        currentPage = 2
+        showPage2()
+    elseif currentPage == 2 then
+        currentPage = 3
+        showPage3()
+    end
+end)
 
+btnBack.MouseButton1Click:Connect(function()
+    if currentPage == 3 then
+        currentPage = 2
+        showPage2()
+    elseif currentPage == 2 then
+        currentPage = 1
+        showPage1()
+    end
+end)
+
+-- TODO: showPage2 e showPage3 serão criadas já com o layout correto
+
+-- Inicializa na página 1
+showPage1()
+
+-- Drag para mover o painel inteiro
+local dragging = false
+local dragStartPos, startPos
+
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStartPos = input.Position
+        startPos = panel.Position
+    end
+end)
+panel.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStartPos
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- Botão minimizar/maximizar (🔽/🔼) que fica separado e movível
+local toggleBtn = createButton("🔽", 10, gui)
+toggleBtn.Size = UDim2.new(0, 40, 0, 30)
+toggleBtn.Position = UDim2.new(0, 280, 0.5, -160)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+
+local toggleDragging = false
+local toggleDragStart, toggleStartPos
+
+toggleBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        toggleDragging = true
+        toggleDragStart = input.Position
+        toggleStartPos = toggleBtn.Position
+    end
+end)
+toggleBtn.InputChanged:Connect(function(input)
+    if toggleDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - toggleDragStart
+        toggleBtn.Position = UDim2.new(toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X, toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        toggleDragging = false
+    end
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if panel.Visible then
+        panel.Visible = false
+        toggleBtn.Text = "🔼"
+    else
+        panel.Visible = true
+        toggleBtn.Text = "🔽"
+    end
+end)
+
+-- ======= Circulo do FOV =======
+local fovCircle = Drawing.new("Circle")
+fovCircle.Transparency = 0.2
+fovCircle.Thickness = 1.5
+fovCircle.Filled = false
+fovCircle.Color = Color3.new(1,1,1)
+
+RunService.RenderStepped:Connect(function()
+    fovCircle.Radius = _G.FOV_RADIUS
+    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    fovCircle.Visible = _G.FOV_VISIBLE
+end)
+
+-- PARTE 2: Implementação dos AIMBOTS (Auto, Manual, Legit) com validação de paredes
+
+local mouse = LocalPlayer:GetMouse()
+local UserInput = UserInputService
+
+-- Função para checar se a posição está visível (não bloqueada por parede)
+local function isVisible(origin, targetPos)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local direction = (targetPos - origin).Unit * (targetPos - origin).Magnitude
+    local raycastResult = workspace:Raycast(origin, direction, raycastParams)
+    if raycastResult then
+        local hitPart = raycastResult.Instance
+        if hitPart and hitPart:IsDescendantOf(workspace) then
+            -- Se o objeto atingido NÃO for um inimigo (humano) ou parte da mesma equipe, retorna false
+            -- Aqui supomos que o personagem está visível se o raio não colidiu antes do inimigo
+            -- Ajuste conforme a lógica de seu jogo
+            if (targetPos - origin).Magnitude < (raycastResult.Position - origin).Magnitude - 0.1 then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+-- Função para pegar o melhor inimigo dentro do FOV com base na seleção da hitbox
+local function getBestTarget()
+    local cameraPos = Camera.CFrame.Position
+    local bestTarget = nil
+    local bestDistance = math.huge
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local origin = cameraPos
+                local targetPartName = nil
+
+                -- Verifica qual hitbox prioritária disponível
+                for partName, priority in pairs(_G.hitboxSelection) do
+                    if priority == "Prioritário" and player.Character:FindFirstChild(partName) then
+                        targetPartName = partName
+                        break
+                    end
+                end
+                if not targetPartName then
+                    -- Se nenhum prioritário, pega cabeça se tiver, senão humanoidrootpart
+                    targetPartName = player.Character:FindFirstChild("Head") and "Head" or "HumanoidRootPart"
+                end
+
+                local targetPart = player.Character:FindFirstChild(targetPartName)
+                if targetPart then
+                    -- Verifica se está visível (não obstruído)
+                    if isVisible(origin, targetPart.Position) then
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                        if onScreen then
+                            local centerX, centerY = Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2
+                            local distFromCenter = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(centerX, centerY)).Magnitude
+
+                            if distFromCenter <= _G.FOV_RADIUS and distFromCenter < bestDistance then
+                                bestDistance = distFromCenter
+                                bestTarget = {Player = player, Part = targetPart}
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return bestTarget
+end
+
+-- Função para mover a mira para o alvo suavemente (para legit)
+local function moveMouseToTarget(part, smoothness)
+    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+    if onScreen then
+        local centerX, centerY = Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2
+        local deltaX = (screenPos.X - centerX) / smoothness
+        local deltaY = (screenPos.Y - centerY) / smoothness
+
+        -- Usa UserInputService para mover o mouse (simulação)
+        -- Como não existe API oficial pra mover mouse em Roblox, isso pode ser um workaround via eventos de entrada
+        -- Aqui um exemplo teórico, você precisaria usar algum método externo para mover mouse real
+        -- Ou ajustar a câmera com Camera.CFrame para mirar (mais usado em Roblox)
+
+        local newCFrame = Camera.CFrame * CFrame.Angles(-math.rad(deltaY * 0.15), -math.rad(deltaX * 0.15), 0)
+        Camera.CFrame = newCFrame
+    end
+end
+
+-- Evento principal para controlar a mira com base nos modos ativados
+RunService.RenderStepped:Connect(function()
+    if _G.aimbotAutoEnabled or _G.aimbotLegitEnabled then
+        local target = getBestTarget()
+        if target then
+            if _G.aimbotAutoEnabled then
+                -- Mira instantânea na hitbox selecionada
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Part.Position)
+                -- Pode incluir disparo automático aqui se quiser
+            elseif _G.aimbotLegitEnabled then
+                -- Mira suave e precisa
+                moveMouseToTarget(target.Part, 15) -- 15 é a suavidade, ajuste para mais lento ou mais rápido
+                -- Disparo automático legítimo, exemplo:
+                local mouseDown = UserInput:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                if mouseDown then
+                    -- Aqui dispare só se o botão do mouse estiver pressionado, pra não atirar sozinho
+                    -- Você pode chamar o disparo do seu jogo aqui
+                end
+            end
+        end
+    elseif _G.aimbotManualEnabled then
+        -- Apenas mira manual, sem mover a câmera automaticamente
+        -- O jogador mira e atira manualmente
+    end
+end)
+
+-- PARTE 3: ESP + WALLHACK NEON COM CONTORNO AMARELO NO ALVO VISADO
+
+local espData = {}
+local highlights = {}
+
+-- Cria ou atualiza o highlight neon para wallhack
+local function updateHighlight(player, isTarget)
+    if not player.Character then return end
+
+    local highlight = highlights[player]
+    if not highlight then
+        highlight = Instance.new("Highlight")
+        highlight.Parent = workspace
+        highlights[player] = highlight
+    end
+
+    highlight.Adornee = player.Character
+    highlight.Enabled = _G.espEnemiesEnabled or _G.espAlliesEnabled
+    highlight.FillColor = isTarget and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(0, 255, 255)
+    highlight.OutlineColor = isTarget and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(0, 255, 255)
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+end
+
+local function disableHighlight(player)
+    local highlight = highlights[player]
+    if highlight then
+        highlight.Enabled = false
+    end
+end
+
+-- Cria ESP para um jogador
+local function createESP(player)
+    if player == LocalPlayer then return end
+
+    local box = Drawing.new("Square")
+    box.Thickness = 1.5
+    box.Filled = false
+    box.Visible = false
+
+    local line = Drawing.new("Line")
+    line.Thickness = 1
+    line.Color = Color3.fromRGB(255, 255, 255)
+    line.Visible = false
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Size = 14
+    nameTag.Center = true
+    nameTag.Outline = true
+    nameTag.Color = Color3.fromRGB(255, 255, 255)
+    nameTag.Visible = false
+
+    local healthBar = Drawing.new("Square")
+    healthBar.Filled = true
+    healthBar.Visible = false
+
+    local distanceTag = Drawing.new("Text")
+    distanceTag.Size = 12
+    distanceTag.Center = true
+    distanceTag.Outline = true
+    distanceTag.Color = Color3.fromRGB(255, 255, 255)
+    distanceTag.Visible = false
+
+    espData[player] = {
+        box = box,
+        line = line,
+        nameTag = nameTag,
+        healthBar = healthBar,
+        distanceTag = distanceTag
+    }
+
+    RunService.RenderStepped:Connect(function()
+        local char = player.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChildOfClass("Humanoid") then
+            box.Visible = false
+            line.Visible = false
+            nameTag.Visible = false
+            healthBar.Visible = false
+            distanceTag.Visible = false
+            disableHighlight(player)
+            return
+        end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local hrp = char.HumanoidRootPart
+
+        local ffa = isFFA()
+        if not ffa then
+            if player.Team == LocalPlayer.Team and not _G.espAlliesEnabled then
+                box.Visible = false
+                line.Visible = false
+                nameTag.Visible = false
+                healthBar.Visible = false
+                distanceTag.Visible = false
+                disableHighlight(player)
+                return
+            elseif player.Team ~= LocalPlayer.Team and not _G.espEnemiesEnabled then
+                box.Visible = false
+                line.Visible = false
+                nameTag.Visible = false
+                healthBar.Visible = false
+                distanceTag.Visible = false
+                disableHighlight(player)
+                return
+            end
+        else
+            if not _G.espEnemiesEnabled then
+                box.Visible = false
+                line.Visible = false
+                nameTag.Visible = false
+                healthBar.Visible = false
+                distanceTag.Visible = false
+                disableHighlight(player)
+                return
+            end
+        end
+
+        local head = char:FindFirstChild("Head")
+        if not head then return end
+
+        local topLeftPos, topLeftVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(-2, 3, 0))
+        local bottomRightPos, bottomRightVis = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(2, -3, 0))
+        local headPos, headVis = Camera:WorldToViewportPoint(head.Position)
+
+        if topLeftVis and bottomRightVis and headVis and topLeftPos.Z > 0 and bottomRightPos.Z > 0 and headPos.Z > 0 then
+            local width = bottomRightPos.X - topLeftPos.X
+            local height = bottomRightPos.Y - topLeftPos.Y
+            local x = topLeftPos.X
+            local y = topLeftPos.Y
+
+            -- Atualiza caixa
+            espData[player].box.Size = Vector2.new(width, height)
+            espData[player].box.Position = Vector2.new(x, y)
+            espData[player].box.Visible = _G.espBoxEnabled
+
+            -- Atualiza linha (do centro inferior da tela até o personagem)
+            local centerX, centerY = Camera.ViewportSize.X / 2, Camera.ViewportSize.Y
+            espData[player].line.From = Vector2.new(centerX, centerY)
+            espData[player].line.To = Vector2.new(headPos.X, headPos.Y)
+            espData[player].line.Color = (player == currentTarget) and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 255, 255)
+            espData[player].line.Visible = _G.espLineEnabled
+
+            -- Atualiza nome
+            espData[player].nameTag.Text = player.Name
+            espData[player].nameTag.Position = Vector2.new(headPos.X, headPos.Y - 20)
+            espData[player].nameTag.Color = (player == currentTarget) and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 255, 255)
+            espData[player].nameTag.Visible = _G.espNameEnabled
+
+            -- Atualiza barra de vida
+            local healthPercent = humanoid.Health / humanoid.MaxHealth
+            local barHeight = height
+            local barWidth = 5
+            local barX = x - barWidth - 3
+            local barY = y + (height * (1 - healthPercent))
+            espData[player].healthBar.Size = Vector2.new(barWidth, barHeight * healthPercent)
+            espData[player].healthBar.Position = Vector2.new(barX, barY)
+            espData[player].healthBar.Color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
+            espData[player].healthBar.Visible = _G.espHealthBarEnabled
+
+            -- Atualiza distância
+            local distance = math.floor((hrp.Position - Camera.CFrame.Position).Magnitude)
+            espData[player].distanceTag.Text = tostring(distance) .. "m"
+            espData[player].distanceTag.Position = Vector2.new(x + width / 2, y + height + 10)
+            espData[player].distanceTag.Visible = _G.espDistanceEnabled
+
+            -- Atualiza highlight (wallhack neon)
+            local isTarget = (player == currentTarget)
+            if (player.Team == LocalPlayer.Team and _G.espAlliesEnabled) or (player.Team ~= LocalPlayer.Team and _G.espEnemiesEnabled) then
+                updateHighlight(player, isTarget)
+            else
+                disableHighlight(player)
+            end
+
+        else
+            espData[player].box.Visible = false
+            espData[player].line.Visible = false
+            espData[player].nameTag.Visible = false
+            espData[player].healthBar.Visible = false
+            espData[player].distanceTag.Visible = false
+            disableHighlight(player)
+        end
+    end)
+end
+
+for _, player in pairs(Players:GetPlayers()) do
+    createESP(player)
+end
+Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(function(player)
+    local data = espData[player]
+    if data then
+        data.box:Remove()
+        data.line:Remove()
+        data.nameTag:Remove()
+        data.healthBar:Remove()
+        data.distanceTag:Remove()
+        espData[player] = nil
+    end
+    disableHighlight(player)
+end)
+
+-- PARTE 4: MENU DE SELEÇÃO DE HITBOX (POPUP 2D COM BACON) + NAVEGAÇÃO E TUTORIAL
+
+-- Cria o popup de seleção de hitbox (menu Bacon)
 local hitboxPopup = Instance.new("Frame")
 hitboxPopup.Size = UDim2.new(0, 300, 0, 400)
 hitboxPopup.Position = UDim2.new(0.5, -150, 0.5, -200)
 hitboxPopup.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 hitboxPopup.BorderSizePixel = 0
 hitboxPopup.Visible = false
-hitboxPopup.ZIndex = 10
 hitboxPopup.Parent = gui
 
--- Fundo escuro semi transparente para popup
-local popupBg = Instance.new("TextButton")
-popupBg.Size = UDim2.new(1, 0, 1, 0)
-popupBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-popupBg.BackgroundTransparency = 0.7
-popupBg.AutoButtonColor = false
-popupBg.Text = ""
-popupBg.Parent = hitboxPopup
-
-popupBg.MouseButton1Click:Connect(function()
+-- Fundo semi-transparente para fechar popup ao clicar fora
+local bgClose = Instance.new("TextButton")
+bgClose.Size = UDim2.new(1, 0, 1, 0)
+bgClose.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+bgClose.BackgroundTransparency = 0.6
+bgClose.Text = ""
+bgClose.Parent = hitboxPopup
+bgClose.ZIndex = 0
+bgClose.MouseButton1Click:Connect(function()
     hitboxPopup.Visible = false
 end)
 
--- Imagem do personagem Bacon (use o asset correto do Roblox)
+-- Imagem do Bacon (personagem Roblox)
 local baconImage = Instance.new("ImageLabel")
-baconImage.Size = UDim2.new(0, 280, 0, 320)
+baconImage.Size = UDim2.new(0, 280, 0, 380)
 baconImage.Position = UDim2.new(0, 10, 0, 10)
 baconImage.BackgroundTransparency = 1
-baconImage.Image = "rbxassetid://108276646" -- Exemplo: imagem do Bacon Roblox
+baconImage.Image = "rbxassetid://8967307840" -- Exemplo de ID do Bacon, substitua se quiser
 baconImage.Parent = hitboxPopup
 
--- Título
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 0, 30)
-titleLabel.Position = UDim2.new(0, 0, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Seleção de Hitbox"
-titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.TextSize = 20
-titleLabel.TextColor3 = Color3.new(1, 1, 1)
-titleLabel.Parent = hitboxPopup
+-- Cria botões invisíveis sobre partes do corpo
 
--- Função para criar área clicável invisível
-local function createHitboxButton(name, pos, size)
-    local btn = Instance.new("TextButton")
-    btn.Size = size
-    btn.Position = pos
-    btn.BackgroundTransparency = 1
-    btn.Text = ""
-    btn.Parent = baconImage
-
-    btn.MouseButton1Click:Connect(function()
-        local currentState = _G.hitboxSelection[name]
-        if currentState == "Nenhum" then
-            _G.hitboxSelection[name] = "Prioritário"
-        else
-            _G.hitboxSelection[name] = "Nenhum"
-        end
-        updateHitboxButtons()
-    end)
-    return btn
-end
-
--- Criar botões invisíveis para as partes do corpo (ajuste posições e tamanhos conforme imagem Bacon)
-local hitboxButtons = {
-    Head = createHitboxButton("Head", UDim2.new(0.4, 0, 0.05, 0), UDim2.new(0.2, 0, 0.15, 0)),
-    Torso = createHitboxButton("Torso", UDim2.new(0.35, 0, 0.2, 0), UDim2.new(0.3, 0, 0.3, 0)),
-    LeftArm = createHitboxButton("LeftArm", UDim2.new(0.1, 0, 0.2, 0), UDim2.new(0.15, 0, 0.3, 0)),
-    RightArm = createHitboxButton("RightArm", UDim2.new(0.75, 0, 0.2, 0), UDim2.new(0.15, 0, 0.3, 0)),
-    LeftLeg = createHitboxButton("LeftLeg", UDim2.new(0.4, 0, 0.5, 0), UDim2.new(0.15, 0, 0.3, 0)),
-    RightLeg = createHitboxButton("RightLeg", UDim2.new(0.55, 0, 0.5, 0), UDim2.new(0.15, 0, 0.3, 0)),
+local parts = {
+    {Name = "Head", Position = UDim2.new(0.35, 0, 0.05, 0), Size = UDim2.new(0, 60, 0, 60)},
+    {Name = "Torso", Position = UDim2.new(0.3, 0, 0.35, 0), Size = UDim2.new(0, 80, 0, 110)},
+    {Name = "LeftArm", Position = UDim2.new(0.1, 0, 0.35, 0), Size = UDim2.new(0, 50, 0, 110)},
+    {Name = "RightArm", Position = UDim2.new(0.65, 0, 0.35, 0), Size = UDim2.new(0, 50, 0, 110)},
+    {Name = "LeftLeg", Position = UDim2.new(0.35, 0, 0.75, 0), Size = UDim2.new(0, 50, 0, 100)},
+    {Name = "RightLeg", Position = UDim2.new(0.55, 0, 0.75, 0), Size = UDim2.new(0, 50, 0, 100)},
 }
 
--- Função para atualizar visual das áreas com base no estado (desenhar bordas)
-function updateHitboxButtons()
-    for part, btn in pairs(hitboxButtons) do
-        if _G.hitboxSelection[part] == "Prioritário" then
-            btn.BackgroundTransparency = 0.5
-            btn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-        else
-            btn.BackgroundTransparency = 1
-        end
+local function updateHitboxButtonColor(button, state)
+    if state == "Nenhum" then
+        button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        button.BackgroundTransparency = 0.7
+    elseif state == "Prioritário" then
+        button.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        button.BackgroundTransparency = 0.3
     end
 end
 
-updateHitboxButtons()
+local hitboxButtons = {}
 
--- Botão para abrir o popup de hitbox na página 1
-local openHitboxPopupBtn = Instance.new("TextButton")
-openHitboxPopupBtn.Size = UDim2.new(1, 0, 0, 30)
-openHitboxPopupBtn.Position = UDim2.new(0, 0, 0, 200)
-openHitboxPopupBtn.Text = "Selecionar Hitbox"
-openHitboxPopupBtn.Font = Enum.Font.SourceSansBold
-openHitboxPopupBtn.TextSize = 18
-openHitboxPopupBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-openHitboxPopupBtn.TextColor3 = Color3.new(1, 1, 1)
-openHitboxPopupBtn.Parent = page1Container
+for _, part in ipairs(parts) do
+    local btn = Instance.new("TextButton")
+    btn.Name = part.Name .. "Button"
+    btn.Size = part.Size
+    btn.Position = part.Position
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.BackgroundTransparency = 0.7
+    btn.Text = part.Name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    btn.Parent = baconImage
+    btn.ZIndex = 2
 
-openHitboxPopupBtn.MouseButton1Click:Connect(function()
+    btn.MouseButton1Click:Connect(function()
+        local currentState = _G.hitboxSelection[part.Name]
+        if currentState == "Nenhum" then
+            _G.hitboxSelection[part.Name] = "Prioritário"
+        else
+            _G.hitboxSelection[part.Name] = "Nenhum"
+        end
+        updateHitboxButtonColor(btn, _G.hitboxSelection[part.Name])
+    end)
+
+    updateHitboxButtonColor(btn, _G.hitboxSelection[part.Name])
+    hitboxButtons[part.Name] = btn
+end
+
+-- ===== MENU DE NAVEGAÇÃO (3 páginas) =====
+local currentPage = 1
+
+local function showPage(page)
+    currentPage = page
+    -- Oculta tudo
+    for _, child in pairs(panel:GetChildren()) do
+        if child:IsA("TextButton") and not (child == toggleButton or child == btnNext or child == btnBack) then
+            child.Visible = false
+        end
+    end
+    tutorialText.Visible = false
+    hitboxPopup.Visible = false
+
+    if page == 1 then
+        -- Página 1: Aimbots e Mostrar FOV + botões +FOV e -FOV
+        aimbotAutoBtn.Visible = true
+        aimbotManualBtn.Visible = true
+        aimbotLegitBtn.Visible = true
+        showFOVBtn.Visible = true
+        btnFovMinus.Visible = true
+        btnFovPlus.Visible = true
+    elseif page == 2 then
+        -- Página 2: ESP inimigos/aliados e opções do ESP
+        espEnemiesBtn.Visible = true
+        espAlliesBtn.Visible = true
+        espBoxBtn.Visible = true
+        espLineBtn.Visible = true
+        espNameBtn.Visible = true
+        espHealthBtn.Visible = true
+        espDistanceBtn.Visible = true
+        btnSelectHitbox.Visible = true
+    elseif page == 3 then
+        -- Página 3: Tutorial
+        tutorialText.Visible = true
+    end
+end
+
+-- Botão para abrir o popup de seleção de hitbox
+local btnSelectHitbox = Instance.new("TextButton")
+btnSelectHitbox.Size = UDim2.new(1, -20, 0, 30)
+btnSelectHitbox.Position = UDim2.new(0, 10, 0, 200)
+btnSelectHitbox.Text = "Selecionar Hitbox"
+btnSelectHitbox.Font = Enum.Font.SourceSansBold
+btnSelectHitbox.TextSize = 16
+btnSelectHitbox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+btnSelectHitbox.TextColor3 = Color3.new(1, 1, 1)
+btnSelectHitbox.Visible = false
+btnSelectHitbox.Parent = panel
+
+btnSelectHitbox.MouseButton1Click:Connect(function()
     hitboxPopup.Visible = true
 end)
 
--- Por fim, evitar que o GUI suma após morrer
+-- Botões de navegação entre páginas
+local btnNext = Instance.new("TextButton")
+btnNext.Size = UDim2.new(0, 40, 0, 30)
+btnNext.Position = UDim2.new(1, -50, 1, -40)
+btnNext.Text = "▶️"
+btnNext.Font = Enum.Font.SourceSansBold
+btnNext.TextSize = 20
+btnNext.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+btnNext.TextColor3 = Color3.new(1, 1, 1)
+btnNext.Parent = panel
+
+local btnBack = Instance.new("TextButton")
+btnBack.Size = UDim2.new(0, 40, 0, 30)
+btnBack.Position = UDim2.new(0, 10, 1, -40)
+btnBack.Text = "◀️"
+btnBack.Font = Enum.Font.SourceSansBold
+btnBack.TextSize = 20
+btnBack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+btnBack.TextColor3 = Color3.new(1, 1, 1)
+btnBack.Parent = panel
+
+btnNext.MouseButton1Click:Connect(function()
+    if currentPage < 3 then
+        showPage(currentPage + 1)
+    end
+end)
+
+btnBack.MouseButton1Click:Connect(function()
+    if currentPage > 1 then
+        showPage(currentPage - 1)
+    end
+end)
+
+-- Texto de tutorial (página 3)
+local tutorialText = Instance.new("TextLabel")
+tutorialText.Size = UDim2.new(1, -20, 1, -60)
+tutorialText.Position = UDim2.new(0, 10, 0, 10)
+tutorialText.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tutorialText.BackgroundTransparency = 0.3
+tutorialText.TextColor3 = Color3.new(1, 1, 1)
+tutorialText.Font = Enum.Font.SourceSansBold
+tutorialText.TextSize = 14
+tutorialText.TextWrapped = true
+tutorialText.TextYAlignment = Enum.TextYAlignment.Top
+tutorialText.Visible = false
+tutorialText.Parent = panel
+tutorialText.Text = [[
+Tutorial de Uso:
+
+- Página 1: Controle os modos de aimbot e o círculo de FOV.
+- Página 2: Ajuste as opções do ESP, selecione inimigos/aliados e personalize o hitbox.
+- Página 3: Leia este tutorial para entender cada botão e funcionalidade.
+
+Hitbox Prioritário: Quando ativado, o aimbot dará preferência para essa parte do corpo.
+Aimbot Legit: Mira automática e atira com precisão, evitando tiros inúteis.
+Aimbot Manual: Você mira e atira manualmente.
+]]
+-- Inicializa a página 1 ao iniciar
+showPage(1)
+
 return gui
