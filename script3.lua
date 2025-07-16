@@ -412,3 +412,97 @@ local function getClosestVisibleEnemy()
 
     return closestEnemy
 end
+
+aimButton.MouseButton1Down:Connect(function()
+    aiming = true
+end)
+aimButton.MouseButton1Up:Connect(function()
+    aiming = false
+    currentTarget = nil
+end)
+shootButton.MouseButton1Down:Connect(function()
+    shooting = true
+end)
+shootButton.MouseButton1Up:Connect(function()
+    shooting = false
+end)
+
+RunService.RenderStepped:Connect(function()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    -- Aimbot Automático
+    if _G.aimbotAutoEnabled then
+        local target = getClosestVisibleEnemy()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local head = target.Character.Head
+            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
+            if visible then
+                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
+                if dist <= _G.FOV_RADIUS then
+                    currentTarget = target
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                else
+                    currentTarget = nil
+                end
+            else
+                currentTarget = nil
+            end
+        else
+            currentTarget = nil
+        end
+    end
+
+    -- Aimbot Manual
+    if _G.aimbotManualEnabled and aiming and shooting then
+        local target = getClosestVisibleEnemy()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local head = target.Character.Head
+            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
+            if visible then
+                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
+                if dist <= _G.FOV_RADIUS then
+                    currentTarget = target
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                else
+                    currentTarget = nil
+                end
+            else
+                currentTarget = nil
+            end
+        else
+            currentTarget = nil
+        end
+    elseif not (_G.aimbotManualEnabled and aiming and shooting) and not _G.aimbotAutoEnabled then
+        currentTarget = nil
+    end
+
+    -- === Funcionalidades extras ativadas ===
+
+    if _G.infiniteAmmo then
+        -- Exemplo: resetar munição para máximo - substitua pelo código do seu jogo para municao
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Ammo") then
+            LocalPlayer.Character.Ammo.Value = math.huge
+        end
+    end
+
+    if _G.instantReload then
+        -- Exemplo: terminar o reload imediatamente - adapte conforme seu jogo
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Reloading") then
+            LocalPlayer.Character.Reloading.Value = false
+        end
+    end
+
+    if _G.noRecoil then
+        -- Exemplo simples: zerar recoil - adapte conforme seu jogo
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Recoil") then
+            LocalPlayer.Character.Recoil.Value = 0
+        end
+    end
+
+    if _G.noSpread then
+        -- Exemplo simples: zerar spread - adapte conforme seu jogo
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Spread") then
+            LocalPlayer.Character.Spread.Value = 0
+        end
+    end
+end)
