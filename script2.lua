@@ -77,6 +77,35 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
+-- Função para aplicar mods na arma
+local function applyWeaponMods(tool)
+    if not tool then return end
+
+    if _G.instareload then
+        tool:SetAttribute("reloadTime", 0)
+    else
+        tool:SetAttribute("reloadTime", 1) -- valor padrão, ajuste se precisar
+    end
+
+    if _G.noRecol then
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
+    else
+        tool:SetAttribute("recoilAimReduction", Vector2.new(1, 1))
+        tool:SetAttribute("recoilMax", Vector2.new(1, 1))
+        tool:SetAttribute("recoilMin", Vector2.new(1, 1))
+    end
+
+    if _G.infiniteAmmo then
+        tool:SetAttribute("_ammo", math.huge)
+        tool:SetAttribute("magazineSize", math.huge)
+    else
+        tool:SetAttribute("_ammo", 200)
+        tool:SetAttribute("magazineSize", 200)
+    end
+end
+
 -- Botão toggle genérico
 local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     local button = Instance.new("TextButton")
@@ -191,7 +220,6 @@ toggleButton.MouseButton1Click:Connect(function()
         panel.BackgroundTransparency = 0.2
         toggleButton.Position = UDim2.new(1, -50, 0, 5)
         gearButton.Visible = true
-        -- Ajusta tamanho do menu para o scale atual
         panel.Size = UDim2.new(0, 220, 0, scales[scaleIndex])
     end
 end)
@@ -207,24 +235,6 @@ local infiniteAmmoBtn = createToggleButton("Infinite Ammo", 250, "infiniteAmmo")
 local showFOVBtn = createToggleButton("Mostrar FOV", 285, "FOV_VISIBLE")
 createFOVAdjustButton("- FOV", 320, -5)
 createFOVAdjustButton("+ FOV", 320, 5)
-
--- Aplica mods na arma
-local function applyWeaponMods(tool)
-    if not tool then return end
-
-    if _G.instareload then
-        tool:SetAttribute("reloadTime", 0)
-    end
-    if _G.noRecol then
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-    end
-    if _G.infiniteAmmo then
-        tool:SetAttribute("_ammo", math.huge)
-        tool:SetAttribute("magazineSize", math.huge)
-    end
-end
 
 -- Forçar exibição visual fixa da munição para parecer 200
 RunService.RenderStepped:Connect(function()
