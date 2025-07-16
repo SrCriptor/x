@@ -13,10 +13,10 @@ _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
-_G.infiniteAmmo = true
-_G.autoSpread = true
-_G.instantReload = true
-_G.fastShot = true
+_G.infiniteAmmo = false
+_G.autoSpread = false
+_G.instantReload = false
+_G.fastShot = false
 
 local shooting = false
 local aiming = false
@@ -221,10 +221,10 @@ panel:GetPropertyChangedSignal("Visible"):Connect(function()
     extraPage.Visible = not onMainPage and panel.Visible
 end)
 
--- LT Settings aplicadas via flags
+-- LT Settings (valores base)
 local ltValues = {
     ["_ammo"] = 200,
-    ["rateOfFire"] = 100, -- taxa média: 100 ms entre tiros (10 tiros por segundo)
+    ["rateOfFire"] = 100, -- taxa média: 100ms entre tiros (10 tiros por segundo)
     ["recoilAimReduction"] = Vector2.new(0, 0),
     ["recoilMax"] = Vector2.new(0, 0),
     ["recoilMin"] = Vector2.new(0, 0),
@@ -234,47 +234,38 @@ local ltValues = {
     ["magazineSize"] = 200
 }
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    local tool
-    while not tool and task.wait() do
-        tool = char:FindFirstChildWhichIsA("Tool")
-    end
-    if tool then
-        for i, v in ltValues do
-            if (_G.infiniteAmmo and i == "_ammo") or
-               (_G.fastShot and i == "rateOfFire") or
-               ((_G.autoSpread or _G.fastShot) and (i == "recoilAimReduction" or i == "recoilMax" or i == "recoilMin")) or
-               (_G.autoSpread and i == "spread") or
-               (_G.instantReload and i == "reloadTime") or
-               (_G.infiniteAmmo and i == "magazineSize") then
-                tool:SetAttribute(i, v)
-            end
-        end
-    end
-end)
-
--- Auto Spread Dinâmico
-RunService.Heartbeat:Connect(function()
-    if not _G.autoSpread then return end
-    local char, hit = LocalPlayer.Character, LocalPlayer:GetMouse().Hit
-    if char and hit then
-        local tool, hd = char:FindFirstChildWhichIsA("Tool"), char:FindFirstChild("Head")
-        if tool and hd then
-            tool:SetAttribute("spread", 30 - (hd.Position - hit.Position).Magnitude / 5)
-        end
-    end
-end)
-
--- Mantém munição infinita enquanto ativado
+-- Atualização dinâmica dos atributos do Tool conforme flags ativas
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     local tool = char:FindFirstChildWhichIsA("Tool")
     if not tool then return end
-    
+
     if _G.infiniteAmmo then
         tool:SetAttribute("_ammo", ltValues["_ammo"])
         tool:SetAttribute("magazineSize", ltValues["magazineSize"])
+    end
+
+    if _G.fastShot then
+        tool:SetAttribute("rateOfFire", ltValues["rateOfFire"])
+        tool:SetAttribute("recoilAimReduction", ltValues["recoilAimReduction"])
+        tool:SetAttribute("recoilMax", ltValues["recoilMax"])
+        tool:SetAttribute("recoilMin", ltValues["recoilMin"])
+    end
+
+    if _G.autoSpread then
+        local head = char:FindFirstChild("Head")
+        if head then
+            local hit = LocalPlayer:GetMouse().Hit
+            tool:SetAttribute("spread", 30 - (head.Position - hit.Position).Magnitude / 5)
+        end
+        tool:SetAttribute("recoilAimReduction", ltValues["recoilAimReduction"])
+        tool:SetAttribute("recoilMax", ltValues["recoilMax"])
+        tool:SetAttribute("recoilMin", ltValues["recoilMin"])
+    end
+
+    if _G.instantReload then
+        tool:SetAttribute("reloadTime", ltValues["reloadTime"])
     end
 end)
 
@@ -307,7 +298,6 @@ RunService.RenderStepped:Connect(function()
         ammoDisplay.Text = "Ammo: ∞"
     else
         local currentAmmo = tool:GetAttribute("_ammo") or maxAmmo
-        -- Para evitar número gigantes, limite o texto
         if currentAmmo > maxAmmo then currentAmmo = maxAmmo end
         ammoDisplay.Text = string.format("Ammo: %d / %d", currentAmmo, maxAmmo)
     end
