@@ -385,15 +385,8 @@ end)
 -- Função para ajustar o tiro por rateOfFire
 local function shootGun(tool)
     if not tool then return end
-    local fireRate = tool:GetAttribute("rateOfFire") or 200
-    -- A cada 5 disparos: (200 / 5) = 40 ticks entre disparos (aprox)
-    -- Aqui você pode ajustar fireRate para controlar cadência
-    -- Exemplo para atirar 5 tiros por vez, delay entre cada 40ms (ajuste conforme necessidade)
-
-    -- Para exemplo básico, vamos simular disparo 5x em sequência com delay
+    local fireRate = tool:GetAttribute("rateOfFire") or 70
     for i = 1, 5 do
-        -- Aqui deve chamar o método do seu jogo para disparar a arma
-        -- tool:Fire() -- Exemplo, substitua pela função do seu jogo
         task.wait(0.04) -- 40 ms entre tiros = 25 tiros por segundo (ajuste)
     end
 end
