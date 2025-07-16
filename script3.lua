@@ -1,275 +1,340 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
 
--- Configurações globais
-_G.FOV_RADIUS = 65
-_G.FOV_VISIBLE = true
-_G.aimbotAutoEnabled = false
-_G.aimbotManualEnabled = false
-_G.espEnemiesEnabled = true
-_G.espAlliesEnabled = false
+-- Criação do Menu GUI
+local player = game.Players.LocalPlayer
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CustomMenuGUI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Extras para armas
-_G.infiniteAmmo = true
-_G.instantReload = true
-_G.noRecoil = true
-_G.noSpread = true
-_G.fastShoot = false
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
 
--- Tabela de atributos default da arma
-_G.lt = {
-    ["_ammo"] = math.huge,
-    ["rateOfFire"] = 0.1,  -- Cadência padrão, ajuste se quiser fastShoot
-    ["recoilAimReduction"] = Vector2.new(0, 0),
-    ["recoilMax"] = Vector2.new(0, 0),
-    ["recoilMin"] = Vector2.new(0, 0),
-    ["spread"] = 0,
-    ["reloadTime"] = 0,
-    ["zoom"] = 3,
-    ["magazineSize"] = math.huge
-}
+-- Página atual
+local currentPage = 1
 
-local shooting = false
-local aiming = false
-local dragging = false
-local dragStart, startPos
-local currentTarget = nil
-
--- Referência aos botões mobile - adapte se necessário
-local aimButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
-    .Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("AimButton")
-local shootButton = LocalPlayer.PlayerScripts:WaitForChild("Assets")
-    .Ui.TouchInputController.BlasterTouchGui.Buttons:WaitForChild("ShootButton")
-
--- Função para saber se é Free For All
-local function isFFA()
-    local teams = {}
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Team then
-            teams[player.Team] = true
+-- Função para limpar botões antigos
+local function clearButtons()
+    for _, child in ipairs(frame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
         end
     end
-    local count = 0
-    for _ in pairs(teams) do count = count + 1 end
-    return count <= 1
 end
 
--- Função para checar se personagem está vivo
-local function isAlive(character)
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    return humanoid and humanoid.Health > 0
-end
-
--- Função para checar linha de visão
-local function hasLineOfSight(targetPart)
-    local origin = Camera.CFrame.Position
-    local direction = (targetPart.Position - origin)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-    local raycastResult = workspace:Raycast(origin, direction, raycastParams)
-    if raycastResult then
-        local hitPart = raycastResult.Instance
-        if hitPart and hitPart:IsDescendantOf(targetPart.Parent) then
-            return true
-        else
-            return false
-        end
-    else
-        return true
+-- Função para criar botões da página 1
+local function createPage1()
+    clearButtons()
+    local btnNames = {"Infinite Ammo", "Auto Spread", "Instant Reload", "Fastshot"}
+    for i, name in ipairs(btnNames) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 260, 0, 35)
+        btn.Position = UDim2.new(0, 20, 0, 20 + (i-1)*45)
+        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        btn.TextColor3 = Color3.fromRGB(255,255,255)
+        btn.Text = name
+        btn.Font = Enum.Font.SourceSansBold
+        btn.TextSize = 20
+        btn.Parent = frame
+        -- Aqui você pode conectar as funções dos botões depois
     end
 end
 
--- Atualiza os atributos da arma (tool) com as configurações globais
-local function applyWeaponAttributes(tool)
+-- ======= MENU DE PÁGINAS E BOTÕES EXTRAS =======
+local currentPage = 1
+local pageButtons = {}
+
+local function clearPageButtons()
+    for _, btn in ipairs(pageButtons) do
+        if btn and btn.Parent then btn:Destroy() end
+    end
+    pageButtons = {}
+end
+
+local infiniteAmmoEnabled = false
+local autoSpreadEnabled = false
+local instantReloadEnabled = false
+local fastShotEnabled = false
+
+local function applyGunMods(tool)
     if not tool then return end
-
-    -- Infinite Ammo: setar munição alta
-    local ammo = tool:FindFirstChild("Ammo")
-    if ammo and _G.infiniteAmmo then
-        ammo.Value = math.huge
+    if infiniteAmmoEnabled then
+        tool:SetAttribute("_ammo", 200)
+        tool:SetAttribute("magazineSize", 200)
     end
-
-    -- Instant Reload: para jogos que usam BoolValue ou NumberValue para reload
-    local reloading = tool:FindFirstChild("Reloading")
-    if reloading and _G.instantReload then
-        if reloading:IsA("BoolValue") then
-            reloading.Value = false
-        elseif reloading:IsA("NumberValue") then
-            reloading.Value = 0
-        end
-    end
-
-    -- No Recoil: zera recoil (supondo atributos)
-    if _G.noRecoil then
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-    end
-
-    -- No Spread
-    if _G.noSpread then
+    if autoSpreadEnabled then
         tool:SetAttribute("spread", 0)
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0,0))
+        tool:SetAttribute("recoilMax", Vector2.new(0,0))
+        tool:SetAttribute("recoilMin", Vector2.new(0,0))
     end
-
-    -- Fast Shoot: diminuir tempo entre tiros
-    if _G.fastShoot then
-        tool:SetAttribute("rateOfFire", 0.02) -- 20ms entre tiros (muito rápido)
-    else
-        tool:SetAttribute("rateOfFire", 0.1) -- padrão (ajuste conforme seu jogo)
+    if instantReloadEnabled then
+        tool:SetAttribute("reloadTime", 0)
+    end
+    if fastShotEnabled then
+        tool:SetAttribute("rateOfFire", 200)
     end
 end
 
--- Atualiza arma atual e aplica atributos
-local function onCharacterAdded(character)
-    local tool
+local function resetGunMods(tool)
+    if not tool then return end
+    -- Aqui você pode colocar valores padrão do jogo, se souber
+    -- Exemplo:
+    -- tool:SetAttribute("_ammo", 30)
+    -- tool:SetAttribute("magazineSize", 30)
+    -- tool:SetAttribute("spread", 1)
+    -- tool:SetAttribute("recoilAimReduction", Vector2.new(0.1,0.1))
+    -- tool:SetAttribute("recoilMax", Vector2.new(1,1))
+    -- tool:SetAttribute("recoilMin", Vector2.new(0.5,0.5))
+    -- tool:SetAttribute("reloadTime", 1.5)
+    -- tool:SetAttribute("rateOfFire", 10)
+end
 
-    -- Espera até o personagem ter uma arma
-    repeat
-        tool = character:FindFirstChildWhichIsA("Tool")
-        task.wait(0.1)
-    until tool
+local function updateGunMods()
+    local char = player.Character
+    if not char then return end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool then
+        applyGunMods(tool)
+    end
+end
 
-    applyWeaponAttributes(tool)
-
-    -- Caso troque de arma, reaplica
-    character.ChildAdded:Connect(function(child)
+player.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(child)
         if child:IsA("Tool") then
-            applyWeaponAttributes(child)
+            task.wait(0.1)
+            applyGunMods(child)
         end
     end)
+end)
+
+local function createPage1Buttons()
+    clearPageButtons()
+    -- Infinite Ammo
+    local btn1 = Instance.new("TextButton")
+    btn1.Size = UDim2.new(1, -20, 0, 30)
+    btn1.Position = UDim2.new(0, 10, 0, 40)
+    btn1.Text = "Infinite Ammo: OFF"
+    btn1.Font = Enum.Font.SourceSansBold
+    btn1.TextSize = 16
+    btn1.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn1.TextColor3 = Color3.new(1, 1, 1)
+    btn1.Parent = frame
+    btn1.MouseButton1Click:Connect(function()
+        infiniteAmmoEnabled = not infiniteAmmoEnabled
+        btn1.Text = "Infinite Ammo: "..(infiniteAmmoEnabled and "ON" or "OFF")
+        updateGunMods()
+    end)
+    table.insert(pageButtons, btn1)
+
+    -- Auto Spread
+    local btn2 = Instance.new("TextButton")
+    btn2.Size = UDim2.new(1, -20, 0, 30)
+    btn2.Position = UDim2.new(0, 10, 0, 75)
+    btn2.Text = "Auto Spread: OFF"
+    btn2.Font = Enum.Font.SourceSansBold
+    btn2.TextSize = 16
+    btn2.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn2.TextColor3 = Color3.new(1, 1, 1)
+    btn2.Parent = frame
+    btn2.MouseButton1Click:Connect(function()
+        autoSpreadEnabled = not autoSpreadEnabled
+        btn2.Text = "Auto Spread: "..(autoSpreadEnabled and "ON" or "OFF")
+        updateGunMods()
+    end)
+    table.insert(pageButtons, btn2)
+
+    -- Instant Reload
+    local btn3 = Instance.new("TextButton")
+    btn3.Size = UDim2.new(1, -20, 0, 30)
+    btn3.Position = UDim2.new(0, 10, 0, 110)
+    btn3.Text = "Instant Reload: OFF"
+    btn3.Font = Enum.Font.SourceSansBold
+    btn3.TextSize = 16
+    btn3.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn3.TextColor3 = Color3.new(1, 1, 1)
+    btn3.Parent = frame
+    btn3.MouseButton1Click:Connect(function()
+        instantReloadEnabled = not instantReloadEnabled
+        btn3.Text = "Instant Reload: "..(instantReloadEnabled and "ON" or "OFF")
+        updateGunMods()
+    end)
+    table.insert(pageButtons, btn3)
+
+    -- Fast Shot
+    local btn4 = Instance.new("TextButton")
+    btn4.Size = UDim2.new(1, -20, 0, 30)
+    btn4.Position = UDim2.new(0, 10, 0, 145)
+    btn4.Text = "Fast Shot: OFF"
+    btn4.Font = Enum.Font.SourceSansBold
+    btn4.TextSize = 16
+    btn4.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn4.TextColor3 = Color3.new(1, 1, 1)
+    btn4.Parent = frame
+    btn4.MouseButton1Click:Connect(function()
+        fastShotEnabled = not fastShotEnabled
+        btn4.Text = "Fast Shot: "..(fastShotEnabled and "ON" or "OFF")
+        updateGunMods()
+    end)
+    table.insert(pageButtons, btn4)
 end
 
--- Evento para aplicar atributos quando personagem nasce
-LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
-if LocalPlayer.Character then
-    onCharacterAdded(LocalPlayer.Character)
+local function createPage2Buttons()
+    clearPageButtons()
+    local info = Instance.new("TextLabel")
+    info.Size = UDim2.new(1, -20, 0, 30)
+    info.Position = UDim2.new(0, 10, 0, 40)
+    info.BackgroundTransparency = 1
+    info.TextColor3 = Color3.fromRGB(200,200,200)
+    info.Text = "Página 2\n(Adicione mais funções aqui)"
+    info.Font = Enum.Font.SourceSans
+    info.TextSize = 18
+    info.Parent = frame
+    table.insert(pageButtons, info)
 end
 
--- Função para achar o inimigo visível mais próximo no FOV
-local function getClosestVisibleEnemy()
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local shortestDistance = _G.FOV_RADIUS
-    local closestEnemy = nil
-    local ffa = isFFA()
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player == LocalPlayer or not player.Character then continue end
-        if not isAlive(player.Character) then continue end
-
-        if not ffa then
-            if player.Team == LocalPlayer.Team and not _G.espAlliesEnabled then continue end
-            if player.Team ~= LocalPlayer.Team and not _G.espEnemiesEnabled then continue end
-        else
-            if not _G.espEnemiesEnabled then continue end
-        end
-
-        local head = player.Character:FindFirstChild("Head")
-        if not head then continue end
-
-        local screenPos, visible = Camera:WorldToViewportPoint(head.Position)
-        if not visible then continue end
-
-        local distToCenter = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-        if distToCenter > shortestDistance then continue end
-
-        if not hasLineOfSight(head) then continue end
-
-        shortestDistance = distToCenter
-        closestEnemy = player
+local function updatePage()
+    if currentPage == 1 then
+        createPage1Buttons()
+    elseif currentPage == 2 then
+        createPage2Buttons()
     end
-
-    return closestEnemy
 end
 
--- Controles dos botões de mira e tiro mobile
-aimButton.MouseButton1Down:Connect(function()
-    aiming = true
+-- Botão de avançar página ▶️
+local nextBtn = Instance.new("TextButton")
+nextBtn.Size = UDim2.new(0, 30, 0, 30)
+nextBtn.Position = UDim2.new(1, -35, 1, -35)
+nextBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+nextBtn.Text = "▶️"
+nextBtn.Font = Enum.Font.SourceSansBold
+nextBtn.TextSize = 20
+nextBtn.TextColor3 = Color3.fromRGB(255,255,255)
+nextBtn.Parent = frame
+
+-- Botão de voltar página ◀️
+local prevBtn = Instance.new("TextButton")
+prevBtn.Size = UDim2.new(0, 30, 0, 30)
+prevBtn.Position = UDim2.new(0, 5, 1, -35)
+prevBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+prevBtn.Text = "◀️"
+prevBtn.Font = Enum.Font.SourceSansBold
+prevBtn.TextSize = 20
+prevBtn.TextColor3 = Color3.fromRGB(255,255,255)
+prevBtn.Parent = frame
+
+nextBtn.MouseButton1Click:Connect(function()
+    if currentPage < 2 then
+        currentPage = currentPage + 1
+        updatePage()
+    end
 end)
-aimButton.MouseButton1Up:Connect(function()
-    aiming = false
-    currentTarget = nil
-end)
-shootButton.MouseButton1Down:Connect(function()
-    shooting = true
-end)
-shootButton.MouseButton1Up:Connect(function()
-    shooting = false
+prevBtn.MouseButton1Click:Connect(function()
+    if currentPage > 1 then
+        currentPage = currentPage - 1
+        updatePage()
+    end
 end)
 
--- Desenho do círculo do FOV
-local fovCircle = Drawing.new("Circle")
-fovCircle.Transparency = 0.2
-fovCircle.Thickness = 1.5
-fovCircle.Filled = false
-fovCircle.Color = Color3.new(1, 1, 1)
+-- Inicializa na página 1
+updatePage()
 
-RunService.RenderStepped:Connect(function()
-    fovCircle.Radius = _G.FOV_RADIUS
-    fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    fovCircle.Visible = _G.FOV_VISIBLE
-end)
+-- Função para criar botões toggle com exclusividade entre 2 flags
+local function createToggleButton(text, yPos, flagName, exclusiveFlag)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -20, 0, 30)
+    button.Position = UDim2.new(0, 10, 0, yPos)
+    button.Text = text .. ": OFF"
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 16
+    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Parent = frame
 
--- Loop principal para aimbot e cheats
-RunService.RenderStepped:Connect(function()
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    button.MouseButton1Click:Connect(function()
+        _G[flagName] = not _G[flagName]
+        -- Exclusividade entre aimbots automático e manual
+        if exclusiveFlag and _G[flagName] then
+            _G[exclusiveFlag] = false
+        end
+        button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
 
-    -- Aimbot automático
-    if _G.aimbotAutoEnabled then
-        local target = getClosestVisibleEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible then
-                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-                if dist <= _G.FOV_RADIUS then
-                    currentTarget = target
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                else
-                    currentTarget = nil
+        -- Atualiza botão irmão (exclusivo)
+        if exclusiveFlag then
+            for _, sibling in pairs(frame:GetChildren()) do
+                if sibling:IsA("TextButton") and sibling ~= button then
+                    local siblingText = sibling.Text:lower()
+                    local exclusiveFlagText = exclusiveFlag:gsub("([A-Z])", " %1"):lower()
+                    exclusiveFlagText = exclusiveFlagText:gsub("^%l", string.upper)
+                    if siblingText:find(exclusiveFlagText) then
+                        sibling.Text = sibling.Text:sub(1, sibling.Text:find(":")) .. (_G[exclusiveFlag] and " ON" or " OFF")
+                    end
                 end
-            else
-                currentTarget = nil
             end
-        else
-            currentTarget = nil
         end
-    end
+    end)
+    return button
+end
 
-    -- Aimbot manual (quando mira e atira)
-    if _G.aimbotManualEnabled and aiming and shooting then
-        local target = getClosestVisibleEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible then
-                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-                if dist <= _G.FOV_RADIUS then
-                    currentTarget = target
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                else
-                    currentTarget = nil
-                end
-            else
-                currentTarget = nil
-            end
-        else
-            currentTarget = nil
-        end
-    elseif not (_G.aimbotManualEnabled and aiming and shooting) and not _G.aimbotAutoEnabled then
-        currentTarget = nil
-    end
+-- Função para criar botões da página 2 (exemplo, pode adicionar mais depois)
+local function createPage2()
+    clearButtons()
+    local info = Instance.new("TextLabel")
+    info.Size = UDim2.new(1, 0, 1, 0)
+    info.BackgroundTransparency = 1
+    info.TextColor3 = Color3.fromRGB(200,200,200)
+    info.Text = "Página 2\n(Adicione mais funções aqui)"
+    info.Font = Enum.Font.SourceSans
+    info.TextSize = 22
+    info.Parent = frame
+end
 
-    -- Atualiza atributos da arma em loop (se quiser garantir cheat ativo)
-    local char = LocalPlayer.Character
-    if char then
-        local tool = char:FindFirstChildWhichIsA("Tool")
-        if tool then
-            applyWeaponAttributes(tool)
-        end
+-- Botão de avançar página ▶️
+local nextBtn = Instance.new("TextButton")
+nextBtn.Size = UDim2.new(0, 40, 0, 40)
+nextBtn.Position = UDim2.new(1, -45, 1, -45)
+nextBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+nextBtn.Text = "▶️"
+nextBtn.Font = Enum.Font.SourceSansBold
+nextBtn.TextSize = 24
+nextBtn.TextColor3 = Color3.fromRGB(255,255,255)
+nextBtn.Parent = frame
+
+-- Botão de voltar página ◀️
+local prevBtn = Instance.new("TextButton")
+prevBtn.Size = UDim2.new(0, 40, 0, 40)
+prevBtn.Position = UDim2.new(0, 5, 1, -45)
+prevBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+prevBtn.Text = "◀️"
+prevBtn.Font = Enum.Font.SourceSansBold
+prevBtn.TextSize = 24
+prevBtn.TextColor3 = Color3.fromRGB(255,255,255)
+prevBtn.Parent = frame
+
+-- Funções de navegação
+local function updatePage()
+    if currentPage == 1 then
+        createPage1()
+    elseif currentPage == 2 then
+        createPage2()
+    end
+end
+
+nextBtn.MouseButton1Click:Connect(function()
+    if currentPage < 2 then
+        currentPage = currentPage + 1
+        updatePage()
     end
 end)
+
+prevBtn.MouseButton1Click:Connect(function()
+    if currentPage > 1 then
+        currentPage = currentPage - 1
+        updatePage()
+    end
+end)
+
+-- Inicializa na página 1
+updatePage()
