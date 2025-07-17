@@ -1,3 +1,4 @@
+-- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -28,7 +29,6 @@ gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Painel principal
 local panel = Instance.new("Frame")
 panel.Size = UDim2.new(0, 220, 0, 320)
 panel.Position = UDim2.new(0, 20, 0.5, -160)
@@ -38,7 +38,6 @@ panel.BorderSizePixel = 0
 panel.Active = true
 panel.Parent = gui
 
--- Botão setinha minimizar/abrir, arrastável separadamente
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 40, 0, 30)
 toggleButton.Position = UDim2.new(0, 250, 0.5, -160)
@@ -51,13 +50,8 @@ toggleButton.Parent = gui
 
 local minimized = false
 local function updateToggleState()
-    if minimized then
-        panel.Visible = false
-        toggleButton.Text = "🔼"
-    else
-        panel.Visible = true
-        toggleButton.Text = "🔽"
-    end
+    panel.Visible = not minimized
+    toggleButton.Text = minimized and "🔼" or "🔽"
 end
 
 toggleButton.MouseButton1Click:Connect(function()
@@ -88,18 +82,15 @@ end
 setupDrag(panel)
 setupDrag(toggleButton)
 
--- Criação dos botões toggle com exclusividade (desliga outro aimbot)
 local function createToggleButton(text, yPos, flagName, exclusiveFlag)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -20, 0, 30)
     button.Position = UDim2.new(0, 10, 0, yPos)
-    button.Text = text .. ": ON"
     button.Font = Enum.Font.SourceSansBold
     button.TextSize = 16
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     button.TextColor3 = Color3.new(1, 1, 1)
     button.Parent = panel
-
     button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
 
     button.MouseButton1Click:Connect(function()
@@ -107,7 +98,6 @@ local function createToggleButton(text, yPos, flagName, exclusiveFlag)
         if exclusiveFlag and _G[flagName] then
             _G[exclusiveFlag] = false
         end
-
         button.Text = text .. (_G[flagName] and ": ON" or ": OFF")
 
         if exclusiveFlag then
@@ -138,7 +128,6 @@ local function createFOVAdjustButton(text, yPos, delta)
     end)
 end
 
--- Criar botões
 local aimbotAutoBtn = createToggleButton("Aimbot Auto", 145, "aimbotAutoEnabled", "aimbotManualEnabled")
 local aimbotLegitBtn = createToggleButton("Aimbot Legit", 180, "aimbotManualEnabled", "aimbotAutoEnabled")
 local espEnemiesBtn = createToggleButton("ESP Inimigos", 215, "espEnemiesEnabled")
@@ -150,7 +139,6 @@ local showFOVBtn = createToggleButton("Mostrar FOV", 285, "FOV_VISIBLE")
 createFOVAdjustButton("- FOV", 320, -5)
 createFOVAdjustButton("+ FOV", 320, 5)
 
--- Círculo do FOV
 local fovCircle = Drawing.new("Circle")
 fovCircle.Transparency = 0.2
 fovCircle.Thickness = 1.5
@@ -163,7 +151,6 @@ RunService.RenderStepped:Connect(function()
     fovCircle.Visible = _G.FOV_VISIBLE
 end)
 
--- Funções úteis
 local function isAlive(character)
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     return humanoid and humanoid.Health > 0
@@ -176,9 +163,7 @@ local function isFFA()
             teams[player.Team] = true
         end
     end
-    local count = 0
-    for _ in pairs(teams) do count = count + 1 end
-    return count <= 1
+    return next(teams) == nil or next(teams, next(teams)) == nil
 end
 
 local function hasLineOfSight(targetPart)
@@ -188,80 +173,68 @@ local function hasLineOfSight(targetPart)
     raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 
-    local raycastResult = workspace:Raycast(origin, direction, raycastParams)
-    if raycastResult then
-        local hitPart = raycastResult.Instance
-        if hitPart and hitPart:IsDescendantOf(targetPart.Parent) then
-            return true
-        else
-            return false
-        end
-    else
-        return true
-    end
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return not result or result.Instance:IsDescendantOf(targetPart.Parent)
 end
 
 local function getClosestVisibleEnemy()
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local shortestDistance = _G.FOV_RADIUS
     local closestEnemy = nil
+    local shortestDistance = _G.FOV_RADIUS
     local ffa = isFFA()
 
     for _, player in pairs(Players:GetPlayers()) do
         if player == LocalPlayer or not player.Character then continue end
         if not isAlive(player.Character) then continue end
 
+        local isAlly = player.Team == LocalPlayer.Team
         if not ffa then
-            if player.Team == LocalPlayer.Team and not _G.espAlliesEnabled then continue end
-            if player.Team ~= LocalPlayer.Team and not _G.espEnemiesEnabled then continue end
+            if isAlly and not _G.espAlliesEnabled then continue end
+            if not isAlly and not _G.espEnemiesEnabled then continue end
         else
             if not _G.espEnemiesEnabled then continue end
         end
 
         local head = player.Character:FindFirstChild("Head")
-        if not head then continue end
-
-        local screenPos, visible = Camera:WorldToViewportPoint(head.Position)
-        if not visible then continue end
-
-        local distToCenter = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-        if distToCenter > shortestDistance then continue end
-
-        if not hasLineOfSight(head) then continue end
-
-        shortestDistance = distToCenter
-        closestEnemy = player
-    end
-
-    return closestEnemy
-end
-
--- Highlights
-local highlights = {}
-
-local function getCharacterPart(character)
-    if character:FindFirstChild("Head") then
-        return character.Head
-    elseif character:FindFirstChild("HumanoidRootPart") then
-        return character.HumanoidRootPart
-    else
-        for _, part in pairs(character:GetChildren()) do
-            if part:IsA("BasePart") then
-                return part
+        if head then
+            local screenPos, visible = Camera:WorldToViewportPoint(head.Position)
+            local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+            if visible and dist <= shortestDistance and hasLineOfSight(head) then
+                shortestDistance = dist
+                closestEnemy = player
             end
         end
     end
-    return nil
+    return closestEnemy
+end
+
+-- 💡 ESP CORRIGIDO AQUI
+local highlights = {}
+
+local function getCharacterPart(character)
+    return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
 end
 
 local function updateHighlight(player, isTarget)
     if not player.Character then return end
-    local char = player.Character
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
     if not humanoid or humanoid.Health <= 0 then
-        if highlights[player] then
-            highlights[player].Enabled = false
-        end
+        if highlights[player] then highlights[player].Enabled = false end
+        return
+    end
+
+    local isAlly = (player.Team == LocalPlayer.Team)
+    local ffa = isFFA()
+    local show = false
+
+    if ffa then
+        show = _G.espEnemiesEnabled
+    else
+        show = (isAlly and _G.espAlliesEnabled) or (not isAlly and _G.espEnemiesEnabled)
+    end
+
+    if not show then
+        if highlights[player] then highlights[player].Enabled = false end
         return
     end
 
@@ -274,14 +247,7 @@ local function updateHighlight(player, isTarget)
         highlights[player] = highlight
     end
 
-    local adorneePart = getCharacterPart(char)
-    if adorneePart then
-        highlight.Adornee = char
-    else
-        highlight.Enabled = false
-        return
-    end
-
+    highlight.Adornee = player.Character
     highlight.Enabled = true
 
     if isTarget then
@@ -289,35 +255,23 @@ local function updateHighlight(player, isTarget)
         highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
         highlight.FillTransparency = 0.3
     else
-        if player.Team == LocalPlayer.Team then
-            local t = tick() * 2
-            local r = (math.sin(t) + 1) / 2 * 0.2
-            local g = (math.sin(t + 2) + 1) / 2 * 0.5
-            local b = (math.sin(t + 4) + 1) / 2 * 1
-            highlight.FillColor = Color3.new(r, g, b)
-            highlight.OutlineColor = Color3.new(r * 0.5, g * 0.5, b * 0.5)
-            highlight.FillTransparency = 0.5
+        if isAlly then
+            highlight.FillColor = Color3.fromRGB(0, 170, 255)
+            highlight.OutlineColor = Color3.fromRGB(0, 85, 170)
         else
-            local t = tick() * 2
-            local r = (math.sin(t) + 1) / 2 * 1
-            local g = (math.sin(t + 2) + 1) / 2 * 0.3
-            local b = 0
-            highlight.FillColor = Color3.new(r, g, b)
-            highlight.OutlineColor = Color3.new(r * 0.5, g * 0.15, 0)
-            highlight.FillTransparency = 0.5
+            highlight.FillColor = Color3.fromRGB(255, 50, 50)
+            highlight.OutlineColor = Color3.fromRGB(150, 0, 0)
         end
     end
 end
 
 local function updateAllHighlights()
     for _, player in pairs(Players:GetPlayers()) do
-        if player == LocalPlayer then
-            if highlights[player] then
-                highlights[player].Enabled = false
-            end
-            continue
+        if player ~= LocalPlayer then
+            updateHighlight(player, player == currentTarget)
+        elseif highlights[player] then
+            highlights[player].Enabled = false
         end
-        updateHighlight(player, player == currentTarget)
     end
 end
 
@@ -335,12 +289,9 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
--- Render loop para atualizações constantes
 RunService.RenderStepped:Connect(function()
     updateAllHighlights()
 end)
-
--- AIMBOT - funções para garantir exclusividade
 
 local function disableOtherAimbot(activeFlag)
     if activeFlag == "aimbotAutoEnabled" then
@@ -353,18 +304,12 @@ local function disableOtherAimbot(activeFlag)
 end
 
 aimbotAutoBtn.MouseButton1Click:Connect(function()
-    if _G.aimbotAutoEnabled then
-        disableOtherAimbot("aimbotAutoEnabled")
-    end
+    if _G.aimbotAutoEnabled then disableOtherAimbot("aimbotAutoEnabled") end
 end)
-
 aimbotLegitBtn.MouseButton1Click:Connect(function()
-    if _G.aimbotManualEnabled then
-        disableOtherAimbot("aimbotManualEnabled")
-    end
+    if _G.aimbotManualEnabled then disableOtherAimbot("aimbotManualEnabled") end
 end)
 
--- Controle do aimbot legit manual
 UserInputService.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
         aiming = true
@@ -380,35 +325,27 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Função para ajustar o tiro por rateOfFire (exemplo simplificado)
 local function shootGun(tool)
     if not tool then return end
-    -- Exemplo simples, só delay entre tiros
     for i = 1, 5 do
         task.wait(0.04)
     end
 end
 
--- Aimbot Automático e Legit
 RunService.RenderStepped:Connect(function()
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-    if _G.aimbotAutoEnabled then
+    if _G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming and shooting) then
         local target = getClosestVisibleEnemy()
         if target and target.Character and target.Character:FindFirstChild("Head") then
             local head = target.Character.Head
             local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible then
-                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-                if dist <= _G.FOV_RADIUS and hasLineOfSight(head) then
-                    currentTarget = target
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
-                    if tool then
-                        shootGun(tool)
-                    end
-                else
-                    currentTarget = nil
+            if visible and (Vector2.new(headPos.X, headPos.Y) - center).Magnitude <= _G.FOV_RADIUS and hasLineOfSight(head) then
+                currentTarget = target
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+                if tool then
+                    shootGun(tool)
                 end
             else
                 currentTarget = nil
@@ -416,37 +353,10 @@ RunService.RenderStepped:Connect(function()
         else
             currentTarget = nil
         end
-    end
-
-    if _G.aimbotManualEnabled and aiming and shooting then
-        local target = getClosestVisibleEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible then
-                local dist = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
-                if dist <= _G.FOV_RADIUS and hasLineOfSight(head) then
-                    currentTarget = target
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
-                    if tool then
-                        shootGun(tool)
-                    end
-                else
-                    currentTarget = nil
-                end
-            else
-                currentTarget = nil
-            end
-        else
-            currentTarget = nil
-        end
-    elseif not (_G.aimbotManualEnabled and aiming and shooting) and not _G.aimbotAutoEnabled then
+    else
         currentTarget = nil
     end
 end)
-
--- No Recoil, Infinite Ammo e Instant Reload
 
 local function applyGunAttributes(tool)
     if not tool then return end
@@ -475,11 +385,7 @@ local function onCharacterAdded(character)
 end
 
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
-
-if LocalPlayer.Character then
-    onCharacterAdded(LocalPlayer.Character)
-end
-
+if LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
 LocalPlayer.CharacterRemoving:Connect(function()
     currentTarget = nil
 end)
