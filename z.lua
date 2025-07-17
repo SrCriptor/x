@@ -25,34 +25,45 @@ uiStroke.Transparency = 0.7
 uiStroke.Thickness = 2
 uiStroke.Parent = frame
 
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundTransparency = 1
+titleBar.Parent = frame
+
 local title = Instance.new("TextLabel")
 title.Text = "Configurações"
-title.Size = UDim2.new(1, 0, 0, 40)
+title.Size = UDim2.new(1, -50, 1, 0)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 22
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Parent = frame
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextYAlignment = Enum.TextYAlignment.Center
+title.Parent = titleBar
+title.PaddingLeft = Instance.new("UIPadding", title)
+title.PaddingLeft.PaddingLeft = UDim.new(0, 15)
 
--- Botão minimizar
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 40, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+minimizeBtn.Position = UDim2.new(1, -45, 0, 5)
 minimizeBtn.Text = "🔽"
 minimizeBtn.Font = Enum.Font.GothamBold
 minimizeBtn.TextSize = 20
 minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
-minimizeBtn.Parent = frame
+minimizeBtn.Parent = titleBar
+minimizeBtn.AutoButtonColor = true
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, 0, 1, -40)
+contentFrame.Position = UDim2.new(0, 0, 0, 40)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = frame
 
 local minimized = false
 local function updateToggleVisibility()
-    for _, child in ipairs(frame:GetChildren()) do
-        if child ~= title and child ~= minimizeBtn and child:IsA("Frame") then
-            child.Visible = not minimized
-        end
-    end
+    contentFrame.Visible = not minimized
     minimizeBtn.Text = minimized and "🔼" or "🔽"
     if minimized then
         frame.Size = UDim2.new(0, 260, 0, 40)
@@ -66,7 +77,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
     updateToggleVisibility()
 end)
 
--- Dragging
+-- Dragging pela titleBar e botão minimizar
 local dragging = false
 local dragInput, dragStart, startPos
 
@@ -76,25 +87,26 @@ local function update(input)
                               startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or
-       input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
+local function startDrag(input)
+    dragging = true
+    dragStart = input.Position
+    startPos = frame.Position
+    input.Changed:Connect(function()
+        if input.UserInputState == Enum.UserInputState.End then
+            dragging = false
+        end
+    end)
+end
 
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        startDrag(input)
     end
 end)
 
-frame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or
-       input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
+minimizeBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        startDrag(input)
     end
 end)
 
@@ -104,7 +116,19 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Toggle criador corrigido
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+minimizeBtn.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+-- Função de criação dos toggles
 local function createToggle(name, parent, posY, defaultValue, callback)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Size = UDim2.new(1, -20, 0, 40)
@@ -175,6 +199,7 @@ local function createToggle(name, parent, posY, defaultValue, callback)
     return toggleFrame
 end
 
+-- Criação dos toggles e link com _G flags
 local toggles = {
     {name = "Aimbot Auto", flag = "aimbotAutoEnabled"},
     {name = "ESP Inimigos", flag = "espEnemiesEnabled"},
@@ -185,7 +210,7 @@ local toggles = {
 }
 
 for i, toggleData in ipairs(toggles) do
-    createToggle(toggleData.name, frame, 50 + (i - 1) * 45, _G[toggleData.flag] or false, function(state)
+    createToggle(toggleData.name, contentFrame, 10 + (i - 1) * 50, _G[toggleData.flag] or false, function(state)
         _G[toggleData.flag] = state
         print(toggleData.name .. " set to " .. tostring(state))
     end)
