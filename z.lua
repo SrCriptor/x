@@ -25,6 +25,7 @@ uiStroke.Transparency = 0.7
 uiStroke.Thickness = 2
 uiStroke.Parent = frame
 
+-- Title bar (drag area)
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 40)
 titleBar.BackgroundTransparency = 1
@@ -41,8 +42,6 @@ title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextYAlignment = Enum.TextYAlignment.Center
 title.Parent = titleBar
-title.PaddingLeft = Instance.new("UIPadding", title)
-title.PaddingLeft.PaddingLeft = UDim.new(0, 15)
 
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 40, 0, 30)
@@ -128,7 +127,7 @@ minimizeBtn.InputChanged:Connect(function(input)
     end
 end)
 
--- Função de criação dos toggles
+-- Função para criar toggles
 local function createToggle(name, parent, posY, defaultValue, callback)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Size = UDim2.new(1, -20, 0, 40)
@@ -199,7 +198,7 @@ local function createToggle(name, parent, posY, defaultValue, callback)
     return toggleFrame
 end
 
--- Criação dos toggles e link com _G flags
+-- Cria toggles e conecta as flags _G
 local toggles = {
     {name = "Aimbot Auto", flag = "aimbotAutoEnabled"},
     {name = "ESP Inimigos", flag = "espEnemiesEnabled"},
@@ -209,9 +208,9 @@ local toggles = {
     {name = "Recarga Instantânea", flag = "instantReloadEnabled"},
 }
 
-for i, toggleData in ipairs(toggles) do
-    createToggle(toggleData.name, contentFrame, 10 + (i - 1) * 50, _G[toggleData.flag] or false, function(state)
-        _G[toggleData.flag] = state
-        print(toggleData.name .. " set to " .. tostring(state))
+for i, t in ipairs(toggles) do
+    createToggle(t.name, contentFrame, 10 + (i - 1) * 50, _G[t.flag] or false, function(state)
+        _G[t.flag] = state
+        print(t.name .. " set to " .. tostring(state))
     end)
 end
