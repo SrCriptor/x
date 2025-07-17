@@ -26,14 +26,14 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local menu = Instance.new("Frame")
 menu.Size = UDim2.new(0, 220, 0, 480)
-menu.Position = UDim2.new(0, 20, 0.5, -240)
+menu.AnchorPoint = Vector2.new(0, 0)
+menu.Position = UDim2.new(0, 20, 0, 100)
 menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 menu.BackgroundTransparency = 0.1
 menu.BorderSizePixel = 0
 menu.ClipsDescendants = true
 menu.Parent = gui
 menu.Name = "MainMenu"
-menu.AnchorPoint = Vector2.new(0, 0.5)
 menu.Active = true
 
 local uicorner = Instance.new("UICorner")
