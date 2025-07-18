@@ -6,7 +6,7 @@ local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Bandeiras globais
+-- Bandeiras globais padrão
 _G.FOV_RADIUS = 65
 _G.FOV_VISIBLE = true
 _G.aimbotAutoEnabled = false
@@ -17,7 +17,7 @@ _G.noRecoilEnabled = true
 _G.infiniteAmmoEnabled = true
 _G.instantReloadEnabled = true
 
--- GUI
+-- Criação da GUI principal
 local gui = Instance.new("ScreenGui")
 gui.Name = "MobileAimbotGUI"
 gui.IgnoreGuiInset = true
@@ -25,7 +25,7 @@ gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local menu = Instance.new("Frame")
-menu.Size = UDim2.new(0, 220, 0, 360)
+menu.Size = UDim2.new(0, 220, 0, 360) -- altura reduzida
 menu.AnchorPoint = Vector2.new(0, 0)
 menu.Position = UDim2.new(0, 20, 0, 100)
 menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -33,13 +33,14 @@ menu.BackgroundTransparency = 0.1
 menu.BorderSizePixel = 0
 menu.ClipsDescendants = true
 menu.Parent = gui
-menu.Name = "MainMenu"
+menu.Name = "MenuPrincipal"
 menu.Active = true
 
 local uicorner = Instance.new("UICorner")
 uicorner.CornerRadius = UDim.new(0, 12)
 uicorner.Parent = menu
 
+-- Título
 local title = Instance.new("TextLabel")
 title.Text = "Menu Aimbot e ESP"
 title.Size = UDim2.new(1, 0, 0, 36)
@@ -51,6 +52,7 @@ title.Parent = menu
 title.Name = "Title"
 title.AnchorPoint = Vector2.new(0, 0)
 
+-- Botão de minimizar
 local toggleVisibilityBtn = Instance.new("TextButton")
 toggleVisibilityBtn.Size = UDim2.new(0, 40, 0, 30)
 toggleVisibilityBtn.Position = UDim2.new(1, -45, 0, 3)
@@ -74,8 +76,8 @@ toggleVisibilityBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local toggles = {}
-local function bindToggle(text, flagName, y)
+-- Função para criar toggles
+local function createToggle(text, y)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, -20, 0, 30)
     frame.Position = UDim2.new(0, 10, 0, y)
@@ -84,7 +86,7 @@ local function bindToggle(text, flagName, y)
 
     local label = Instance.new("TextLabel")
     label.Text = text
-    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Size = UDim2.new(0.7, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.new(1, 1, 1)
     label.Font = Enum.Font.Gotham
@@ -92,127 +94,63 @@ local function bindToggle(text, flagName, y)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
 
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(0, 60, 0, 25)
-    button.Position = UDim2.new(1, -65, 0, 2)
-    button.BackgroundColor3 = _G[flagName] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(70, 70, 70)
-    button.Text = _G[flagName] and "ON" or "OFF"
-    button.Font = Enum.Font.GothamBold
-    button.TextColor3 = Color3.new(1,1,1)
-    button.TextSize = 14
-    button.Parent = frame
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.new(0, 50, 0, 25)
+    toggleBtn.Position = UDim2.new(0.7, 5, 0, 2)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    toggleBtn.AutoButtonColor = false
+    toggleBtn.Text = "DESLIGADO"
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+    toggleBtn.TextSize = 14
+    toggleBtn.Parent = frame
 
-    button.MouseButton1Click:Connect(function()
-        _G[flagName] = not _G[flagName]
-        button.Text = _G[flagName] and "ON" or "OFF"
-        button.BackgroundColor3 = _G[flagName] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(70, 70, 70)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = toggleBtn
+
+    local toggleCircle = Instance.new("Frame")
+    toggleCircle.Size = UDim2.new(0, 20, 0, 20)
+    toggleCircle.Position = UDim2.new(0, 5, 0.15, 0)
+    toggleCircle.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    toggleCircle.Parent = toggleBtn
+
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1, 0)
+    circleCorner.Parent = toggleCircle
+
+    toggleBtn.MouseEnter:Connect(function()
+        TweenService:Create(toggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(90, 90, 90)}):Play()
     end)
 
-    toggles[flagName] = button
-end
+    toggleBtn.MouseLeave:Connect(function()
+        local color = toggleBtn.Text == "LIGADO" and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(70, 70, 70)
+        TweenService:Create(toggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
+    end)
 
--- Bind toggles
-bindToggle("Aimbot Automático", "aimbotAutoEnabled", 40)
-bindToggle("Manual do Aimbot", "aimbotManualEnabled", 70)
-bindToggle("ESP Inimigos", "espEnemiesEnabled", 100)
-bindToggle("ESP Aliados", "espAlliesEnabled", 130)
-bindToggle("Sem recuo", "noRecoilEnabled", 160)
-bindToggle("Munição Infinita", "infiniteAmmoEnabled", 190)
-bindToggle("Recarga Instantânea", "instantReloadEnabled", 220)
-
--- FOV
-local fovLabel = Instance.new("TextLabel")
-fovLabel.Text = "FOV: ".._G.FOV_RADIUS
-fovLabel.Size = UDim2.new(1, -20, 0, 20)
-fovLabel.Position = UDim2.new(0, 10, 0, 260)
-fovLabel.BackgroundTransparency = 1
-fovLabel.TextColor3 = Color3.new(1,1,1)
-fovLabel.Font = Enum.Font.GothamBold
-fovLabel.TextSize = 16
-fovLabel.TextXAlignment = Enum.TextXAlignment.Center
-fovLabel.Parent = menu
-
-local function updateFOVLabel()
-    fovLabel.Text = "FOV: ".._G.FOV_RADIUS
-end
-
-local function createFOVButton(text, xPos)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 50, 0, 30)
-    btn.Position = UDim2.new(0, xPos, 0, 290)
-    btn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 20
-    btn.Text = text
-    btn.Parent = menu
-
-    btn.MouseButton1Click:Connect(function()
-        if text == "+" then
-            _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
+    local debounce = false
+    local function updateToggleState(isOn)
+        if debounce then return end
+        debounce = true
+        if isOn then
+            toggleBtn.Text = "LIGADO"
+            TweenService:Create(toggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(0, 170, 0)}):Play()
+            TweenService:Create(toggleCircle, TweenInfo.new(0.3), {Position = UDim2.new(0, 25, 0.15, 0)}):Play()
         else
-            _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
+            toggleBtn.Text = "DESLIGADO"
+            TweenService:Create(toggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
+            TweenService:Create(toggleCircle, TweenInfo.new(0.3), {Position = UDim2.new(0, 5, 0.15, 0)}):Play()
         end
-        updateFOVLabel()
-    end)
-end
-
-createFOVButton("-", 55)
-createFOVButton("+", 135)
-
-updateFOVLabel()
-
--- Aplicar atributos na arma
-local function applyGunAttributes(tool)
-    if not tool or not tool:IsA("Tool") then return end
-
-    if _G.noRecoilEnabled then
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-        tool:SetAttribute("spread", 0)
-        if tool:FindFirstChild("Recoil") then
-            tool.Recoil.Value = 0
-        end
+        task.wait(0.3)
+        debounce = false
     end
 
-    if _G.infiniteAmmoEnabled then
-        tool:SetAttribute("_ammo", 200)
-        tool:SetAttribute("magazineSize", 200)
-        if tool:FindFirstChild("Ammo") then
-            tool.Ammo.Value = math.huge
-        end
-    end
-
-    if _G.instantReloadEnabled then
-        tool:SetAttribute("reloadTime", 0)
-        if tool:FindFirstChild("ReloadTime") then
-            tool.ReloadTime.Value = 0
-        end
-    end
+    return {
+        frame = frame,
+        toggleBtn = toggleBtn,
+        update = updateToggleState,
+        getState = function() return toggleBtn.Text == "LIGADO" end
+    }
 end
 
-local function onCharacterAdded(character)
-    for _, tool in pairs(character:GetChildren()) do
-        if tool:IsA("Tool") then
-            applyGunAttributes(tool)
-        end
-    end
-
-    character.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            task.wait(0.1)
-            applyGunAttributes(child)
-        end
-    end)
-end
-
-LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
-
-if LocalPlayer.Character then
-    onCharacterAdded(LocalPlayer.Character)
-end
-
-LocalPlayer.CharacterRemoving:Connect(function()
-    currentTarget = nil
-end)
+-- CONTINUA NA PARTE 2
