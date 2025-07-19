@@ -1,56 +1,52 @@
---[[ 
- 🔍 DEBUGGER DE CLIQUES E INPUTS
- Rastreia tudo que o jogador clicar (botões na tela) e teclas pressionadas.
- Útil para descobrir nomes de botões e analisar GUI de jogos.
-]]
-local char = game.Players.LocalPlayer.Character
-local tool = char:FindFirstChildOfClass("Tool")
-
-if tool then
-    if tool:FindFirstChild("Ammo") then
-        tool.Ammo.Value = 999
-    end
-    tool:SetAttribute("rateOfFire", 9999)
-    tool:SetAttribute("reloadTime", 0)
-    tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-end
-
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- Aguarda o PlayerGui estar disponível
-repeat wait() until LocalPlayer:FindFirstChild("PlayerGui")
-local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+-- Espera o personagem e ferramenta carregarem
+repeat wait() until LocalPlayer.Character
+local char = LocalPlayer.Character
+local tool = char:FindFirstChildOfClass("Tool")
 
-print("🟢 DEBUGGER ATIVO - Aguardando interfaces...")
+if not tool then
+    warn("❌ Nenhuma arma (Tool) equipada.")
+    return
+end
 
--- Função para conectar a qualquer botão
-local function trackButton(obj)
-    if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-        obj.MouseButton1Click:Connect(function()
-            print("🖱️ Clique em botão: " .. (obj:GetFullName()))
-        end)
+local lines = {}
+table.insert(lines, "🔫 DEBUG: Inspeção da arma \"" .. tool.Name .. "\"")
+table.insert(lines, "----------------------------")
+
+-- Atributos
+table.insert(lines, "\n📦 Atributos:")
+for key, value in pairs(tool:GetAttributes()) do
+    local val = typeof(value) == "Vector2" and ("Vector2.new("..value.X..", "..value.Y..")") or tostring(value)
+    table.insert(lines, "    " .. key .. " = " .. val)
+end
+
+-- Valores internos
+table.insert(lines, "\n🧪 Valores internos:")
+for _, obj in pairs(tool:GetDescendants()) do
+    if obj:IsA("NumberValue") or obj:IsA("IntValue") or obj:IsA("BoolValue") or obj:IsA("StringValue") then
+        table.insert(lines, "    " .. obj.Name .. " ("..obj.ClassName..") = " .. tostring(obj.Value))
     end
 end
 
--- Rastrear botões já existentes
-for _, gui in pairs(playerGui:GetDescendants()) do
-    trackButton(gui)
-end
+-- Juntar tudo como texto
+local result = table.concat(lines, "\n")
 
--- Rastrear novos botões adicionados
-playerGui.DescendantAdded:Connect(function(obj)
-    trackButton(obj)
-end)
+-- Mostrar no console
+print("\n\n====== DUMP DE ARMA ======\n" .. result .. "\n==========================")
 
--- Rastrear teclas pressionadas
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed then
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            print("⌨️ Tecla pressionada: " .. input.KeyCode.Name)
-        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-            print("🖱️ Clique do mouse detectado.")
-        end
-    end
+-- (Opcional) Salvar em um StringValue no Workspace (visível pelo Explorer para copiar)
+local dump = Instance.new("StringValue")
+dump.Name = "GunDebug_" .. tool.Name
+dump.Value = result
+dump.Parent = workspace
+
+-- Notificação simples (se suportado)
+pcall(function()
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "Debugger",
+        Text = "Inspeção da arma salva como StringValue em Workspace.",
+        Duration = 4
+    })
 end)
