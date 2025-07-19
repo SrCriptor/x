@@ -231,9 +231,9 @@ local function createToggle(text, flagName, y)
     return frame
 end
 
--- Toggles principais
+-- Criação dos toggles principais
 local y = menuSizes[menuSizeIdx].title + menuSizes[menuSizeIdx].pad*2
-local function addToggle(text, flag, inc)
+local function addToggle(text, flag)
     local frame = createToggle(text, flag, y)
     y = y + frame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 end
@@ -246,11 +246,11 @@ addToggle("No Recoil", "noRecoilEnabled")
 addToggle("Munição Infinita", "infiniteAmmoEnabled")
 addToggle("Recarga Instantânea", "instantReloadEnabled")
 
--- Toggle Mostrar FOV
+-- Mostrar FOV: toggle ON/OFF
 local fovToggleFrame = createToggle("Mostrar FOV", "FOV_VISIBLE", y)
 y = y + fovToggleFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
--- FOV botões centralizados
+-- Botões + e - centralizados para FOV
 local fovBtnsFrame = Instance.new("Frame")
 fovBtnsFrame.Name = "FOVBtns"
 fovBtnsFrame.Size = UDim2.new(1, -2*menuSizes[menuSizeIdx].pad, 0, menuSizes[menuSizeIdx].font + menuSizes[menuSizeIdx].pad*2)
@@ -261,7 +261,7 @@ fovBtnsFrame.Parent = menu
 local btnW = menuSizes[menuSizeIdx].font*2.2
 local pad = menuSizes[menuSizeIdx].pad
 local totalW = btnW*2 + pad
-local startX = (fovBtnsFrame.Size.X.Offset - totalW) / 2
+local startX = (fovBtnsFrame.AbsoluteSize.X - totalW) / 2
 
 local function createFOVBtn(text, xPos)
     local btn = Instance.new("TextButton")
@@ -284,15 +284,16 @@ local function createFOVBtn(text, xPos)
         end
     end)
 end
-createFOVBtn("-", fovBtnsFrame.Size.X.Offset/2 - btnW - pad/2)
-createFOVBtn("+", fovBtnsFrame.Size.X.Offset/2 + pad/2)
+createFOVBtn("-", 0)
+createFOVBtn("+", btnW + pad)
 
 y = y + fovBtnsFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
--- Rate of Fire: toggle + botão de modo
+-- Rate of Fire: toggle ON/OFF
 local rofFrame = createToggle("Rate of Fire", "rateOfFireEnabled", y)
 y = y + rofFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
+-- Botão centralizado para alternar modos de Rate of Fire
 local rofModes = {
     {name = "Padrão", value = 150},
     {name = "Legit", value = 200},
