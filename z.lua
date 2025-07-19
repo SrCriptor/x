@@ -586,7 +586,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Aplicar cheats na arma atual
+-- Função para aplicar cheats na arma atual
 local function patchWeapon(tool)
     if tool and tool:IsA("Tool") then
         if _G.infiniteAmmoEnabled and tool:FindFirstChild("Ammo") then
@@ -707,7 +707,7 @@ title.Position = UDim2.new(0.5, -title.Size.X.Offset / 2, 0, 0)
 
 -- Criar os toggles para RapidFire
 local RapidFireOptions = {nil, 200, 500, 99999999999999}
-local RapidFireRateName = {"Padrão", "Legit", "Médio", "Agressivo"}
+local RapidFireRateName = {"Legit", "Médio", "Agressivo"}
 
 local function createFireRateToggle()
     local frame = Instance.new("Frame")
@@ -783,3 +783,39 @@ title.InputChanged:Connect(function(input)
         )
     end
 end)
+
+-- Desenhar FOV na tela
+local fovCircle
+local function drawFOV()
+    if fovCircle then fovCircle:Remove() end
+    if not _G.FOV_VISIBLE then return end
+    fovCircle = Drawing and Drawing.new("Circle") or nil
+    if fovCircle then
+        fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        fovCircle.Radius = _G.FOV_RADIUS
+        fovCircle.Color = Color3.fromRGB(0,255,0)
+        fovCircle.Thickness = 2
+        fovCircle.Transparency = 0.5
+        fovCircle.Filled = false
+        fovCircle.Visible = true
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    drawFOV()
+end)
+
+local function isFFA()
+    -- Se não tiver sistema de times, sempre FFA
+    return not LocalPlayer.Team
+end
+
+local function isAlive(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health > 0
+end
+
+local function hasLineOfSight(part)
+    -- Simples: sempre true, ou implemente Raycast se quiser
+    return true
+end
