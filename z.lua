@@ -716,3 +716,89 @@ spawn(function()
         task.wait(0.1)
     end
 end)
+
+
+-- Tabela para armazenar valores originais
+local originalValues = {}
+
+-- Aplicar cheats na arma atual e salvar valores originais
+local function patchWeapon(tool)
+    if tool and tool:IsA("Tool") then
+        if not originalValues[tool] then
+            originalValues[tool] = {
+                ammo = tool:FindFirstChild("Ammo") and tool.Ammo.Value,
+                recoil = tool:FindFirstChild("Recoil") and tool.Recoil.Value,
+                reload = tool:FindFirstChild("ReloadTime") and tool.ReloadTime.Value,
+                attributes = {
+                    recoilAimReduction = tool:GetAttribute("recoilAimReduction"),
+                    recoilMax = tool:GetAttribute("recoilMax"),
+                    recoilMin = tool:GetAttribute("recoilMin"),
+                    spread = tool:GetAttribute("spread"),
+                    _ammo = tool:GetAttribute("_ammo"),
+                    magazineSize = tool:GetAttribute("magazineSize"),
+                    reloadTime = tool:GetAttribute("reloadTime"),
+                    rateOfFire = tool:GetAttribute("rateOfFire")
+                }
+            }
+        end
+
+        if _G.infiniteAmmoEnabled and tool:FindFirstChild("Ammo") then
+            tool.Ammo.Value = math.huge
+            tool:SetAttribute("_ammo", 200)
+            tool:SetAttribute("magazineSize", 200)
+        end
+        if _G.noRecoilEnabled and tool:FindFirstChild("Recoil") then
+            tool.Recoil.Value = 0
+            tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
+            tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+            tool:SetAttribute("recoilMin", Vector2.new(0, 0))
+            tool:SetAttribute("spread", 0)
+        end
+        if _G.instantReloadEnabled and tool:FindFirstChild("ReloadTime") then
+            tool.ReloadTime.Value = 0
+            tool:SetAttribute("reloadTime", 0)
+        end
+        if _G.rateOfFire then
+            tool:SetAttribute("rateOfFire", _G.rateOfFire)
+        end
+    end
+end
+
+-- Restaurar atributos ao desabilitar cheats
+local function restoreWeapon(tool)
+    local orig = originalValues[tool]
+    if not orig then return end
+
+    if not _G.infiniteAmmoEnabled and tool:FindFirstChild("Ammo") then
+        tool.Ammo.Value = orig.ammo or 30
+        tool:SetAttribute("_ammo", orig.attributes._ammo)
+        tool:SetAttribute("magazineSize", orig.attributes.magazineSize)
+    end
+    if not _G.noRecoilEnabled and tool:FindFirstChild("Recoil") then
+        tool.Recoil.Value = orig.recoil or 1
+        tool:SetAttribute("recoilAimReduction", orig.attributes.recoilAimReduction)
+        tool:SetAttribute("recoilMax", orig.attributes.recoilMax)
+        tool:SetAttribute("recoilMin", orig.attributes.recoilMin)
+        tool:SetAttribute("spread", orig.attributes.spread)
+    end
+    if not _G.instantReloadEnabled and tool:FindFirstChild("ReloadTime") then
+        tool.ReloadTime.Value = orig.reload or 1
+        tool:SetAttribute("reloadTime", orig.attributes.reloadTime)
+    end
+    if not _G.rateOfFire then
+        tool:SetAttribute("rateOfFire", orig.attributes.rateOfFire)
+    end
+end
+
+-- Atualizar a cada ciclo para aplicar ou restaurar
+RunService.Heartbeat:Connect(function()
+    for _, tool in pairs(LocalPlayer.Character and LocalPlayer.Character:GetChildren() or {}) do
+        if tool:IsA("Tool") then
+            if _G.infiniteAmmoEnabled or _G.noRecoilEnabled or _G.instantReloadEnabled or _G.rateOfFire then
+                patchWeapon(tool)
+            else
+                restoreWeapon(tool)
+            end
+        end
+    end
+end)
