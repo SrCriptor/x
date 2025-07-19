@@ -636,19 +636,3 @@ title.InputChanged:Connect(function(input)
         )
     end
 end)
-
-function changeMenuSize()
-    -- Alterar a largura e altura do menu de acordo com os tamanhos
-    if menu.Size.X.Offset == 220 then
-        menu.Size = UDim2.new(0, 250, 0, 480)  -- Aumenta a largura
-    elseif menu.Size.X.Offset == 250 then
-        menu.Size = UDim2.new(0, 180, 0, 480)  -- Diminui a largura
-    else
-        menu.Size = UDim2.new(0, 220, 0, 480)  -- Tamanho inicial
-    end
-
-    -- Ajustar a posição do título e botões se necessário
-    adjustMenuComponents()
-end
-
-
