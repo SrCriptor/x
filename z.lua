@@ -189,11 +189,13 @@ local function createSection(titleText, y)
 end
 
 -- Limpa os toggles antigos (caso esteja testando várias vezes)
+--[[
 for _, v in ipairs(menu:GetChildren()) do
     if v:IsA("Frame") or (v:IsA("TextLabel") and v.Name ~= "Title") then
         v:Destroy()
     end
 end
+]]
 
 -- Adicionando o botão de configuração de tamanho (engrenagem) ao lado do minimizar
 local sizeBtn = Instance.new("TextButton")
@@ -589,12 +591,6 @@ local function updateMenuLayout()
         {title = "Arma", flags = {"noRecoilEnabled", "infiniteAmmoEnabled", "instantReloadEnabled"}},
         {title = "FOV", flags = {}}
     }
-    for _, v in ipairs(menu:GetChildren()) do
-        if v:IsA("Frame") or (v:IsA("TextLabel") and v.Name ~= "Title") then
-            v:Destroy()
-        end
-    end
-    toggles = {}
     for _, section in ipairs(sections) do
         y = createSection(section.title, y)
         for _, flag in ipairs(section.flags) do
@@ -623,12 +619,20 @@ local function changeMenuSize()
     local newSize = menuSizeOptions[currentMenuSizeIndex]
     menu.Size = newSize
     menu.Position = UDim2.new(0.5, -newSize.X.Offset / 2, 0.5, -newSize.Y.Offset / 2)
-    updateMenuLayout()
+    -- Ajusta barra de navegação e páginas para novo tamanho
+    navBar.Size = UDim2.new(1, 0, 0, 32)
+    for _, frame in ipairs(pageFrames) do
+        frame.Size = UDim2.new(1, -20, 1, -78)
+        frame.Position = UDim2.new(0, 10, 0, 68)
+    end
 end
 
 sizeBtn.MouseButton1Click:Connect(function()
     changeMenuSize()
 end)
+
+-- Certifique-se que a barra de navegação e as páginas estão sendo criadas e exibidas corretamente,
+-- e que não há nenhum código destruindo ou escondendo os frames/toggles das páginas.
 
 -- Iniciar o menu centralizado na tela com tamanho reduzido
 menu.Size = menuSizeOptions[1]
