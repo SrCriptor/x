@@ -195,6 +195,21 @@ for _, v in ipairs(menu:GetChildren()) do
     end
 end
 
+-- Adicionando o botão de configuração de tamanho (engrenagem) ao lado do minimizar
+local sizeBtn = Instance.new("TextButton")
+sizeBtn.Size = UDim2.new(0, 30, 0, 30)
+sizeBtn.Position = UDim2.new(1, -45, 0, 3)
+sizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+sizeBtn.TextColor3 = Color3.new(1, 1, 1)
+sizeBtn.Font = Enum.Font.GothamBold
+sizeBtn.TextSize = 20
+sizeBtn.Text = "⚙️"
+sizeBtn.Parent = menu
+sizeBtn.Name = "SizeButton"
+
+-- REMOVA ou COMENTE TODO O TRECHO ABAIXO (sistema antigo de seções/toggles diretos):
+
+--[[
 -- Organização em seções/tabelas
 local y = 45
 y = createSection("Aimbot", y)
@@ -247,36 +262,7 @@ end)
 fovPlusBtn.MouseButton1Click:Connect(function()
     _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
 end)
-
--- Botão "-" para diminuir FOV
-local fovMinusBtn = Instance.new("TextButton")
-fovMinusBtn.Size = UDim2.new(0, 40, 0, 30)
-fovMinusBtn.Position = UDim2.new(0, 40, 0, 445)
-fovMinusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-fovMinusBtn.TextColor3 = Color3.new(1,1,1)
-fovMinusBtn.Font = Enum.Font.GothamBold
-fovMinusBtn.TextSize = 20
-fovMinusBtn.Text = "-"
-fovMinusBtn.Parent = menu
-
-local cornerMinus = Instance.new("UICorner")
-cornerMinus.CornerRadius = UDim.new(0, 8)
-cornerMinus.Parent = fovMinusBtn
-
--- Botão "+" para aumentar FOV
-local fovPlusBtn = Instance.new("TextButton")
-fovPlusBtn.Size = UDim2.new(0, 40, 0, 30)
-fovPlusBtn.Position = UDim2.new(0, 130, 0, 445)
-fovPlusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-fovPlusBtn.TextColor3 = Color3.new(1,1,1)
-fovPlusBtn.Font = Enum.Font.GothamBold
-fovPlusBtn.TextSize = 20
-fovPlusBtn.Text = "+"
-fovPlusBtn.Parent = menu
-
-local cornerPlus = Instance.new("UICorner")
-cornerPlus.CornerRadius = UDim.new(0, 8)
-cornerPlus.Parent = fovPlusBtn
+]]
 
 -- Atualizar FOV ao clicar nos botões
 fovMinusBtn.MouseButton1Click:Connect(function()
@@ -639,18 +625,6 @@ local function changeMenuSize()
     menu.Position = UDim2.new(0.5, -newSize.X.Offset / 2, 0.5, -newSize.Y.Offset / 2)
     updateMenuLayout()
 end
-
--- Adicionando o botão de configuração de tamanho (engrenagem) ao lado do minimizar
-local sizeBtn = Instance.new("TextButton")
-sizeBtn.Size = UDim2.new(0, 30, 0, 30)
-sizeBtn.Position = UDim2.new(1, -45, 0, 3)
-sizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-sizeBtn.TextColor3 = Color3.new(1, 1, 1)
-sizeBtn.Font = Enum.Font.GothamBold
-sizeBtn.TextSize = 20
-sizeBtn.Text = "⚙️"
-sizeBtn.Parent = menu
-sizeBtn.Name = "SizeButton"
 
 sizeBtn.MouseButton1Click:Connect(function()
     changeMenuSize()
