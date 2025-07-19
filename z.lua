@@ -261,7 +261,7 @@ fovBtnsFrame.Parent = menu
 local btnW = menuSizes[menuSizeIdx].font*2.2
 local pad = menuSizes[menuSizeIdx].pad
 local totalW = btnW*2 + pad
-local startX = (fovBtnsFrame.AbsoluteSize.X - totalW) / 2
+local startX = (menuSizes[menuSizeIdx].w - 2*menuSizes[menuSizeIdx].pad - totalW) / 2
 
 local function createFOVBtn(text, xPos)
     local btn = Instance.new("TextButton")
@@ -284,8 +284,8 @@ local function createFOVBtn(text, xPos)
         end
     end)
 end
-createFOVBtn("-", 0)
-createFOVBtn("+", btnW + pad)
+createFOVBtn("-", startX)
+createFOVBtn("+", startX + btnW + pad)
 
 y = y + fovBtnsFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
