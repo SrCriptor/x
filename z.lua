@@ -295,10 +295,10 @@ y = y + rofFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
 -- Botão centralizado para alternar modos de Rate of Fire
 local rofModes = {
-    {name = "[Padrão]", value = nil}, -- nil = valor original da arma
-    {name = "[Legit]", value = 200},
-    {name = "[Médio]", value = 500},
-    {name = "[Agressivo]", value = 9999999},
+    {name = "Padrão", value = nil}, -- nil = valor original da arma
+    {name = "Legit", value = 200},
+    {name = "Médio", value = 500},
+    {name = "Agressivo", value = 9999999},
 }
 local rofIdx = 1
 _G.rateOfFire = nil -- padrão: não altera o valor da arma
