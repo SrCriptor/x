@@ -24,8 +24,11 @@ gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local menu = Instance.new("Frame")
-menu.Size = UDim2.new(0, 220, 0, 480)
+-- Substitua o Frame principal do menu por um ScrollingFrame para permitir scroll
+local menu = Instance.new("ScrollingFrame")
+menu.Size = UDim2.new(0, 220, 0, 340) -- altura reduzida para facilitar o scroll
+menu.CanvasSize = UDim2.new(0, 0, 0, 520) -- ajuste conforme a quantidade de conteúdo
+menu.ScrollBarThickness = 8
 menu.AnchorPoint = Vector2.new(0, 0)
 menu.Position = UDim2.new(0, 20, 0, 100)
 menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -35,6 +38,7 @@ menu.ClipsDescendants = true
 menu.Parent = gui
 menu.Name = "MainMenu"
 menu.Active = true
+menu.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
 local uicorner = Instance.new("UICorner")
 uicorner.CornerRadius = UDim.new(0, 12)
@@ -283,6 +287,389 @@ local function updateMenuLayout()
 end
 
 -- Botão engrenagem (ajuste de tamanho)
+local sizeBtn = Instance.new("TextButton")
+sizeBtn.Size = UDim2.new(0, 40, 0, 26)
+sizeBtn.Position = UDim2.new(1, -85, 0, 3)
+sizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+sizeBtn.TextColor3 = Color3.new(1, 1, 1)
+sizeBtn.Font = Enum.Font.GothamBold
+sizeBtn.TextSize = 20
+sizeBtn.Text = "⚙️"
+sizeBtn.Parent = menu
+sizeBtn.Name = "SizeButton"
+
+sizeBtn.MouseButton1Click:Connect(function()
+    currentMenuSizeIndex = currentMenuSizeIndex % #menuSizeOptions + 1
+    updateMenuLayout()
+end)
+
+-- Remover label FOV antigo, criar toggle Mostrar FOV e botões +/-
+if fovLabel then fovLabel:Destroy() end
+
+local function bindShowFovToggle(y)
+    local tog = createToggle("Mostrar FOV", y)
+    tog.update(_G.FOV_VISIBLE)
+    tog.toggleBtn.MouseButton1Click:Connect(function()
+        _G.FOV_VISIBLE = not _G.FOV_VISIBLE
+        tog.update(_G.FOV_VISIBLE)
+    end)
+    toggles["showFov"] = tog
+end
+
+bindShowFovToggle(410)
+
+-- Botões + e - para FOV
+local function createFOVButton(text, xPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 40, 0, 26)
+    btn.Position = UDim2.new(0, xPos, 0, 460)
+    btn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 20
+    btn.Text = text
+    btn.Parent = menu
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(90,90,90)}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70,70,70)}):Play()
+    end)
+
+    btn.MouseButton1Click:Connect(function()
+        if text == "+" then
+            _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
+        else
+            _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
+        end
+    end)
+    return btn
+end
+
+local fovMinusBtn = createFOVButton("-", 40)
+local fovPlusBtn = createFOVButton("+", 120)
+
+-- Inicializa layout adaptado
+updateMenuLayout()
+
+-- Drag para mover o menu pela barra do título
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = menu.Position
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+title.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        menu.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Funções auxiliares
+local function isAlive(character)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health > 0
+end
+
+local function isFFA()
+    local teams = {}
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Team then
+            teams[player.Team] = true
+        end
+    end
+    return next(teams) == nil or next(teams, next(teams)) == nil
+end
+
+local function hasLineOfSight(targetPart)
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * 500
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return not result or result.Instance:IsDescendantOf(targetPart.Parent)
+end
+
+-- Buscar inimigo visível mais próximo dentro do FOV
+local function getClosestVisibleEnemy()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local closestEnemy = nil
+    local shortestDistance = _G.FOV_RADIUS
+    local ffa = isFFA()
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player == LocalPlayer or not player.Character then continue end
+        if not isAlive(player.Character) then continue end
+
+        local isAlly = player.Team == LocalPlayer.Team
+        if not ffa then
+            if isAlly and not _G.espAlliesEnabled then continue end
+            if not isAlly and not _G.espEnemiesEnabled then continue end
+        else
+            if not _G.espEnemiesEnabled then continue end
+        end
+
+        local head = player.Character:FindFirstChild("Head")
+        if head then
+            local screenPos, visible = Camera:WorldToViewportPoint(head.Position)
+            local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+            if visible and dist <= shortestDistance and hasLineOfSight(head) then
+                shortestDistance = dist
+                closestEnemy = player
+            end
+        end
+    end
+    return closestEnemy
+end
+
+-- ESP Wallhack com Highlights
+local highlights = {}
+
+local function updateHighlight(player, isTarget)
+    if not player.Character then return end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        if highlights[player] then highlights[player].Enabled = false end
+        return
+    end
+
+    local isAlly = (player.Team == LocalPlayer.Team)
+    local ffa = isFFA()
+    local show = false
+
+    if ffa then
+        show = _G.espEnemiesEnabled
+    else
+        show = (isAlly and _G.espAlliesEnabled) or (not isAlly and _G.espEnemiesEnabled)
+    end
+
+    if not show then
+        if highlights[player] then highlights[player].Enabled = false end
+        return
+    end
+
+    local highlight = highlights[player]
+    if not highlight then
+        highlight = Instance.new("Highlight")
+        highlight.Parent = workspace
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillTransparency = 0.5
+        highlights[player] = highlight
+    end
+
+    highlight.Adornee = player.Character
+    highlight.Enabled = true
+
+    if isTarget then
+        highlight.FillColor = Color3.fromRGB(255, 255, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+        highlight.FillTransparency = 0.3
+    else
+        if isAlly then
+            highlight.FillColor = Color3.fromRGB(0, 170, 255)
+            highlight.OutlineColor = Color3.fromRGB(0, 85, 170)
+        else
+            highlight.FillColor = Color3.fromRGB(255, 50, 50)
+            highlight.OutlineColor = Color3.fromRGB(150, 0, 0)
+        end
+    end
+end
+
+local function updateAllHighlights()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            updateHighlight(player, player == currentTarget)
+        elseif highlights[player] then
+            highlights[player].Enabled = false
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        updateAllHighlights()
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if highlights[player] then
+        highlights[player]:Destroy()
+        highlights[player] = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    updateAllHighlights()
+end)
+
+-- Variáveis do aimbot
+local currentTarget = nil
+local aiming = false
+local shooting = false
+
+-- Eventos de input para aimbot manual
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = true
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+        shooting = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = false
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+        shooting = false
+    end
+end)
+
+-- Função para mirar no inimigo
+local function aimAtTarget(target)
+    if not target or not target.Character then return end
+    local head = target.Character:FindFirstChild("Head")
+    if not head then return end
+
+    local cameraCFrame = Camera.CFrame
+    local direction = (head.Position - cameraCFrame.Position).Unit
+    Camera.CFrame = CFrame.new(cameraCFrame.Position, head.Position)
+end
+
+-- Loop principal do aimbot e ESP
+RunService.RenderStepped:Connect(function()
+    if _G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming) then
+        currentTarget = getClosestVisibleEnemy()
+        if currentTarget then
+            aimAtTarget(currentTarget)
+        end
+    else
+        currentTarget = nil
+    end
+end)
+
+-- Aplicar cheats na arma atual
+local function patchWeapon(tool)
+    if tool and tool:IsA("Tool") then
+        if _G.infiniteAmmoEnabled and tool:FindFirstChild("Ammo") then
+            tool.Ammo.Value = math.huge
+        end
+        if _G.noRecoilEnabled and tool:FindFirstChild("Recoil") then
+            tool.Recoil.Value = 0
+        end
+        if _G.instantReloadEnabled and tool:FindFirstChild("ReloadTime") then
+            tool.ReloadTime.Value = 0
+        end
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            task.wait(0.1)
+            patchWeapon(child)
+        end
+    end)
+end)
+
+if LocalPlayer.Character then
+    for _, tool in pairs(LocalPlayer.Character:GetChildren()) do
+        if tool:IsA("Tool") then
+            patchWeapon(tool)
+        end
+    end
+end
+
+-- Função para aplicar os atributos de arma
+local function applyGunAttributes(tool)
+    if not tool then return end
+    if _G.noRecoilEnabled then
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
+        tool:SetAttribute("spread", 0)
+    end
+    if _G.infiniteAmmoEnabled then
+        tool:SetAttribute("_ammo", 200)
+        tool:SetAttribute("magazineSize", 200)
+    end
+    if _G.instantReloadEnabled then
+        tool:SetAttribute("reloadTime", 0)
+    end
+    if _G.rateOfFire then
+        tool:SetAttribute("rateOfFire", _G.rateOfFire)
+    end
+end
+
+-- Função para ajustar o tiro por rateOfFire
+local function shootGun(tool)
+    if not tool then return end
+    local fireRate = tool:GetAttribute("rateOfFire") or 70
+    for i = 1, 5 do
+        task.wait(1 / fireRate) -- Ajuste do rateOfFire
+    end
+end
+
+-- Atualiza os atributos das armas quando o personagem é adicionado
+local function onCharacterAdded(character)
+    local tool
+    repeat
+        tool = character:FindFirstChildWhichIsA("Tool")
+        task.wait()
+    until tool
+    applyGunAttributes(tool)
+end
+
+-- Funções de eventos para quando o personagem entra ou sai
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+if LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
+LocalPlayer.CharacterRemoving:Connect(function()
+    currentTarget = nil
+end)
+
+-- Ajustar tamanho do menu
+local menuSizeOptions = {UDim2.new(0, 220, 0, 480), UDim2.new(0, 250, 0, 480), UDim2.new(0, 180, 0, 480)}
+local currentMenuSizeIndex = 1
+
+local function changeMenuSize()
+    currentMenuSizeIndex = currentMenuSizeIndex % #menuSizeOptions + 1
+    local newSize = menuSizeOptions[currentMenuSizeIndex]
+    menu.Size = newSize
+    -- Recentralizar o menu no meio da tela
+    menu.Position = UDim2.new(0.5, -newSize.X.Offset / 2, 0.5, -newSize.Y.Offset / 2)
+    -- Garantir que título continue no topo
+    title.Position = UDim2.new(0, 0, 0, 0)
+    -- Reposicionar botão de minimizar no canto superior direito
+    toggleVisibilityBtn.Position = UDim2.new(1, -45, 0, 3)
+    -- Reposicionar botão engrenagem logo abaixo do botão minimizar
+    sizeBtn.Position = UDim2.new(1, -45, 0, 40)
+end
+
+-- Adicionando o botão de configuração de tamanho
 local sizeBtn = Instance.new("TextButton")
 sizeBtn.Size = UDim2.new(0, 40, 0, 26)
 sizeBtn.Position = UDim2.new(1, -85, 0, 3)
