@@ -181,58 +181,56 @@ bindToggle("No Recoil", "noRecoilEnabled", 250)
 bindToggle("Munição Infinita", "infiniteAmmoEnabled", 300)
 bindToggle("Recarga Instantânea", "instantReloadEnabled", 350)
 
--- Label do FOV
-local fovLabel = Instance.new("TextLabel")
-fovLabel.Text = "FOV: ".._G.FOV_RADIUS
-fovLabel.Size = UDim2.new(1, -20, 0, 30)
-fovLabel.Position = UDim2.new(0, 10, 0, 410)
-fovLabel.BackgroundTransparency = 1
-fovLabel.TextColor3 = Color3.new(1,1,1)
-fovLabel.Font = Enum.Font.GothamBold
-fovLabel.TextSize = 20
-fovLabel.TextXAlignment = Enum.TextXAlignment.Center
-fovLabel.Parent = menu
-
-local function updateFOVLabel()
-    fovLabel.Text = "FOV: ".._G.FOV_RADIUS
+-- Remover o label FOV antigo
+if fovLabel then
+    fovLabel:Destroy()
 end
 
-local function createFOVButton(text, xPos)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 50, 0, 30)
-    btn.Position = UDim2.new(0, xPos, 0, 450)
-    btn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 20
-    btn.Text = text
-    btn.Parent = menu
+-- Botão Mostrar FOV (toggle ON/OFF)
+local showFovToggle = createToggle("Mostrar FOV", 400)
+showFovToggle.update(_G.FOV_VISIBLE)
+showFovToggle.toggleBtn.MouseButton1Click:Connect(function()
+    _G.FOV_VISIBLE = not _G.FOV_VISIBLE
+    showFovToggle.update(_G.FOV_VISIBLE)
+end)
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = btn
+-- Botão "-" para diminuir FOV
+local fovMinusBtn = Instance.new("TextButton")
+fovMinusBtn.Size = UDim2.new(0, 40, 0, 30)
+fovMinusBtn.Position = UDim2.new(0, 40, 0, 445)
+fovMinusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+fovMinusBtn.TextColor3 = Color3.new(1,1,1)
+fovMinusBtn.Font = Enum.Font.GothamBold
+fovMinusBtn.TextSize = 20
+fovMinusBtn.Text = "-"
+fovMinusBtn.Parent = menu
 
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(90,90,90)}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70,70,70)}):Play()
-    end)
+local cornerMinus = Instance.new("UICorner")
+cornerMinus.CornerRadius = UDim.new(0, 8)
+cornerMinus.Parent = fovMinusBtn
 
-    btn.MouseButton1Click:Connect(function()
-        if text == "+" then
-            _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
-        else
-            _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
-        end
-        updateFOVLabel()
-    end)
-end
+-- Botão "+" para aumentar FOV
+local fovPlusBtn = Instance.new("TextButton")
+fovPlusBtn.Size = UDim2.new(0, 40, 0, 30)
+fovPlusBtn.Position = UDim2.new(0, 130, 0, 445)
+fovPlusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+fovPlusBtn.TextColor3 = Color3.new(1,1,1)
+fovPlusBtn.Font = Enum.Font.GothamBold
+fovPlusBtn.TextSize = 20
+fovPlusBtn.Text = "+"
+fovPlusBtn.Parent = menu
 
-createFOVButton("-", 55)
-createFOVButton("+", 135)
+local cornerPlus = Instance.new("UICorner")
+cornerPlus.CornerRadius = UDim.new(0, 8)
+cornerPlus.Parent = fovPlusBtn
 
-updateFOVLabel()
+-- Atualizar FOV ao clicar nos botões
+fovMinusBtn.MouseButton1Click:Connect(function()
+    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
+end)
+fovPlusBtn.MouseButton1Click:Connect(function()
+    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
+end)
 
 -- Drag para mover o menu pela barra do título
 local dragging = false
