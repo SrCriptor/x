@@ -16,256 +16,72 @@ _G.espAlliesEnabled = false
 _G.noRecoilEnabled = true
 _G.infiniteAmmoEnabled = false
 _G.instantReloadEnabled = true
-_G.RapidFireEnabled = false
-_G.RapidFire = nil
 
--- Armazenar valores padrão das armas
-local defaultWeaponAttributes = {}
-
--- Função para salvar valores padrão
-local function saveDefaultAttributes(tool)
-    if not tool or not tool:IsA("Tool") then return end
-    if defaultWeaponAttributes[tool] then return end
-    defaultWeaponAttributes[tool] = {
-        reloadTime = tool:GetAttribute("reloadTime"),
-        RapidFire = tool:GetAttribute("RapidFire"),
-        magazineSize = tool:GetAttribute("magazineSize"),
-        _ammo = tool:GetAttribute("_ammo"),
-        spread = tool:GetAttribute("spread"),
-        recoilMin = tool:GetAttribute("recoilMin"),
-        recoilMax = tool:GetAttribute("recoilMax"),
-        recoilAimReduction = tool:GetAttribute("recoilAimReduction"),
-    }
-end
-
--- Função para restaurar valores padrão
-local function restoreDefaultAttributes(tool)
-    local defaults = defaultWeaponAttributes[tool]
-    if not defaults then return end
-    for attr, val in pairs(defaults) do
-        if val ~= nil then
-            tool:SetAttribute(attr, val)
-        end
-    end
-end
-
--- Função para aplicar cheats
-local function applyWeaponCheats(tool)
-    if not tool or not tool:IsA("Tool") then return end
-    saveDefaultAttributes(tool)
-    -- RapidFire
-    if _G.RapidFireEnabled and _G.RapidFire then
-        tool:SetAttribute("RapidFire", _G.RapidFire)
-    end
-    -- No Recoil
-    if _G.noRecoilEnabled then
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-        tool:SetAttribute("spread", 0)
-    end
-    -- Infinite Ammo
-    if _G.infiniteAmmoEnabled then
-        tool:SetAttribute("_ammo", 200)
-        tool:SetAttribute("magazineSize", 200)
-    end
-    -- Instant Reload
-    if _G.instantReloadEnabled then
-        tool:SetAttribute("reloadTime", 0)
-    end
-end
-
--- Função para atualizar cheats ou restaurar padrão
-local function updateWeaponAttributes(tool)
-    if not tool or not tool:IsA("Tool") then return end
-    -- RapidFire
-    if not _G.RapidFireEnabled then
-        restoreDefaultAttributes(tool)
-    else
-        applyWeaponCheats(tool)
-    end
-    -- No Recoil
-    if not _G.noRecoilEnabled then
-        restoreDefaultAttributes(tool)
-    else
-        applyWeaponCheats(tool)
-    end
-    -- Infinite Ammo
-    if not _G.infiniteAmmoEnabled then
-        restoreDefaultAttributes(tool)
-    else
-        applyWeaponCheats(tool)
-    end
-    -- Instant Reload
-    if not _G.instantReloadEnabled then
-        restoreDefaultAttributes(tool)
-    else
-        applyWeaponCheats(tool)
-    end
-end
-
--- Atualiza todos os tools do personagem
-local function updateAllTools()
-    if LocalPlayer.Character then
-        for _, tool in pairs(LocalPlayer.Character:GetChildren()) do
-            if tool:IsA("Tool") then
-                updateWeaponAttributes(tool)
-            end
-        end
-    end
-end
-
--- Eventos para atualizar armas ao equipar/desativar cheats
-LocalPlayer.CharacterAdded:Connect(function(char)
-    char.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            task.wait(0.1)
-            updateWeaponAttributes(child)
-        end
-    end)
-end)
-if LocalPlayer.Character then
-    for _, tool in pairs(LocalPlayer.Character:GetChildren()) do
-        if tool:IsA("Tool") then
-            updateWeaponAttributes(tool)
-        end
-    end
-end
-
--- Menu responsivo, arrastável, ScrollingFrame
+-- Criação do GUI principal
 local gui = Instance.new("ScreenGui")
-gui.Name = "KryptonToolsGUI"
+gui.Name = "MobileAimbotGUI"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local menuSizes = {
-    UDim2.new(0, 240, 0, 420),
-    UDim2.new(0, 300, 0, 520),
-    UDim2.new(0, 180, 0, 340)
-}
-local currentMenuSize = 1
-
-local menu = Instance.new("ScrollingFrame")
-menu.Size = menuSizes[currentMenuSize]
-menu.Position = UDim2.new(0, 20, 0, 40)
-menu.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+local menu = Instance.new("Frame")
+menu.Size = UDim2.new(0, 220, 0, 480)
+menu.AnchorPoint = Vector2.new(0, 0)
+menu.Position = UDim2.new(0, 20, 0, 100)
+menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 menu.BackgroundTransparency = 0.1
 menu.BorderSizePixel = 0
 menu.ClipsDescendants = true
-menu.ScrollBarThickness = 4
-menu.CanvasSize = UDim2.new(0, 0, 0, 700)
 menu.Parent = gui
 menu.Name = "MainMenu"
 menu.Active = true
-menu.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
 local uicorner = Instance.new("UICorner")
 uicorner.CornerRadius = UDim.new(0, 12)
 uicorner.Parent = menu
 
--- Título com efeito RGB/Matrix
+-- Título do menu
 local title = Instance.new("TextLabel")
-title.Text = "Krypton Tools"
-title.Size = UDim2.new(1, 0, 0, 38)
-title.Position = UDim2.new(0, 0, 0, 0)
+title.Text = "Aimbot & ESP Menu"
+title.Size = UDim2.new(1, 0, 0, 36)
 title.BackgroundTransparency = 1
-title.TextColor3 = Color3.new(0, 1, 0)
-title.Font = Enum.Font.Code
-title.TextSize = 26
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
 title.Parent = menu
 title.Name = "Title"
-title.TextXAlignment = Enum.TextXAlignment.Center
-
--- Efeito RGB animado no título
-task.spawn(function()
-    local t = 0
-    while true do
-        t = t + 0.03
-        local r = math.abs(math.sin(t)) * 0.7 + 0.3
-        local g = math.abs(math.sin(t + 2)) * 0.7 + 0.3
-        local b = math.abs(math.sin(t + 4)) * 0.7 + 0.3
-        title.TextColor3 = Color3.new(r, g, b)
-        task.wait(0.03)
-    end
-end)
-
--- Engrenagem para trocar tamanho do menu
-local sizeBtn = Instance.new("TextButton")
-sizeBtn.Size = UDim2.new(0, 32, 0, 32)
-sizeBtn.Position = UDim2.new(1, -38, 0, 3)
-sizeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-sizeBtn.TextColor3 = Color3.new(1, 1, 1)
-sizeBtn.Font = Enum.Font.GothamBold
-sizeBtn.TextSize = 20
-sizeBtn.Text = "⚙️"
-sizeBtn.Parent = menu
-sizeBtn.Name = "SizeButton"
-local sizeBtnCorner = Instance.new("UICorner")
-sizeBtnCorner.CornerRadius = UDim.new(1, 0)
-sizeBtnCorner.Parent = sizeBtn
-
-sizeBtn.MouseButton1Click:Connect(function()
-    currentMenuSize = currentMenuSize % #menuSizes + 1
-    menu.Size = menuSizes[currentMenuSize]
-end)
-
--- Drag para mover o menu
-local dragging, dragStart, startPos = false, nil, nil
-title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = menu.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-title.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-        local delta = input.Position - dragStart
-        local newY = math.max(0, startPos.Y.Offset + delta.Y)
-        menu.Position = UDim2.new(0, math.max(0, startPos.X.Offset + delta.X), 0, newY)
-    end
-end)
+title.AnchorPoint = Vector2.new(0, 0)
 
 -- Botão minimizar/maximizar
 local toggleVisibilityBtn = Instance.new("TextButton")
-toggleVisibilityBtn.Size = UDim2.new(0, 32, 0, 32)
-toggleVisibilityBtn.Position = UDim2.new(1, -76, 0, 3)
-toggleVisibilityBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggleVisibilityBtn.Size = UDim2.new(0, 40, 0, 30)
+toggleVisibilityBtn.Position = UDim2.new(1, -45, 0, 3)
+toggleVisibilityBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 toggleVisibilityBtn.TextColor3 = Color3.new(1,1,1)
 toggleVisibilityBtn.Font = Enum.Font.GothamBold
 toggleVisibilityBtn.TextSize = 20
 toggleVisibilityBtn.Text = "–"
 toggleVisibilityBtn.Parent = menu
 toggleVisibilityBtn.Name = "ToggleVisibility"
-local toggleBtnCorner = Instance.new("UICorner")
-toggleBtnCorner.CornerRadius = UDim.new(1, 0)
-toggleBtnCorner.Parent = toggleVisibilityBtn
 
 local minimized = false
 toggleVisibilityBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
-        menu.CanvasSize = UDim2.new(0,0,0,0)
-        menu.Size = UDim2.new(menu.Size.X.Scale, menu.Size.X.Offset, 0, 38)
+        -- anima esconder o menu, só deixa o título visível
+        menu.Size = UDim2.new(0, 220, 0, 36)
         toggleVisibilityBtn.Text = "+"
     else
-        menu.Size = menuSizes[currentMenuSize]
-        menu.CanvasSize = UDim2.new(0,0,0,700)
+        menu.Size = UDim2.new(0, 220, 0, 480)
         toggleVisibilityBtn.Text = "–"
     end
 end)
 
--- Função para criar toggles arredondados
-local function createToggle(text, y, flagName, callback)
+-- Função para criar toggles arredondados com animação e debounce
+local function createToggle(text, y)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -24, 0, 38)
-    frame.Position = UDim2.new(0, 12, 0, y)
+    frame.Size = UDim2.new(1, -20, 0, 40)
+    frame.Position = UDim2.new(0, 10, 0, y)
     frame.BackgroundTransparency = 1
     frame.Parent = menu
 
@@ -280,11 +96,11 @@ local function createToggle(text, y, flagName, callback)
     label.Parent = frame
 
     local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(0, 48, 0, 24)
+    toggleBtn.Size = UDim2.new(0, 50, 0, 25)
     toggleBtn.Position = UDim2.new(0.75, 0, 0.25, 0)
-    toggleBtn.BackgroundColor3 = _G[flagName] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(70, 70, 70)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
     toggleBtn.AutoButtonColor = false
-    toggleBtn.Text = _G[flagName] and "ON" or "OFF"
+    toggleBtn.Text = "OFF"
     toggleBtn.Font = Enum.Font.GothamBold
     toggleBtn.TextColor3 = Color3.new(1, 1, 1)
     toggleBtn.TextSize = 16
@@ -297,13 +113,14 @@ local function createToggle(text, y, flagName, callback)
 
     local toggleCircle = Instance.new("Frame")
     toggleCircle.Size = UDim2.new(0, 20, 0, 20)
-    toggleCircle.Position = _G[flagName] and UDim2.new(0, 25, 0.15, 0) or UDim2.new(0, 5, 0.15, 0)
+    toggleCircle.Position = UDim2.new(0, 5, 0.15, 0)
     toggleCircle.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     toggleCircle.Parent = toggleBtn
     local cornerCircle = Instance.new("UICorner")
     cornerCircle.CornerRadius = UDim.new(1, 0)
     cornerCircle.Parent = toggleCircle
 
+    -- Hover effect
     toggleBtn.MouseEnter:Connect(function()
         TweenService:Create(toggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(90, 90, 90)}):Play()
     end)
@@ -312,122 +129,167 @@ local function createToggle(text, y, flagName, callback)
         TweenService:Create(toggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
     end)
 
-    toggleBtn.MouseButton1Click:Connect(function()
-        _G[flagName] = not _G[flagName]
-        local isOn = _G[flagName]
-        toggleBtn.Text = isOn and "ON" or "OFF"
-        TweenService:Create(toggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = isOn and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(70, 70, 70)}):Play()
-        TweenService:Create(toggleCircle, TweenInfo.new(0.3), {Position = isOn and UDim2.new(0, 25, 0.15, 0) or UDim2.new(0, 5, 0.15, 0)}):Play()
-        if callback then callback(isOn) end
-        updateAllTools()
-    end)
-    return frame
+    local debounce = false
+    -- Função para atualizar visual do toggle com animação
+    local function updateToggleState(isOn)
+        if debounce then return end
+        debounce = true
+        if isOn then
+            toggleBtn.Text = "ON"
+            local tween1 = TweenService:Create(toggleBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(0, 170, 0)})
+            local tween2 = TweenService:Create(toggleCircle, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0, 25, 0.15, 0)})
+            tween1:Play()
+            tween2:Play()
+            tween2.Completed:Wait()
+        else
+            toggleBtn.Text = "OFF"
+            local tween1 = TweenService:Create(toggleBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)})
+            local tween2 = TweenService:Create(toggleCircle, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0.15, 0)})
+            tween1:Play()
+            tween2:Play()
+            tween2.Completed:Wait()
+        end
+        debounce = false
+    end
+
+    return {
+        frame = frame,
+        toggleBtn = toggleBtn,
+        update = updateToggleState,
+        getState = function() return toggleBtn.Text == "ON" end
+    }
 end
 
--- Layout dos toggles
-local y = 50
-local spacing = 44
-createToggle("Aimbot Auto", y, "aimbotAutoEnabled")
-createToggle("Aimbot Manual", y + spacing, "aimbotManualEnabled")
-createToggle("ESP Inimigos", y + spacing*2, "espEnemiesEnabled")
-createToggle("ESP Aliados", y + spacing*3, "espAlliesEnabled")
-createToggle("No Recoil", y + spacing*4, "noRecoilEnabled", function() updateAllTools() end)
-createToggle("Munição Infinita", y + spacing*5, "infiniteAmmoEnabled", function() updateAllTools() end)
-createToggle("Recarga Instantânea", y + spacing*6, "instantReloadEnabled", function() updateAllTools() end)
+-- Criar toggles e ligar aos flags globais
+local toggles = {}
 
--- Toggle Mostrar FOV
-local fovToggle = createToggle("Mostrar FOV", y + spacing*7, "FOV_VISIBLE")
+local function bindToggle(text, flagName, y)
+    local tog = createToggle(text, y)
+    tog.update(_G[flagName])
+    tog.toggleBtn.MouseButton1Click:Connect(function()
+        _G[flagName] = not _G[flagName]
+        tog.update(_G[flagName])
+    end)
+    toggles[flagName] = tog
+end
 
--- Botões de FOV centralizados
-local fovBtnFrame = Instance.new("Frame")
-fovBtnFrame.Size = UDim2.new(1, -24, 0, 36)
-fovBtnFrame.Position = UDim2.new(0, 12, 0, y + spacing*8)
-fovBtnFrame.BackgroundTransparency = 1
-fovBtnFrame.Parent = menu
+bindToggle("Aimbot Auto", "aimbotAutoEnabled", 50)
+bindToggle("Aimbot Manual", "aimbotManualEnabled", 100)
+bindToggle("ESP Inimigos", "espEnemiesEnabled", 150)
+bindToggle("ESP Aliados", "espAlliesEnabled", 200)
+bindToggle("No Recoil", "noRecoilEnabled", 250)
+bindToggle("Munição Infinita", "infiniteAmmoEnabled", 300)
+bindToggle("Recarga Instantânea", "instantReloadEnabled", 350)
 
-local fovMinus = Instance.new("TextButton")
-fovMinus.Size = UDim2.new(0, 48, 0, 28)
-fovMinus.Position = UDim2.new(0.25, -24, 0, 4)
-fovMinus.BackgroundColor3 = Color3.fromRGB(70,70,70)
-fovMinus.TextColor3 = Color3.new(1,1,1)
-fovMinus.Font = Enum.Font.GothamBold
-fovMinus.TextSize = 22
-fovMinus.Text = "-"
-fovMinus.Parent = fovBtnFrame
-local fovMinusCorner = Instance.new("UICorner")
-fovMinusCorner.CornerRadius = UDim.new(0, 8)
-fovMinusCorner.Parent = fovMinus
+-- Label do FOV
+local fovLabel = Instance.new("TextLabel")
+fovLabel.Text = "FOV: ".._G.FOV_RADIUS
+fovLabel.Size = UDim2.new(1, -20, 0, 30)
+fovLabel.Position = UDim2.new(0, 10, 0, 410)
+fovLabel.BackgroundTransparency = 1
+fovLabel.TextColor3 = Color3.new(1,1,1)
+fovLabel.Font = Enum.Font.GothamBold
+fovLabel.TextSize = 20
+fovLabel.TextXAlignment = Enum.TextXAlignment.Center
+fovLabel.Parent = menu
 
-local fovPlus = Instance.new("TextButton")
-fovPlus.Size = UDim2.new(0, 48, 0, 28)
-fovPlus.Position = UDim2.new(0.75, -24, 0, 4)
-fovPlus.BackgroundColor3 = Color3.fromRGB(70,70,70)
-fovPlus.TextColor3 = Color3.new(1,1,1)
-fovPlus.Font = Enum.Font.GothamBold
-fovPlus.TextSize = 22
-fovPlus.Text = "+"
-fovPlus.Parent = fovBtnFrame
-local fovPlusCorner = Instance.new("UICorner")
-fovPlusCorner.CornerRadius = UDim.new(0, 8)
-fovPlusCorner.Parent = fovPlus
+local function updateFOVLabel()
+    fovLabel.Text = "FOV: ".._G.FOV_RADIUS
+end
 
-fovMinus.MouseButton1Click:Connect(function()
-    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
-end)
-fovPlus.MouseButton1Click:Connect(function()
-    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
-end)
+local function createFOVButton(text, xPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 50, 0, 30)
+    btn.Position = UDim2.new(0, xPos, 0, 450)
+    btn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 20
+    btn.Text = text
+    btn.Parent = menu
 
--- Toggle RapidFire
-local rapidFireToggle = createToggle("RAPID FIRE", y + spacing*9, "RapidFireEnabled", function(isOn)
-    if not isOn then
-        _G.RapidFire = nil
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(90,90,90)}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70,70,70)}):Play()
+    end)
+
+    btn.MouseButton1Click:Connect(function()
+        if text == "+" then
+            _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
+        else
+            _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
+        end
+        updateFOVLabel()
+    end)
+end
+
+createFOVButton("-", 55)
+createFOVButton("+", 135)
+
+updateFOVLabel()
+
+-- Drag para mover o menu pela barra do título
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = menu.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
     end
-    updateAllTools()
 end)
 
--- Botão de modo RapidFire centralizado
-local rapidFireModes = {200, 500, 999999999999}
-local rapidFireNames = {"Legit", "Médio", "Agressivo"}
-local rapidFireBtnFrame = Instance.new("Frame")
-rapidFireBtnFrame.Size = UDim2.new(1, -24, 0, 36)
-rapidFireBtnFrame.Position = UDim2.new(0, 12, 0, y + spacing*10)
-rapidFireBtnFrame.BackgroundTransparency = 1
-rapidFireBtnFrame.Parent = menu
-
-local rapidFireBtn = Instance.new("TextButton")
-rapidFireBtn.Size = UDim2.new(0, 120, 0, 28)
-rapidFireBtn.Position = UDim2.new(0.5, -60, 0, 4)
-rapidFireBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-rapidFireBtn.TextColor3 = Color3.new(1, 1, 1)
-rapidFireBtn.Font = Enum.Font.GothamBold
-rapidFireBtn.TextSize = 18
-rapidFireBtn.Text = rapidFireNames[1]
-rapidFireBtn.Parent = rapidFireBtnFrame
-local rapidFireBtnCorner = Instance.new("UICorner")
-rapidFireBtnCorner.CornerRadius = UDim.new(0, 8)
-rapidFireBtnCorner.Parent = rapidFireBtn
-
-local rapidFireIndex = 1
-rapidFireBtn.MouseButton1Click:Connect(function()
-    rapidFireIndex = rapidFireIndex % #rapidFireModes + 1
-    _G.RapidFire = rapidFireModes[rapidFireIndex]
-    rapidFireBtn.Text = rapidFireNames[rapidFireIndex]
-    updateAllTools()
-end)
-
--- Atualiza texto do botão ao ativar/desativar RapidFire
-rapidFireToggle.ToggleButton.MouseButton1Click:Connect(function()
-    if not _G.RapidFireEnabled then
-        rapidFireBtn.Text = rapidFireNames[1]
-        rapidFireIndex = 1
-        _G.RapidFire = nil
-    else
-        _G.RapidFire = rapidFireModes[rapidFireIndex]
-        rapidFireBtn.Text = rapidFireNames[rapidFireIndex]
+title.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStart
+        menu.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
     end
-    updateAllTools()
 end)
+
+-- Funções auxiliares
+local function isAlive(character)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health > 0
+end
+
+local function isFFA()
+    local teams = {}
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Team then
+            teams[player.Team] = true
+        end
+    end
+    return next(teams) == nil or next(teams, next(teams)) == nil
+end
+
+local function hasLineOfSight(targetPart)
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * 500
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return not result or result.Instance:IsDescendantOf(targetPart.Parent)
+end
 
 -- Buscar inimigo visível mais próximo dentro do FOV
 local function getClosestVisibleEnemy()
@@ -586,7 +448,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Função para aplicar cheats na arma atual
+-- Aplicar cheats na arma atual
 local function patchWeapon(tool)
     if tool and tool:IsA("Tool") then
         if _G.infiniteAmmoEnabled and tool:FindFirstChild("Ammo") then
@@ -707,7 +569,7 @@ title.Position = UDim2.new(0.5, -title.Size.X.Offset / 2, 0, 0)
 
 -- Criar os toggles para RapidFire
 local RapidFireOptions = {nil, 200, 500, 99999999999999}
-local RapidFireRateName = {"Legit", "Médio", "Agressivo"}
+local RapidFireRateName = {"Padrão", "Legit", "Médio", "Agressivo"}
 
 local function createFireRateToggle()
     local frame = Instance.new("Frame")
@@ -783,39 +645,3 @@ title.InputChanged:Connect(function(input)
         )
     end
 end)
-
--- Desenhar FOV na tela
-local fovCircle
-local function drawFOV()
-    if fovCircle then fovCircle:Remove() end
-    if not _G.FOV_VISIBLE then return end
-    fovCircle = Drawing and Drawing.new("Circle") or nil
-    if fovCircle then
-        fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-        fovCircle.Radius = _G.FOV_RADIUS
-        fovCircle.Color = Color3.fromRGB(0,255,0)
-        fovCircle.Thickness = 2
-        fovCircle.Transparency = 0.5
-        fovCircle.Filled = false
-        fovCircle.Visible = true
-    end
-end
-
-RunService.RenderStepped:Connect(function()
-    drawFOV()
-end)
-
-local function isFFA()
-    -- Se não tiver sistema de times, sempre FFA
-    return not LocalPlayer.Team
-end
-
-local function isAlive(character)
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    return humanoid and humanoid.Health > 0
-end
-
-local function hasLineOfSight(part)
-    -- Simples: sempre true, ou implemente Raycast se quiser
-    return true
-end
