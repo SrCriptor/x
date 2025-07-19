@@ -16,7 +16,7 @@ _G.espAlliesEnabled = false
 _G.noRecoilEnabled = true
 _G.infiniteAmmoEnabled = false
 _G.instantReloadEnabled = true
-_G.rateOfFire = 70
+_G.rateOfFire = nil
 
 -- Tamanhos do menu
 local menuSizes = {
@@ -295,10 +295,10 @@ y = y + rofFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
 -- Botão centralizado para alternar modos de Rate of Fire
 local rofModes = {
-    {name = "Padrão", value = nil}, -- nil = valor original da arma
-    {name = "Legit", value = 200},
-    {name = "Médio", value = 500},
-    {name = "Agressivo", value = 9999999},
+    {name = "[Padrão]", value = nil}, -- nil = valor original da arma
+    {name = "[Legit]", value = 200},
+    {name = "[Médio]", value = 500},
+    {name = "[Agressivo]", value = 9999999},
 }
 local rofIdx = 1
 _G.rateOfFire = nil -- padrão: não altera o valor da arma
@@ -349,11 +349,10 @@ end)
 title.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
         local delta = input.Position - dragStart
+        local newY = math.max(0, startPos.Y.Offset + delta.Y)
         menu.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, newY
         )
     end
 end)
@@ -593,7 +592,6 @@ local function applyGunAttributes(tool)
     if _G.rateOfFire then
         tool:SetAttribute("rateOfFire", _G.rateOfFire)
     end
-    -- Se _G.rateOfFire for nil, não altera o rateOfFire da arma!
 end
 
 -- Função para ajustar o tiro por rateOfFire
@@ -732,11 +730,10 @@ end)
 title.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
         local delta = input.Position - dragStart
+        local newY = math.max(0, startPos.Y.Offset + delta.Y)
         menu.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, newY
         )
     end
 end)
