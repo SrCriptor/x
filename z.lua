@@ -132,16 +132,17 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	logAction("Input Began", "Tipo: "..inputType..", Key: "..key)
 end)
 
--- Detectar RemoteEvents com "shoot" no nome (exemplo para tiros)
+-- Hook seguro para RemoteEvents com "shoot" no nome
 for _, v in pairs(game:GetDescendants()) do
 	if v:IsA("RemoteEvent") and string.find(v.Name:lower(), "shoot") then
-		local origFire = v.FireServer
-		v.FireServer = function(self, ...)
-			logAction("Tiro disparado", "RemoteEvent: "..v.Name)
-			return origFire(self, ...)
+		local success, origFire = pcall(function() return v.FireServer end)
+		if success and type(origFire) == "function" then
+			v.FireServer = function(self, ...)
+				logAction("Tiro disparado", "RemoteEvent: "..v.Name)
+				return origFire(self, ...)
+			end
 		end
 	end
 end
 
 addLogLine("Debugger ativo. Toque no título para abrir/fechar.")
-
