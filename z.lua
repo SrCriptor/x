@@ -587,16 +587,57 @@ local menuSizeOptions = {
 }
 local currentMenuSizeIndex = 1
 
+-- Função para atualizar o layout dos elementos ao mudar o tamanho do menu
+local function updateMenuLayout()
+    -- Atualiza posição dos botões do topo
+    title.Position = UDim2.new(0, 0, 0, 0)
+    toggleVisibilityBtn.Position = UDim2.new(1, -85, 0, 3)
+    sizeBtn.Position = UDim2.new(1, -45, 0, 3)
+
+    -- Reposiciona todos os toggles, seções e botões conforme o novo tamanho
+    local y = 45
+    -- Seções e toggles
+    local sections = {
+        {title = "Aimbot", flags = {"aimbotAutoEnabled", "aimbotManualEnabled"}},
+        {title = "ESP", flags = {"espEnemiesEnabled", "espAlliesEnabled"}},
+        {title = "Arma", flags = {"noRecoilEnabled", "infiniteAmmoEnabled", "instantReloadEnabled"}},
+        {title = "FOV", flags = {}}
+    }
+    for _, v in ipairs(menu:GetChildren()) do
+        if v:IsA("Frame") or (v:IsA("TextLabel") and v.Name ~= "Title") then
+            v:Destroy()
+        end
+    end
+    toggles = {}
+    for _, section in ipairs(sections) do
+        y = createSection(section.title, y)
+        for _, flag in ipairs(section.flags) do
+            bindToggle(flag:gsub("Enabled", ""):gsub("^%l", string.upper):gsub("([A-Z])", " %1"):gsub("^%s+", ""), flag, y)
+            y = y + 40
+        end
+    end
+
+    -- FOV
+    showFovToggle = createToggle("Mostrar FOV", y)
+    showFovToggle.update(_G.FOV_VISIBLE)
+    y = y + 40
+
+    -- Botões de FOV
+    local fovBtnY = y + 5
+    fovMinusBtn.Position = UDim2.new(0, 40, 0, fovBtnY)
+    fovPlusBtn.Position = UDim2.new(0, 130, 0, fovBtnY)
+
+    -- Rate of Fire
+    createFireRateButtons(y)
+end
+
+-- Atualize o layout sempre que mudar o tamanho do menu
 local function changeMenuSize()
     currentMenuSizeIndex = currentMenuSizeIndex % #menuSizeOptions + 1
     local newSize = menuSizeOptions[currentMenuSizeIndex]
     menu.Size = newSize
-    -- Centraliza o menu na tela
     menu.Position = UDim2.new(0.5, -newSize.X.Offset / 2, 0.5, -newSize.Y.Offset / 2)
-    -- Garante que título, minimizar e engrenagem fiquem no topo
-    title.Position = UDim2.new(0, 0, 0, 0)
-    toggleVisibilityBtn.Position = UDim2.new(1, -85, 0, 3)
-    sizeBtn.Position = UDim2.new(1, -45, 0, 3)
+    updateMenuLayout()
 end
 
 -- Adicionando o botão de configuração de tamanho (engrenagem) ao lado do minimizar
@@ -699,6 +740,210 @@ end
 -- Após bindToggle("Recarga Instantânea", ...), adicione:
 createFireRateButtons(y)
 y = y + 40
+
+-- Adiciona um sistema de páginas ao menu (estilo abas/páginas)
+local pageTitles = {"Aimbot", "ESP", "Arma", "FOV"}
+local totalPages = #pageTitles
+local currentPage = 1
+local pageFrames = {}
+
+-- Cria barra de navegação de páginas (tipo abas)
+local navBar = Instance.new("Frame")
+navBar.Size = UDim2.new(1, 0, 0, 32)
+navBar.Position = UDim2.new(0, 0, 0, 36)
+navBar.BackgroundTransparency = 1
+navBar.Parent = menu
+
+local navButtons = {}
+
+for i, title in ipairs(pageTitles) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 55, 1, 0)
+    btn.Position = UDim2.new(0, (i-1)*60 + 10, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 15
+    btn.Text = title
+    btn.Parent = navBar
+    btn.Name = "NavBtn"..i
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+
+    navButtons[i] = btn
+
+    btn.MouseButton1Click:Connect(function()
+        currentPage = i
+        for j, frame in ipairs(pageFrames) do
+            frame.Visible = (j == currentPage)
+            navButtons[j].BackgroundColor3 = (j == currentPage) and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(40, 40, 40)
+        end
+    end)
+end
+
+-- Função para criar uma página (Frame) para cada seção
+local function createPage()
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -20, 1, -78)
+    frame.Position = UDim2.new(0, 10, 0, 68)
+    frame.BackgroundTransparency = 1
+    frame.Parent = menu
+    frame.Visible = false
+    return frame
+end
+
+-- Cria frames para cada página
+for i = 1, totalPages do
+    pageFrames[i] = createPage()
+end
+pageFrames[1].Visible = true
+navButtons[1].BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+
+-- Função para adicionar toggles em cada página
+local function addToggleToPage(pageIdx, text, flagName, y)
+    local tog = createToggle(text, y)
+    tog.update(_G[flagName])
+    tog.toggleBtn.MouseButton1Click:Connect(function()
+        _G[flagName] = not _G[flagName]
+        tog.update(_G[flagName])
+    end)
+    tog.frame.Parent = pageFrames[pageIdx]
+end
+
+-- Adiciona os toggles e controles em cada página
+-- Página 1: Aimbot
+local y = 10
+addToggleToPage(1, "Aimbot Auto", "aimbotAutoEnabled", y); y = y + 40
+addToggleToPage(1, "Aimbot Manual", "aimbotManualEnabled", y)
+
+-- Página 2: ESP
+y = 10
+addToggleToPage(2, "ESP Inimigos", "espEnemiesEnabled", y); y = y + 40
+addToggleToPage(2, "ESP Aliados", "espAlliesEnabled", y)
+
+-- Página 3: Arma
+y = 10
+addToggleToPage(3, "No Recoil", "noRecoilEnabled", y); y = y + 40
+addToggleToPage(3, "Munição Infinita", "infiniteAmmoEnabled", y); y = y + 40
+addToggleToPage(3, "Recarga Instantânea", "instantReloadEnabled", y); y = y + 40
+
+-- Rate of Fire na página de Arma
+local function addRateOfFireToPage(pageIdx, y)
+    local label = Instance.new("TextLabel")
+    label.Text = "Rate of Fire"
+    label.Size = UDim2.new(0, 120, 0, 30)
+    label.Position = UDim2.new(0, 10, 0, y)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 16
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = pageFrames[pageIdx]
+
+    local minusBtn = Instance.new("TextButton")
+    minusBtn.Size = UDim2.new(0, 30, 0, 30)
+    minusBtn.Position = UDim2.new(0, 130, 0, y)
+    minusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    minusBtn.TextColor3 = Color3.new(1,1,1)
+    minusBtn.Font = Enum.Font.GothamBold
+    minusBtn.TextSize = 18
+    minusBtn.Text = "-"
+    minusBtn.Parent = pageFrames[pageIdx]
+    local minusCorner = Instance.new("UICorner")
+    minusCorner.CornerRadius = UDim.new(0, 8)
+    minusCorner.Parent = minusBtn
+
+    local plusBtn = Instance.new("TextButton")
+    plusBtn.Size = UDim2.new(0, 30, 0, 30)
+    plusBtn.Position = UDim2.new(0, 170, 0, y)
+    plusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    plusBtn.TextColor3 = Color3.new(1,1,1)
+    plusBtn.Font = Enum.Font.GothamBold
+    plusBtn.TextSize = 18
+    plusBtn.Text = "+"
+    plusBtn.Parent = pageFrames[pageIdx]
+    local plusCorner = Instance.new("UICorner")
+    plusCorner.CornerRadius = UDim.new(0, 8)
+    plusCorner.Parent = plusBtn
+
+    local rateLabel = Instance.new("TextLabel")
+    rateLabel.Size = UDim2.new(0, 40, 0, 30)
+    rateLabel.Position = UDim2.new(0, 100, 0, y)
+    rateLabel.BackgroundTransparency = 1
+    rateLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
+    rateLabel.Font = Enum.Font.GothamBold
+    rateLabel.TextSize = 16
+    rateLabel.Text = tostring(_G.rateOfFire)
+    rateLabel.TextXAlignment = Enum.TextXAlignment.Center
+    rateLabel.Parent = pageFrames[pageIdx]
+
+    local function updateRateLabel()
+        rateLabel.Text = tostring(_G.rateOfFire)
+    end
+
+    minusBtn.MouseButton1Click:Connect(function()
+        local idx = table.find(fireRateOptions, _G.rateOfFire) or 1
+        idx = idx - 1
+        if idx < 1 then idx = #fireRateOptions end
+        _G.rateOfFire = fireRateOptions[idx]
+        updateRateLabel()
+    end)
+    plusBtn.MouseButton1Click:Connect(function()
+        local idx = table.find(fireRateOptions, _G.rateOfFire) or 1
+        idx = idx + 1
+        if idx > #fireRateOptions then idx = 1 end
+        _G.rateOfFire = fireRateOptions[idx]
+        updateRateLabel()
+    end)
+end
+addRateOfFireToPage(3, 130)
+
+-- Página 4: FOV
+y = 10
+local showFovToggle = createToggle("Mostrar FOV", y)
+showFovToggle.update(_G.FOV_VISIBLE)
+showFovToggle.toggleBtn.MouseButton1Click:Connect(function()
+    _G.FOV_VISIBLE = not _G.FOV_VISIBLE
+    showFovToggle.update(_G.FOV_VISIBLE)
+end)
+showFovToggle.frame.Parent = pageFrames[4]
+
+-- Botões de FOV na página FOV
+local fovBtnY = y + 45
+local fovMinusBtn = Instance.new("TextButton")
+fovMinusBtn.Size = UDim2.new(0, 40, 0, 30)
+fovMinusBtn.Position = UDim2.new(0, 40, 0, fovBtnY)
+fovMinusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+fovMinusBtn.TextColor3 = Color3.new(1,1,1)
+fovMinusBtn.Font = Enum.Font.GothamBold
+fovMinusBtn.TextSize = 20
+fovMinusBtn.Text = "-"
+fovMinusBtn.Parent = pageFrames[4]
+local cornerMinus = Instance.new("UICorner")
+cornerMinus.CornerRadius = UDim.new(0, 8)
+cornerMinus.Parent = fovMinusBtn
+
+local fovPlusBtn = Instance.new("TextButton")
+fovPlusBtn.Size = UDim2.new(0, 40, 0, 30)
+fovPlusBtn.Position = UDim2.new(0, 130, 0, fovBtnY)
+fovPlusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+fovPlusBtn.TextColor3 = Color3.new(1,1,1)
+fovPlusBtn.Font = Enum.Font.GothamBold
+fovPlusBtn.TextSize = 20
+fovPlusBtn.Text = "+"
+fovPlusBtn.Parent = pageFrames[4]
+local cornerPlus = Instance.new("UICorner")
+cornerPlus.CornerRadius = UDim.new(0, 8)
+cornerPlus.Parent = fovPlusBtn
+
+fovMinusBtn.MouseButton1Click:Connect(function()
+    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
+end)
+fovPlusBtn.MouseButton1Click:Connect(function()
+    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
+end)
 
 -- Ajustar o tamanho do menu conforme solicitado
 local dragging = false
