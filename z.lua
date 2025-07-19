@@ -173,25 +173,79 @@ local function bindToggle(text, flagName, y)
     toggles[flagName] = tog
 end
 
-bindToggle("Aimbot Auto", "aimbotAutoEnabled", 50)
-bindToggle("Aimbot Manual", "aimbotManualEnabled", 100)
-bindToggle("ESP Inimigos", "espEnemiesEnabled", 150)
-bindToggle("ESP Aliados", "espAlliesEnabled", 200)
-bindToggle("No Recoil", "noRecoilEnabled", 250)
-bindToggle("Munição Infinita", "infiniteAmmoEnabled", 300)
-bindToggle("Recarga Instantânea", "instantReloadEnabled", 350)
-
--- Remover o label FOV antigo
-if fovLabel then
-    fovLabel:Destroy()
+-- Função utilitária para criar uma "seção" (tabela) no menu
+local function createSection(titleText, y)
+    local sectionLabel = Instance.new("TextLabel")
+    sectionLabel.Text = titleText
+    sectionLabel.Size = UDim2.new(1, -20, 0, 22)
+    sectionLabel.Position = UDim2.new(0, 10, 0, y)
+    sectionLabel.BackgroundTransparency = 1
+    sectionLabel.TextColor3 = Color3.fromRGB(180, 180, 255)
+    sectionLabel.Font = Enum.Font.GothamBold
+    sectionLabel.TextSize = 16
+    sectionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    sectionLabel.Parent = menu
+    return y + 26
 end
 
--- Botão Mostrar FOV (toggle ON/OFF)
-local showFovToggle = createToggle("Mostrar FOV", 400)
-showFovToggle.update(_G.FOV_VISIBLE)
-showFovToggle.toggleBtn.MouseButton1Click:Connect(function()
-    _G.FOV_VISIBLE = not _G.FOV_VISIBLE
-    showFovToggle.update(_G.FOV_VISIBLE)
+-- Limpa os toggles antigos (caso esteja testando várias vezes)
+for _, v in ipairs(menu:GetChildren()) do
+    if v:IsA("Frame") or (v:IsA("TextLabel") and v.Name ~= "Title") then
+        v:Destroy()
+    end
+end
+
+-- Organização em seções/tabelas
+local y = 45
+y = createSection("Aimbot", y)
+bindToggle("Aimbot Auto", "aimbotAutoEnabled", y); y = y + 40
+bindToggle("Aimbot Manual", "aimbotManualEnabled", y); y = y + 40
+
+y = createSection("ESP", y)
+bindToggle("ESP Inimigos", "espEnemiesEnabled", y); y = y + 40
+bindToggle("ESP Aliados", "espAlliesEnabled", y); y = y + 40
+
+y = createSection("Arma", y)
+bindToggle("No Recoil", "noRecoilEnabled", y); y = y + 40
+bindToggle("Munição Infinita", "infiniteAmmoEnabled", y); y = y + 40
+bindToggle("Recarga Instantânea", "instantReloadEnabled", y); y = y + 40
+
+y = createSection("FOV", y)
+showFovToggle = createToggle("Mostrar FOV", y); showFovToggle.update(_G.FOV_VISIBLE); y = y + 40
+
+-- Botões de FOV centralizados na seção FOV
+local fovBtnY = y + 5
+local fovMinusBtn = Instance.new("TextButton")
+fovMinusBtn.Size = UDim2.new(0, 40, 0, 30)
+fovMinusBtn.Position = UDim2.new(0, 40, 0, fovBtnY)
+fovMinusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+fovMinusBtn.TextColor3 = Color3.new(1,1,1)
+fovMinusBtn.Font = Enum.Font.GothamBold
+fovMinusBtn.TextSize = 20
+fovMinusBtn.Text = "-"
+fovMinusBtn.Parent = menu
+local cornerMinus = Instance.new("UICorner")
+cornerMinus.CornerRadius = UDim.new(0, 8)
+cornerMinus.Parent = fovMinusBtn
+
+local fovPlusBtn = Instance.new("TextButton")
+fovPlusBtn.Size = UDim2.new(0, 40, 0, 30)
+fovPlusBtn.Position = UDim2.new(0, 130, 0, fovBtnY)
+fovPlusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+fovPlusBtn.TextColor3 = Color3.new(1,1,1)
+fovPlusBtn.Font = Enum.Font.GothamBold
+fovPlusBtn.TextSize = 20
+fovPlusBtn.Text = "+"
+fovPlusBtn.Parent = menu
+local cornerPlus = Instance.new("UICorner")
+cornerPlus.CornerRadius = UDim.new(0, 8)
+cornerPlus.Parent = fovPlusBtn
+
+fovMinusBtn.MouseButton1Click:Connect(function()
+    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS - 5, 10, 300)
+end)
+fovPlusBtn.MouseButton1Click:Connect(function()
+    _G.FOV_RADIUS = math.clamp(_G.FOV_RADIUS + 5, 10, 300)
 end)
 
 -- Botão "-" para diminuir FOV
@@ -568,54 +622,83 @@ title.Position = UDim2.new(0, 0, 0, 0)
 toggleVisibilityBtn.Position = UDim2.new(1, -85, 0, 3)
 sizeBtn.Position = UDim2.new(1, -45, 0, 3)
 
--- Criar os toggles para rateOfFire
+-- Remover fireRateNames, usar apenas fireRateOptions
 local fireRateOptions = {50, 70, 100, 150, 200}
-local fireRateNames = {"Padrão", "Médio", "Rápido", "Agressivo", "RapidFire"}
+_G.rateOfFire = fireRateOptions[1]
 
-local function createFireRateToggle()
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -20, 0, 40)
-    frame.Position = UDim2.new(0, 10, 0, 450)
-    frame.BackgroundTransparency = 1
-    frame.Parent = menu
-
+-- Botões de Rate of Fire centralizados na seção Arma
+local function createFireRateButtons(y)
     local label = Instance.new("TextLabel")
     label.Text = "Rate of Fire"
-    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Size = UDim2.new(0, 120, 0, 30)
+    label.Position = UDim2.new(0, 10, 0, y)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 18
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 16
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
+    label.Parent = menu
 
-    local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(0, 50, 0, 25)
-    toggleBtn.Position = UDim2.new(0.75, 0, 0.25, 0)
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    toggleBtn.AutoButtonColor = false
-    toggleBtn.Text = fireRateNames[1]
-    toggleBtn.Font = Enum.Font.GothamBold
-    toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-    toggleBtn.TextSize = 16
-    toggleBtn.Parent = frame
-    toggleBtn.Name = "ToggleButton"
+    local minusBtn = Instance.new("TextButton")
+    minusBtn.Size = UDim2.new(0, 30, 0, 30)
+    minusBtn.Position = UDim2.new(0, 130, 0, y)
+    minusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    minusBtn.TextColor3 = Color3.new(1,1,1)
+    minusBtn.Font = Enum.Font.GothamBold
+    minusBtn.TextSize = 18
+    minusBtn.Text = "-"
+    minusBtn.Parent = menu
+    local minusCorner = Instance.new("UICorner")
+    minusCorner.CornerRadius = UDim.new(0, 8)
+    minusCorner.Parent = minusBtn
 
-    local cornerBtn = Instance.new("UICorner")
-    cornerBtn.CornerRadius = UDim.new(0, 8)
-    cornerBtn.Parent = toggleBtn
+    local plusBtn = Instance.new("TextButton")
+    plusBtn.Size = UDim2.new(0, 30, 0, 30)
+    plusBtn.Position = UDim2.new(0, 170, 0, y)
+    plusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    plusBtn.TextColor3 = Color3.new(1,1,1)
+    plusBtn.Font = Enum.Font.GothamBold
+    plusBtn.TextSize = 18
+    plusBtn.Text = "+"
+    plusBtn.Parent = menu
+    local plusCorner = Instance.new("UICorner")
+    plusCorner.CornerRadius = UDim.new(0, 8)
+    plusCorner.Parent = plusBtn
 
-    local debounce = false
-    toggleBtn.MouseButton1Click:Connect(function()
-        if debounce then return end
-        debounce = true
-        _G.rateOfFire = fireRateOptions[((table.find(fireRateOptions, _G.rateOfFire) or 1) % #fireRateOptions) + 1]
-        toggleBtn.Text = fireRateNames[table.find(fireRateOptions, _G.rateOfFire)]
-        debounce = false
+    local rateLabel = Instance.new("TextLabel")
+    rateLabel.Size = UDim2.new(0, 40, 0, 30)
+    rateLabel.Position = UDim2.new(0, 100, 0, y)
+    rateLabel.BackgroundTransparency = 1
+    rateLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
+    rateLabel.Font = Enum.Font.GothamBold
+    rateLabel.TextSize = 16
+    rateLabel.Text = tostring(_G.rateOfFire)
+    rateLabel.TextXAlignment = Enum.TextXAlignment.Center
+    rateLabel.Parent = menu
+
+    local function updateRateLabel()
+        rateLabel.Text = tostring(_G.rateOfFire)
+    end
+
+    minusBtn.MouseButton1Click:Connect(function()
+        local idx = table.find(fireRateOptions, _G.rateOfFire) or 1
+        idx = idx - 1
+        if idx < 1 then idx = #fireRateOptions end
+        _G.rateOfFire = fireRateOptions[idx]
+        updateRateLabel()
+    end)
+    plusBtn.MouseButton1Click:Connect(function()
+        local idx = table.find(fireRateOptions, _G.rateOfFire) or 1
+        idx = idx + 1
+        if idx > #fireRateOptions then idx = 1 end
+        _G.rateOfFire = fireRateOptions[idx]
+        updateRateLabel()
     end)
 end
 
-createFireRateToggle()
+-- Após bindToggle("Recarga Instantânea", ...), adicione:
+createFireRateButtons(y)
+y = y + 40
 
 -- Ajustar o tamanho do menu conforme solicitado
 local dragging = false
