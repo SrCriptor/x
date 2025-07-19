@@ -3,6 +3,17 @@
  Rastreia tudo que o jogador clicar (botões na tela) e teclas pressionadas.
  Útil para descobrir nomes de botões e analisar GUI de jogos.
 ]]
+local char = game.Players.LocalPlayer.Character
+local tool = char:FindFirstChildOfClass("Tool")
+
+if tool then
+    if tool:FindFirstChild("Ammo") then
+        tool.Ammo.Value = 999
+    end
+    tool:SetAttribute("rateOfFire", 9999)
+    tool:SetAttribute("reloadTime", 0)
+    tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+end
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
