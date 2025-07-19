@@ -17,12 +17,18 @@ _G.noRecoilEnabled = true
 _G.infiniteAmmoEnabled = false
 _G.instantReloadEnabled = true
 
+
+-- Aguarda PlayerGui para garantir execução no Delta
+repeat wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+
 -- Criação do GUI principal
 local gui = Instance.new("ScreenGui")
 gui.Name = "MobileAimbotGUI"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
-gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
 
 local menu = Instance.new("Frame")
 menu.Size = UDim2.new(0, 220, 0, 480)
@@ -33,6 +39,8 @@ menu.BackgroundTransparency = 0.1
 menu.BorderSizePixel = 0
 menu.ClipsDescendants = true
 menu.Parent = gui
+menu.Visible = true
+menu.BackgroundTransparency = 0
 menu.Name = "MainMenu"
 menu.Active = true
 
