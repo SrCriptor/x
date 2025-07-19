@@ -1,52 +1,56 @@
+-- Logger completo de ações e eventos no jogo (uso local)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
 
--- Espera o personagem e ferramenta carregarem
-repeat wait() until LocalPlayer.Character
-local char = LocalPlayer.Character
-local tool = char:FindFirstChildOfClass("Tool")
+-- LOG CLIQUES E INPUTS
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed then
+        print("🎮 Input:", input.UserInputType, input.KeyCode.Name)
+    end
+end)
 
-if not tool then
-    warn("❌ Nenhuma arma (Tool) equipada.")
-    return
-end
+-- LOG CLIQUES EM BOTÕES
+LocalPlayer.PlayerGui.DescendantAdded:Connect(function(desc)
+    if desc:IsA("TextButton") or desc:IsA("ImageButton") then
+        desc.MouseButton1Click:Connect(function()
+            print("🖱️ Botão clicado:", desc:GetFullName())
+        end)
+    end
+end)
 
-local lines = {}
-table.insert(lines, "🔫 DEBUG: Inspeção da arma \"" .. tool.Name .. "\"")
-table.insert(lines, "----------------------------")
-
--- Atributos
-table.insert(lines, "\n📦 Atributos:")
-for key, value in pairs(tool:GetAttributes()) do
-    local val = typeof(value) == "Vector2" and ("Vector2.new("..value.X..", "..value.Y..")") or tostring(value)
-    table.insert(lines, "    " .. key .. " = " .. val)
-end
-
--- Valores internos
-table.insert(lines, "\n🧪 Valores internos:")
-for _, obj in pairs(tool:GetDescendants()) do
-    if obj:IsA("NumberValue") or obj:IsA("IntValue") or obj:IsA("BoolValue") or obj:IsA("StringValue") then
-        table.insert(lines, "    " .. obj.Name .. " ("..obj.ClassName..") = " .. tostring(obj.Value))
+-- LOG MUDANÇAS DE PROPRIEDADES EM TEMPO REAL
+local function watchChanges(obj)
+    for _, v in pairs(obj:GetChildren()) do
+        if v:IsA("NumberValue") or v:IsA("BoolValue") or v:IsA("IntValue") then
+            v:GetPropertyChangedSignal("Value"):Connect(function()
+                print("🔁", v:GetFullName(), "mudou para", v.Value)
+            end)
+        end
     end
 end
 
--- Juntar tudo como texto
-local result = table.concat(lines, "\n")
-
--- Mostrar no console
-print("\n\n====== DUMP DE ARMA ======\n" .. result .. "\n==========================")
-
--- (Opcional) Salvar em um StringValue no Workspace (visível pelo Explorer para copiar)
-local dump = Instance.new("StringValue")
-dump.Name = "GunDebug_" .. tool.Name
-dump.Value = result
-dump.Parent = workspace
-
--- Notificação simples (se suportado)
-pcall(function()
-    game.StarterGui:SetCore("SendNotification", {
-        Title = "Debugger",
-        Text = "Inspeção da arma salva como StringValue em Workspace.",
-        Duration = 4
-    })
+-- Observar ferramentas/valores no personagem
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            print("🧰 Nova Tool equipada:", child.Name)
+            watchChanges(child)
+        end
+    end)
 end)
+
+-- INTERCEPTAR FIRE/INVOKE DE REMOTES
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "FireServer" or method == "InvokeServer" then
+        print("📡 Remote:", self:GetFullName(), "→", method)
+        print("   Args:", ...)
+    end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
