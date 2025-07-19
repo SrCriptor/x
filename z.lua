@@ -1,33 +1,45 @@
--- DEBUGGER: Escuta cliques em todos os botões da interface
-local function watchClicksInGui(gui)
-    local function hookButton(obj)
-        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-            obj.MouseButton1Click:Connect(function()
-                warn("[DEBUG] Botão clicado: " .. (obj.Name or tostring(obj)))
-            end)
+--[[ 
+ 🔍 DEBUGGER DE CLIQUES E INPUTS
+ Rastreia tudo que o jogador clicar (botões na tela) e teclas pressionadas.
+ Útil para descobrir nomes de botões e analisar GUI de jogos.
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Aguarda o PlayerGui estar disponível
+repeat wait() until LocalPlayer:FindFirstChild("PlayerGui")
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+print("🟢 DEBUGGER ATIVO - Aguardando interfaces...")
+
+-- Função para conectar a qualquer botão
+local function trackButton(obj)
+    if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+        obj.MouseButton1Click:Connect(function()
+            print("🖱️ Clique em botão: " .. (obj:GetFullName()))
+        end)
+    end
+end
+
+-- Rastrear botões já existentes
+for _, gui in pairs(playerGui:GetDescendants()) do
+    trackButton(gui)
+end
+
+-- Rastrear novos botões adicionados
+playerGui.DescendantAdded:Connect(function(obj)
+    trackButton(obj)
+end)
+
+-- Rastrear teclas pressionadas
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed then
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            print("⌨️ Tecla pressionada: " .. input.KeyCode.Name)
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+            print("🖱️ Clique do mouse detectado.")
         end
     end
-
-    -- Monitorar botões já existentes
-    for _, obj in pairs(gui:GetDescendants()) do
-        hookButton(obj)
-    end
-
-    -- Monitorar botões que forem adicionados no futuro
-    gui.DescendantAdded:Connect(function(obj)
-        hookButton(obj)
-    end)
-end
-
--- Esperar até que o PlayerGui e GUI existam
-local Player = game:GetService("Players").LocalPlayer
-repeat wait() until Player:FindFirstChild("PlayerGui")
-
--- Assumindo que seu GUI é o "MobileAimbotGUI"
-local myGui = Player.PlayerGui:FindFirstChild("MobileAimbotGUI")
-if myGui then
-    watchClicksInGui(myGui)
-    warn("[DEBUG] Debugger de botões ativado!")
-else
-    warn("[DEBUG] GUI não encontrado.")
-end
+end)
