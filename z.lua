@@ -527,11 +527,11 @@ LocalPlayer.CharacterRemoving:Connect(function()
     currentTarget = nil
 end)
 
--- Ajustar tamanho do menu (agora ajusta largura e altura e mantém centralizado)
+-- Ajustar tamanho do menu (agora menor para caber melhor na tela)
 local menuSizeOptions = {
-    UDim2.new(0, 220, 0, 480),
-    UDim2.new(0, 250, 0, 520),
-    UDim2.new(0, 180, 0, 400)
+    UDim2.new(0, 220, 0, 340), -- tamanho padrão reduzido
+    UDim2.new(0, 250, 0, 380),
+    UDim2.new(0, 180, 0, 260)
 }
 local currentMenuSizeIndex = 1
 
@@ -563,7 +563,7 @@ sizeBtn.MouseButton1Click:Connect(function()
     changeMenuSize()
 end)
 
--- Iniciar o menu centralizado na tela
+-- Iniciar o menu centralizado na tela com tamanho reduzido
 menu.Size = menuSizeOptions[1]
 menu.Position = UDim2.new(0.5, -menu.Size.X.Offset / 2, 0.5, -menu.Size.Y.Offset / 2)
 title.Position = UDim2.new(0, 0, 0, 0)
