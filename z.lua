@@ -529,22 +529,12 @@ LocalPlayer.CharacterRemoving:Connect(function()
 end)
 
 -- Ajustar tamanho do menu
-local menuSizeOptions = {UDim2.new(0, 220, 0, 480), UDim2.new(0, 250, 0, 480), UDim2.new(0, 180, 0, 480)}
+local menuSizeOptions = {
+    UDim2.new(0, 220, 0, 480),
+    UDim2.new(0, 270, 0, 480),
+    UDim2.new(0, 210, 0, 480)
+}
 local currentMenuSizeIndex = 1
-
-local function changeMenuSize()
-    currentMenuSizeIndex = currentMenuSizeIndex % #menuSizeOptions + 1
-    local newSize = menuSizeOptions[currentMenuSizeIndex]
-    menu.Size = newSize
-    -- Recentralizar o menu no meio da tela
-    menu.Position = UDim2.new(0.5, -newSize.X.Offset / 2, 0.5, -newSize.Y.Offset / 2)
-    -- Garantir que título continue no topo
-    title.Position = UDim2.new(0, 0, 0, 0)
-    -- Reposicionar botão de minimizar no canto superior direito
-    toggleVisibilityBtn.Position = UDim2.new(1, -45, 0, 3)
-    -- Reposicionar botão engrenagem logo abaixo do botão minimizar
-    sizeBtn.Position = UDim2.new(1, -45, 0, 40)
-end
 
 -- Adicionando o botão de configuração de tamanho
 local sizeBtn = Instance.new("TextButton")
