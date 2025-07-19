@@ -43,6 +43,7 @@ menu.Visible = true
 menu.BackgroundTransparency = 0
 menu.Name = "MainMenu"
 menu.Active = true
+warn("Krypton Tools carregado.")
 
 local uicorner = Instance.new("UICorner")
 uicorner.CornerRadius = UDim.new(0, 12)
@@ -810,3 +811,4 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+warn("Krypton Tools carregado 2.")
