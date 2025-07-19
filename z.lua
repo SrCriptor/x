@@ -533,7 +533,16 @@ local currentMenuSizeIndex = 1
 
 local function changeMenuSize()
     currentMenuSizeIndex = currentMenuSizeIndex % #menuSizeOptions + 1
-    menu.Size = menuSizeOptions[currentMenuSizeIndex]
+    local newSize = menuSizeOptions[currentMenuSizeIndex]
+    menu.Size = newSize
+    -- Recentralizar o menu no meio da tela
+    menu.Position = UDim2.new(0.5, -newSize.X.Offset / 2, 0.5, -newSize.Y.Offset / 2)
+    -- Garantir que título continue no topo
+    title.Position = UDim2.new(0, 0, 0, 0)
+    -- Reposicionar botão de minimizar no canto superior direito
+    toggleVisibilityBtn.Position = UDim2.new(1, -45, 0, 3)
+    -- Reposicionar botão engrenagem logo abaixo do botão minimizar
+    sizeBtn.Position = UDim2.new(1, -45, 0, 40)
 end
 
 -- Adicionando o botão de configuração de tamanho
