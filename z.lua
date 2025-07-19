@@ -295,13 +295,13 @@ y = y + rofFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
 -- Botão centralizado para alternar modos de Rate of Fire
 local rofModes = {
-    {name = "Padrão", value = 150},
+    {name = "Padrão", value = nil}, -- nil = valor original da arma
     {name = "Legit", value = 200},
     {name = "Médio", value = 500},
     {name = "Agressivo", value = 9999999},
 }
 local rofIdx = 1
-_G.rateOfFire = rofModes[rofIdx].value
+_G.rateOfFire = nil -- padrão: não altera o valor da arma
 
 local rofBtn = Instance.new("TextButton")
 rofBtn.Size = UDim2.new(0.7, 0, 0, menuSizes[menuSizeIdx].font+menuSizes[menuSizeIdx].pad)
@@ -319,7 +319,11 @@ corner.Parent = rofBtn
 rofBtn.MouseButton1Click:Connect(function()
     rofIdx = rofIdx % #rofModes + 1
     rofBtn.Text = rofModes[rofIdx].name
-    _G.rateOfFire = rofModes[rofIdx].value
+    if rofModes[rofIdx].value then
+        _G.rateOfFire = rofModes[rofIdx].value
+    else
+        _G.rateOfFire = nil -- valor padrão, não altera a arma
+    end
 end)
 
 y = y + rofBtn.Size.Y.Offset + menuSizes[menuSizeIdx].pad
@@ -589,6 +593,7 @@ local function applyGunAttributes(tool)
     if _G.rateOfFire then
         tool:SetAttribute("rateOfFire", _G.rateOfFire)
     end
+    -- Se _G.rateOfFire for nil, não altera o rateOfFire da arma!
 end
 
 -- Função para ajustar o tiro por rateOfFire
