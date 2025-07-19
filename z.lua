@@ -250,7 +250,7 @@ addToggle("Recarga Instantânea", "instantReloadEnabled")
 local fovToggleFrame = createToggle("Mostrar FOV", "FOV_VISIBLE", y)
 y = y + fovToggleFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
--- FOV botões
+-- FOV botões centralizados
 local fovBtnsFrame = Instance.new("Frame")
 fovBtnsFrame.Name = "FOVBtns"
 fovBtnsFrame.Size = UDim2.new(1, -2*menuSizes[menuSizeIdx].pad, 0, menuSizes[menuSizeIdx].font + menuSizes[menuSizeIdx].pad*2)
@@ -258,9 +258,14 @@ fovBtnsFrame.Position = UDim2.new(0, menuSizes[menuSizeIdx].pad, 0, y)
 fovBtnsFrame.BackgroundTransparency = 1
 fovBtnsFrame.Parent = menu
 
+local btnW = menuSizes[menuSizeIdx].font*2.2
+local pad = menuSizes[menuSizeIdx].pad
+local totalW = btnW*2 + pad
+local startX = (fovBtnsFrame.Size.X.Offset - totalW) / 2
+
 local function createFOVBtn(text, xPos)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, menuSizes[menuSizeIdx].font*2.2, 0, menuSizes[menuSizeIdx].font+menuSizes[menuSizeIdx].pad)
+    btn.Size = UDim2.new(0, btnW, 0, menuSizes[menuSizeIdx].font+pad)
     btn.Position = UDim2.new(0, xPos, 0, 0)
     btn.BackgroundColor3 = Color3.fromRGB(70,70,70)
     btn.TextColor3 = Color3.new(1,1,1)
@@ -279,62 +284,44 @@ local function createFOVBtn(text, xPos)
         end
     end)
 end
-createFOVBtn("-", 0)
-createFOVBtn("+", menuSizes[menuSizeIdx].font*2.2 + menuSizes[menuSizeIdx].pad)
+createFOVBtn("-", fovBtnsFrame.Size.X.Offset/2 - btnW - pad/2)
+createFOVBtn("+", fovBtnsFrame.Size.X.Offset/2 + pad/2)
 
 y = y + fovBtnsFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
--- Rate of Fire: toggle + botões +/-
+-- Rate of Fire: toggle + botão de modo
 local rofFrame = createToggle("Rate of Fire", "rateOfFireEnabled", y)
 y = y + rofFrame.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
-local rofBtnsFrame = Instance.new("Frame")
-rofBtnsFrame.Size = UDim2.new(1, -2*menuSizes[menuSizeIdx].pad, 0, menuSizes[menuSizeIdx].font + menuSizes[menuSizeIdx].pad*2)
-rofBtnsFrame.Position = UDim2.new(0, menuSizes[menuSizeIdx].pad, 0, y)
-rofBtnsFrame.BackgroundTransparency = 1
-rofBtnsFrame.Parent = menu
+local rofModes = {
+    {name = "Padrão", value = 150},
+    {name = "Legit", value = 200},
+    {name = "Médio", value = 500},
+    {name = "Agressivo", value = 9999999},
+}
+local rofIdx = 1
+_G.rateOfFire = rofModes[rofIdx].value
 
-local rofOptions = {50, 70, 100, 150, 200}
-local rofIdx = table.find(rofOptions, _G.rateOfFire) or 2
+local rofBtn = Instance.new("TextButton")
+rofBtn.Size = UDim2.new(0.7, 0, 0, menuSizes[menuSizeIdx].font+menuSizes[menuSizeIdx].pad)
+rofBtn.Position = UDim2.new(0.15, 0, 0, y)
+rofBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+rofBtn.TextColor3 = Color3.new(1,1,1)
+rofBtn.Font = Enum.Font.Code
+rofBtn.TextSize = menuSizes[menuSizeIdx].font
+rofBtn.Text = rofModes[rofIdx].name
+rofBtn.Parent = menu
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = rofBtn
 
-local rofLabel = Instance.new("TextLabel")
-rofLabel.Size = UDim2.new(0.5, 0, 1, 0)
-rofLabel.Position = UDim2.new(0.25, 0, 0, 0)
-rofLabel.BackgroundTransparency = 1
-rofLabel.TextColor3 = Color3.new(1,1,1)
-rofLabel.Font = Enum.Font.Code
-rofLabel.TextSize = menuSizes[menuSizeIdx].font
-rofLabel.Text = tostring(rofOptions[rofIdx])
-rofLabel.Parent = rofBtnsFrame
+rofBtn.MouseButton1Click:Connect(function()
+    rofIdx = rofIdx % #rofModes + 1
+    rofBtn.Text = rofModes[rofIdx].name
+    _G.rateOfFire = rofModes[rofIdx].value
+end)
 
-local function updateROFLabel()
-    rofLabel.Text = tostring(rofOptions[rofIdx])
-    _G.rateOfFire = rofOptions[rofIdx]
-end
-
-local function createROFBtn(text, xPos, dir)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, menuSizes[menuSizeIdx].font*2.2, 0, menuSizes[menuSizeIdx].font+menuSizes[menuSizeIdx].pad)
-    btn.Position = UDim2.new(0, xPos, 0, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.Code
-    btn.TextSize = menuSizes[menuSizeIdx].font
-    btn.Text = text
-    btn.Parent = rofBtnsFrame
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = btn
-    btn.MouseButton1Click:Connect(function()
-        rofIdx = math.clamp(rofIdx + dir, 1, #rofOptions)
-        updateROFLabel()
-    end)
-end
-createROFBtn("-", 0, -1)
-createROFBtn("+", menuSizes[menuSizeIdx].font*2.2 + menuSizes[menuSizeIdx].pad + rofLabel.Size.X.Offset, 1)
-
-updateROFLabel()
-applyMenuSize()
+y = y + rofBtn.Size.Y.Offset + menuSizes[menuSizeIdx].pad
 
 -- Drag para mover o menu pela barra do título
 local dragging = false
