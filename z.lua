@@ -14,7 +14,7 @@ _G.aimbotManualEnabled = false
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
 _G.noRecoilEnabled = true
-_G.infiniteAmmoEnabled = true
+_G.infiniteAmmoEnabled = false
 _G.instantReloadEnabled = true
 
 -- Criação do GUI principal
@@ -527,28 +527,30 @@ LocalPlayer.CharacterRemoving:Connect(function()
     currentTarget = nil
 end)
 
--- Ajustar tamanho do menu
-local menuSizeOptions = {UDim2.new(0, 220, 0, 480), UDim2.new(0, 250, 0, 480), UDim2.new(0, 180, 0, 480)}
+-- Ajustar tamanho do menu (agora ajusta largura e altura e mantém centralizado)
+local menuSizeOptions = {
+    UDim2.new(0, 220, 0, 480),
+    UDim2.new(0, 250, 0, 520),
+    UDim2.new(0, 180, 0, 400)
+}
 local currentMenuSizeIndex = 1
 
 local function changeMenuSize()
     currentMenuSizeIndex = currentMenuSizeIndex % #menuSizeOptions + 1
     local newSize = menuSizeOptions[currentMenuSizeIndex]
     menu.Size = newSize
-    -- Recentralizar o menu no meio da tela
+    -- Centraliza o menu na tela
     menu.Position = UDim2.new(0.5, -newSize.X.Offset / 2, 0.5, -newSize.Y.Offset / 2)
-    -- Garantir que título continue no topo
+    -- Garante que título, minimizar e engrenagem fiquem no topo
     title.Position = UDim2.new(0, 0, 0, 0)
-    -- Reposicionar botão de minimizar no canto superior direito
-    toggleVisibilityBtn.Position = UDim2.new(1, -45, 0, 3)
-    -- Reposicionar botão engrenagem logo abaixo do botão minimizar
-    sizeBtn.Position = UDim2.new(1, -45, 0, 40)
+    toggleVisibilityBtn.Position = UDim2.new(1, -85, 0, 3)
+    sizeBtn.Position = UDim2.new(1, -45, 0, 3)
 end
 
--- Adicionando o botão de configuração de tamanho
+-- Adicionando o botão de configuração de tamanho (engrenagem) ao lado do minimizar
 local sizeBtn = Instance.new("TextButton")
 sizeBtn.Size = UDim2.new(0, 30, 0, 30)
-sizeBtn.Position = UDim2.new(1, -45, 0, 50)
+sizeBtn.Position = UDim2.new(1, -45, 0, 3)
 sizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 sizeBtn.TextColor3 = Color3.new(1, 1, 1)
 sizeBtn.Font = Enum.Font.GothamBold
@@ -561,11 +563,12 @@ sizeBtn.MouseButton1Click:Connect(function()
     changeMenuSize()
 end)
 
--- Iniciar o menu no centro da tela
+-- Iniciar o menu centralizado na tela
+menu.Size = menuSizeOptions[1]
 menu.Position = UDim2.new(0.5, -menu.Size.X.Offset / 2, 0.5, -menu.Size.Y.Offset / 2)
-
--- Título do menu ajustado
-title.Position = UDim2.new(0.5, -title.Size.X.Offset / 2, 0, 0)
+title.Position = UDim2.new(0, 0, 0, 0)
+toggleVisibilityBtn.Position = UDim2.new(1, -85, 0, 3)
+sizeBtn.Position = UDim2.new(1, -45, 0, 3)
 
 -- Criar os toggles para rateOfFire
 local fireRateOptions = {50, 70, 100, 150, 200}
