@@ -142,6 +142,23 @@ local function getTarget()
         end
     end
 
+    local function applyGunAttributes(tool)
+    if not tool then return end
+    if _G.noRecoilEnabled then
+        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
+        tool:SetAttribute("spread", 0)
+    end
+    if _G.infiniteAmmoEnabled then
+        tool:SetAttribute("_ammo", 200)
+        tool:SetAttribute("magazineSize", 200)
+    end
+    if _G.instantReloadEnabled then
+        tool:SetAttribute("reloadTime", 0)
+    end
+    end
+    
     -- Lógica para NPCs (Mobs)
     if not target and _G.aimbotNPCEnabled then
         for _, obj in pairs(workspace:GetDescendants()) do
