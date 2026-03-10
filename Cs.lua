@@ -1,39 +1,156 @@
--- SERVIÇOS
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+-- [[ CONFIGURAÇÃO E OFUSCAÇÃO ]]
+local _G_S = game.GetService
+local Plrs = _G_S(game, "Players")
+local RunS = _G_S(game, "RunService")
+local UIS = _G_S(game, "UserInputService")
+local L_Plr = Plrs.LocalPlayer
+local Cam = workspace.CurrentCamera
 
--- CONFIGURAÇÕES
-local Config = {
-    Aimbot = false, Silent = false, Trigger = false, RedDot = false, 
-    PartyMode = false, FOV = 90, Smoothness = 0.15
+local _CORE = game:GetService("CoreGui")
+local _RAND_ID = "vfx_" .. math.random(100, 999) -- ID dinâmico para a GUI
+
+local Settings = {
+    A = false, -- Aimbot
+    S = false, -- Silent
+    T = false, -- Trigger
+    M = 0,     -- DotMode (0:Off, 1:Ponto, 2:Cruz)
+    P = false, -- Party
+    F = 90,    -- FOV
+    Sm = 0.15  -- Smooth
 }
-local ColorList = {Color3.new(1,0,0), Color3.new(0,1,0), Color3.new(0,0,1), Color3.new(1,1,0)}
-local CurCol = 1
 
--- GUI PRINCIPAL
-local Gui = Instance.new("ScreenGui", game.CoreGui)
-local ToggleBtn = Instance.new("TextButton", Gui)
-ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.1, 0)
-ToggleBtn.Text = "-"
-ToggleBtn.TextSize = 30
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
-ToggleBtn.Active = true
-ToggleBtn.Draggable = true 
+local Cols = {Color3.new(1,0,0), Color3.new(0,1,0), Color3.new(0,0,1), Color3.new(1,1,0)}
+local C_Idx = 1
 
-local Corner = Instance.new("UICorner", ToggleBtn)
-Corner.CornerRadius = UDim.new(1, 0)
+-- [[ INTERFACE DISCRETIZADA ]]
+local G = Instance.new("ScreenGui")
+G.Name = _RAND_ID
+G.Parent = _CORE
 
-local Main = Instance.new("Frame", ToggleBtn)
-Main.Size = UDim2.new(0, 180, 0, 310) -- Aumentado para o novo botão
-Main.Position = UDim2.new(0, 0, 1.1, 0)
-Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Main.BorderSizePixel = 0
+local T_Btn = Instance.new("TextButton", G)
+T_Btn.Size = UDim2.new(0, 45, 0, 45)
+T_Btn.Position = UDim2.new(0.1, 0, 0.1, 0)
+T_Btn.Text = "X"
+T_Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+T_Btn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", T_Btn).CornerRadius = UDim.new(1, 0)
+T_Btn.Draggable = true
 
+local M_Frame = Instance.new("Frame", T_Btn)
+M_Frame.Size = UDim2.new(0, 160, 0, 280)
+M_Frame.Position = UDim2.new(0, 0, 1.2, 0)
+M_Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+M_Frame.Visible = false
+
+T_Btn.MouseButton1Click:Connect(function() M_Frame.Visible = not M_Frame.Visible end)
+
+-- [[ GERADOR DE BOTÕES ]]
+local function NewB(txt, y, var, isDot)
+    local b = Instance.new("TextButton", M_Frame)
+    b.Size = UDim2.new(isDot and 0.7 or 0.9, 0, 0, 30)
+    b.Position = UDim2.new(0.05, 0, 0, y)
+    b.Text = txt
+    b.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
+    b.TextColor3 = Color3.new(1, 1, 1)
+
+    if not isDot then
+        b.MouseButton1Click:Connect(function()
+            Settings[var] = not Settings[var]
+            b.BackgroundColor3 = Settings[var] and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+        end)
+    end
+    return b
+end
+
+NewB("AIMBOT", 10, "A")
+NewB("SILENT", 45, "S")
+NewB("TRIGGER", 80, "T")
+local dotB = NewB("DOT: OFF", 115, "M", true)
+NewB("PARTY", 150, "P")
+
+-- Botão de Cor
+local cB = Instance.new("TextButton", M_Frame)
+cB.Size = UDim2.new(0.15, 0, 0, 30)
+cB.Position = UDim2.new(0.8, 0, 0, 115)
+cB.Text = "C"
+cB.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+
+-- [[ DESENHOS (FOV TRANSPARENTE) ]]
+local FOV_C = Drawing.new("Circle")
+FOV_C.Thickness = 1
+FOV_C.Filled = false -- Transparente por dentro
+FOV_C.Transparency = 0.6
+FOV_C.Color = Color3.new(1, 1, 1)
+FOV_C.Visible = true
+
+local Dot_C = Drawing.new("Circle")
+Dot_C.Radius = 3
+Dot_C.Filled = true
+Dot_C.Visible = false
+
+local Cr_V = Drawing.new("Line")
+local Cr_H = Drawing.new("Line")
+Cr_V.Thickness = 1.5
+Cr_H.Thickness = 1.5
+
+-- [[ LÓGICA DO PONTO/CRUZ ]]
+dotB.MouseButton1Click:Connect(function()
+    Settings.M = (Settings.M + 1) % 3
+    if Settings.M == 0 then dotB.Text = "OFF" dotB.BackgroundColor3 = Color3.fromRGB(80,30,30)
+    elseif Settings.M == 1 then dotB.Text = "PONTO" dotB.BackgroundColor3 = Color3.fromRGB(30,80,30)
+    else dotB.Text = "CRUZ" dotB.BackgroundColor3 = Color3.fromRGB(30,30,80) end
+end)
+
+cB.MouseButton1Click:Connect(function()
+    C_Idx = (C_Idx % #Cols) + 1
+    Dot_C.Color = Cols[C_Idx]
+    Cr_V.Color = Cols[C_Idx]
+    Cr_H.Color = Cols[C_Idx]
+end)
+
+-- [[ LOOP DE RENDERIZAÇÃO ]]
+RunS.RenderStepped:Connect(function()
+    local mousePos = UIS:GetMouseLocation()
+    FOV_C.Position = mousePos
+    FOV_C.Radius = Settings.F
+    
+    -- Atualiza Mira Central
+    Dot_C.Position = mousePos
+    Dot_C.Visible = (Settings.M == 1)
+    
+    local s = 5 -- Tamanho da cruz
+    Cr_V.From = mousePos - Vector2.new(0, s)
+    Cr_V.To = mousePos + Vector2.new(0, s)
+    Cr_H.From = mousePos - Vector2.new(s, 0)
+    Cr_H.To = mousePos + Vector2.new(s, 0)
+    Cr_V.Visible = (Settings.M == 2)
+    Cr_H.Visible = (Settings.M == 2)
+
+    -- Aimbot Logic
+    if Settings.A and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local target = nil
+        local maxDist = Settings.F
+        
+        for _, p in pairs(Plrs:GetPlayers()) do
+            if p ~= L_Plr and p.Character and p.Character:FindFirstChild("Head") and p.Team ~= L_Plr.Team then
+                local screenPos, onScreen = Cam:WorldToViewportPoint(p.Character.Head.Position)
+                local mag = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if onScreen and mag < maxDist then
+                    target = p.Character.Head.Position
+                    maxDist = mag
+                end
+            end
+        end
+        
+        if target then
+            if Settings.S then
+                Cam.CFrame = Cam.CFrame:Lerp(CFrame.new(Cam.CFrame.Position, target), Settings.Sm)
+            else
+                Cam.CFrame = CFrame.new(Cam.CFrame.Position, target)
+            end
+        end
+    end
+end)
 ToggleBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
     ToggleBtn.Text = Main.Visible and "-" or "+"
