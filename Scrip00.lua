@@ -10,7 +10,7 @@ _G.FOV_RADIUS = 65
 _G.FOV_VISIBLE = true
 _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
-_G.aimbotNPCEnabled = false -- NOVA FUNÇÃO
+_G.aimbotNPCEnabled = false 
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
 _G.noRecoilEnabled = true
@@ -32,7 +32,7 @@ local Corner = Instance.new("UICorner", toggleButton)
 Corner.CornerRadius = UDim.new(1, 0)
 
 local panel = Instance.new("Frame", toggleButton)
-panel.Size = UDim2.new(0, 200, 0, 420) -- Aumentado para o novo botão
+panel.Size = UDim2.new(0, 200, 0, 420) 
 panel.Position = UDim2.new(0, 0, 1.1, 0)
 panel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 panel.Visible = false
@@ -51,6 +51,7 @@ local function createToggle(text, yPos, flagName, exclusive)
     btn.Font = Enum.Font.SourceSansBold
     btn.TextSize = 14
     btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Name = "Toggle"
     Instance.new("UICorner", btn)
     
     local function update()
@@ -63,12 +64,18 @@ local function createToggle(text, yPos, flagName, exclusive)
         if exclusive and _G[flagName] then _G[exclusive] = false end
         
         for _, v in pairs(panel:GetChildren()) do
-            if v:IsA("TextButton") and v.Name == "Toggle" then v.UpdateFunc() end
+            if v:IsA("TextButton") and v.Name == "Toggle" and v:FindFirstChild("UpdateFunc") then
+                v.UpdateFunc.Value()
+            end
         end
+        update()
     end)
     
-    btn.Name = "Toggle"
-    btn.UpdateFunc = update
+    -- Armazenar função de update para chamadas externas
+    local val = Instance.new("BindableFunction", btn)
+    val.Name = "UpdateFunc"
+    val.OnInvoke = update
+    
     update()
     return btn
 end
@@ -76,7 +83,7 @@ end
 -- [[ CRIAÇÃO DOS CONTROLES ]]
 createToggle("Aimbot Auto", 10, "aimbotAutoEnabled", "aimbotManualEnabled")
 createToggle("Aimbot Legit", 45, "aimbotManualEnabled", "aimbotAutoEnabled")
-createToggle("Aimbot NPC", 80, "aimbotNPCEnabled") -- Botão Adicionado
+createToggle("Aimbot NPC", 80, "aimbotNPCEnabled")
 createToggle("No Recoil", 120, "noRecoilEnabled")
 createToggle("Inf. Ammo", 155, "infiniteAmmoEnabled")
 createToggle("Fast Reload", 190, "instantReloadEnabled")
@@ -84,7 +91,6 @@ createToggle("ESP Inimigos", 230, "espEnemiesEnabled")
 createToggle("ESP Aliados", 265, "espAlliesEnabled")
 createToggle("Mostrar FOV", 305, "FOV_VISIBLE")
 
--- Ajustes de FOV
 local function fovBtn(txt, x, delta)
     local b = Instance.new("TextButton", panel)
     b.Size = UDim2.new(0.42, 0, 0, 30)
@@ -98,14 +104,14 @@ end
 fovBtn("- FOV", 0.05, -5)
 fovBtn("+ FOV", 0.53, 5)
 
--- [[ DESENHO DO FOV (TRANSPARENTE) ]]
+-- [[ DESENHO DO FOV ]]
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1
 fovCircle.Filled = false
 fovCircle.Color = Color3.new(1, 1, 1)
 fovCircle.Transparency = 0.7
 
--- [[ FUNÇÕES DE LÓGICA ]]
+-- [[ LÓGICA DE JOGO ]]
 local function isAlive(character)
     local hum = character and character:FindFirstChildOfClass("Humanoid")
     return hum and hum.Health > 0
@@ -119,12 +125,32 @@ local function hasLineOfSight(targetPart)
     return not res or res.Instance:IsDescendantOf(targetPart.Parent)
 end
 
+-- Modificador de Armas
+local function applyGunAttributes()
+    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+    if tool then
+        if _G.noRecoilEnabled then
+            tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
+            tool:SetAttribute("recoilMax", Vector2.new(0, 0))
+            tool:SetAttribute("recoilMin", Vector2.new(0, 0))
+            tool:SetAttribute("spread", 0)
+        end
+        if _G.infiniteAmmoEnabled then
+            tool:SetAttribute("_ammo", 200)
+            tool:SetAttribute("magazineSize", 200)
+        end
+        if _G.instantReloadEnabled then
+            tool:SetAttribute("reloadTime", 0)
+        end
+    end
+end
+
 local function getTarget()
     local center = UserInputService:GetMouseLocation()
     local target = nil
     local shortestDist = _G.FOV_RADIUS
 
-    -- Lógica para Jogadores (Aimbot Auto/Legit)
+    -- Jogadores
     if _G.aimbotAutoEnabled or _G.aimbotManualEnabled then
         for _, p in pairs(Players:GetPlayers()) do
             if p == LocalPlayer or not p.Character or not isAlive(p.Character) then continue end
@@ -142,24 +168,7 @@ local function getTarget()
         end
     end
 
-    local function applyGunAttributes(tool)
-    if not tool then return end
-    if _G.noRecoilEnabled then
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-        tool:SetAttribute("spread", 0)
-    end
-    if _G.infiniteAmmoEnabled then
-        tool:SetAttribute("_ammo", 200)
-        tool:SetAttribute("magazineSize", 200)
-    end
-    if _G.instantReloadEnabled then
-        tool:SetAttribute("reloadTime", 0)
-    end
-    end
-    
-    -- Lógica para NPCs (Mobs)
+    -- NPCs
     if not target and _G.aimbotNPCEnabled then
         for _, obj in pairs(workspace:GetDescendants()) do
             if obj:IsA("Humanoid") and obj.Parent and not Players:GetPlayerFromCharacter(obj.Parent) then
@@ -175,7 +184,6 @@ local function getTarget()
             end
         end
     end
-
     return target
 end
 
@@ -184,9 +192,10 @@ RunService.RenderStepped:Connect(function()
     fovCircle.Radius = _G.FOV_RADIUS
     fovCircle.Position = UserInputService:GetMouseLocation()
     fovCircle.Visible = _G.FOV_VISIBLE
+    
+    applyGunAttributes() -- Aplica NoRecoil/Ammo constantemente
 
     local active = _G.aimbotAutoEnabled or _G.aimbotNPCEnabled or (_G.aimbotManualEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
-    
     if active then
         local target = getTarget()
         if target then
