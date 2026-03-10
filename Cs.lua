@@ -29,7 +29,7 @@ local Corner = Instance.new("UICorner", ToggleBtn)
 Corner.CornerRadius = UDim.new(1, 0)
 
 local Main = Instance.new("Frame", ToggleBtn)
-Main.Size = UDim2.new(0, 180, 0, 310) 
+Main.Size = UDim2.new(0, 180, 0, 310) -- Aumentado para o novo botão
 Main.Position = UDim2.new(0, 0, 1.1, 0)
 Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Main.BorderSizePixel = 0
@@ -71,7 +71,7 @@ CreateToggle("Aimbot", 10, "Aimbot")
 CreateToggle("Silent", 50, "Silent")
 CreateToggle("Trigger", 90, "Trigger")
 CreateToggle("Red Dot", 130, "RedDot", true)
-CreateToggle("Modo Festa 🌈", 170, "PartyMode")
+CreateToggle("Modo Festa 🌈", 170, "PartyMode") -- Novo botão
 
 -- FOV SEÇÃO
 local fovDisplay = Instance.new("TextLabel", Main)
@@ -98,14 +98,11 @@ fovMinus.TextColor3 = Color3.new(1, 1, 1)
 fovPlus.MouseButton1Click:Connect(function() Config.FOV = Config.FOV + 10 fovDisplay.Text = "FOV: "..Config.FOV end)
 fovMinus.MouseButton1Click:Connect(function() Config.FOV = math.max(10, Config.FOV - 10) fovDisplay.Text = "FOV: "..Config.FOV end)
 
--- DESENHOS (ALTERAÇÃO AQUI: FOV TRANSPARENTE)
+-- DESENHOS
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 1
-FOVCircle.Filled = false     -- Garante que o meio seja transparente
-FOVCircle.Color = Color3.new(1, 1, 1)
-FOVCircle.Transparency = 0.8 -- Deixa a linha sutil
+FOVCircle.Filled = false -- AQUI FOI ALTERADO PARA FALSE PARA FICAR VISÍVEL
 FOVCircle.Visible = true
-
 local Dot = Drawing.new("Circle")
 Dot.Radius = 4
 Dot.Filled = true
@@ -119,8 +116,9 @@ RunService.RenderStepped:Connect(function()
     FOVCircle.Radius = Config.FOV
     Dot.Position = center
     
+    -- Modo Festa (Ciclo de Cores para Inimigos)
     if Config.PartyMode then
-        local hue = tick() % 1
+        local hue = tick() % 1 -- Ciclo baseado no tempo
         local rainbowColor = Color3.fromHSV(hue, 1, 1)
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character then
@@ -134,6 +132,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- Lógica Aimbot (Simplificada)
     local isAiming = (UserInputService.TouchEnabled and Config.Aimbot) or (not UserInputService.TouchEnabled and Config.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
     if isAiming then
         local target = nil
@@ -143,7 +142,7 @@ RunService.RenderStepped:Connect(function()
                 local pos, vis = Camera:WorldToViewportPoint(p.Character.Head.Position)
                 if vis and (Vector2.new(pos.X, pos.Y) - center).Magnitude < dist then
                     target = p.Character.Head.Position
-                    dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    break
                 end
             end
         end
@@ -165,6 +164,7 @@ local function ApplyESP(p)
         local hl = Instance.new("Highlight", c)
         hl.FillColor = isAlly and Color3.fromRGB(0, 162, 255) or Color3.fromRGB(255, 0, 0)
         hl.FillTransparency = 0.5
+        -- Cor base inicial
         for _, part in pairs(c:GetChildren()) do
             if part:IsA("BasePart") then
                 part.Color = isAlly and Color3.fromRGB(0, 162, 255) or Color3.fromRGB(200, 140, 60)
