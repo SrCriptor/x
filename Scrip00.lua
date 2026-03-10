@@ -10,6 +10,7 @@ _G.FOV_RADIUS = 65
 _G.FOV_VISIBLE = true
 _G.aimbotAutoEnabled = false
 _G.aimbotManualEnabled = false
+_G.aimbotNPCEnabled = false -- NOVA FUNÇÃO
 _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
 _G.noRecoilEnabled = true
@@ -31,7 +32,7 @@ local Corner = Instance.new("UICorner", toggleButton)
 Corner.CornerRadius = UDim.new(1, 0)
 
 local panel = Instance.new("Frame", toggleButton)
-panel.Size = UDim2.new(0, 200, 0, 380)
+panel.Size = UDim2.new(0, 200, 0, 420) -- Aumentado para o novo botão
 panel.Position = UDim2.new(0, 0, 1.1, 0)
 panel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 panel.Visible = false
@@ -61,7 +62,6 @@ local function createToggle(text, yPos, flagName, exclusive)
         _G[flagName] = not _G[flagName]
         if exclusive and _G[flagName] then _G[exclusive] = false end
         
-        -- Atualiza todos os botões do painel para refletir mudanças exclusivas
         for _, v in pairs(panel:GetChildren()) do
             if v:IsA("TextButton") and v.Name == "Toggle" then v.UpdateFunc() end
         end
@@ -76,18 +76,19 @@ end
 -- [[ CRIAÇÃO DOS CONTROLES ]]
 createToggle("Aimbot Auto", 10, "aimbotAutoEnabled", "aimbotManualEnabled")
 createToggle("Aimbot Legit", 45, "aimbotManualEnabled", "aimbotAutoEnabled")
-createToggle("No Recoil", 85, "noRecoilEnabled")
-createToggle("Inf. Ammo", 120, "infiniteAmmoEnabled")
-createToggle("Fast Reload", 155, "instantReloadEnabled")
-createToggle("ESP Inimigos", 195, "espEnemiesEnabled")
-createToggle("ESP Aliados", 230, "espAlliesEnabled")
-createToggle("Mostrar FOV", 270, "FOV_VISIBLE")
+createToggle("Aimbot NPC", 80, "aimbotNPCEnabled") -- Botão Adicionado
+createToggle("No Recoil", 120, "noRecoilEnabled")
+createToggle("Inf. Ammo", 155, "infiniteAmmoEnabled")
+createToggle("Fast Reload", 190, "instantReloadEnabled")
+createToggle("ESP Inimigos", 230, "espEnemiesEnabled")
+createToggle("ESP Aliados", 265, "espAlliesEnabled")
+createToggle("Mostrar FOV", 305, "FOV_VISIBLE")
 
 -- Ajustes de FOV
 local function fovBtn(txt, x, delta)
     local b = Instance.new("TextButton", panel)
     b.Size = UDim2.new(0.42, 0, 0, 30)
-    b.Position = UDim2.new(x, 0, 0, 310)
+    b.Position = UDim2.new(x, 0, 0, 345)
     b.Text = txt
     b.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     b.TextColor3 = Color3.new(1, 1, 1)
@@ -104,16 +105,10 @@ fovCircle.Filled = false
 fovCircle.Color = Color3.new(1, 1, 1)
 fovCircle.Transparency = 0.7
 
--- [[ FUNÇÕES DE LÓGICA ORIGINAL ]]
+-- [[ FUNÇÕES DE LÓGICA ]]
 local function isAlive(character)
     local hum = character and character:FindFirstChildOfClass("Humanoid")
     return hum and hum.Health > 0
-end
-
-local function isFFA()
-    local teams = {}
-    for _, p in pairs(Players:GetPlayers()) do if p.Team then teams[p.Team] = true end end
-    return next(teams) == nil or next(teams, next(teams)) == nil
 end
 
 local function hasLineOfSight(targetPart)
@@ -124,48 +119,59 @@ local function hasLineOfSight(targetPart)
     return not res or res.Instance:IsDescendantOf(targetPart.Parent)
 end
 
-local function getClosestVisibleEnemy()
+local function getTarget()
     local center = UserInputService:GetMouseLocation()
     local target = nil
     local shortestDist = _G.FOV_RADIUS
-    local ffa = isFFA()
 
-    for _, p in pairs(Players:GetPlayers()) do
-        if p == LocalPlayer or not p.Character or not isAlive(p.Character) then continue end
-        
-        local isAlly = p.Team == LocalPlayer.Team
-        if not ffa then
-            if isAlly and not _G.espAlliesEnabled then continue end
-            if not isAlly and not _G.espEnemiesEnabled then continue end
-        else
-            if not _G.espEnemiesEnabled then continue end
-        end
-
-        local head = p.Character:FindFirstChild("Head")
-        if head then
-            local screenPos, vis = Camera:WorldToViewportPoint(head.Position)
-            local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-            if vis and dist <= shortestDist and hasLineOfSight(head) then
-                shortestDist = dist
-                target = head
+    -- Lógica para Jogadores (Aimbot Auto/Legit)
+    if _G.aimbotAutoEnabled or _G.aimbotManualEnabled then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p == LocalPlayer or not p.Character or not isAlive(p.Character) then continue end
+            if p.Team == LocalPlayer.Team and not _G.espAlliesEnabled then continue end
+            
+            local head = p.Character:FindFirstChild("Head")
+            if head then
+                local screenPos, vis = Camera:WorldToViewportPoint(head.Position)
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                if vis and dist <= shortestDist and hasLineOfSight(head) then
+                    shortestDist = dist
+                    target = head
+                end
             end
         end
     end
+
+    -- Lógica para NPCs (Mobs)
+    if not target and _G.aimbotNPCEnabled then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("Humanoid") and obj.Parent and not Players:GetPlayerFromCharacter(obj.Parent) then
+                if obj.Health > 0 and obj.Parent:FindFirstChild("Head") then
+                    local head = obj.Parent.Head
+                    local screenPos, vis = Camera:WorldToViewportPoint(head.Position)
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if vis and dist <= shortestDist and hasLineOfSight(head) then
+                        shortestDist = dist
+                        target = head
+                    end
+                end
+            end
+        end
+    end
+
     return target
 end
 
--- [[ LOOPS DE EXECUÇÃO ]]
+-- [[ LOOP PRINCIPAL ]]
 RunService.RenderStepped:Connect(function()
-    -- Atualiza FOV
     fovCircle.Radius = _G.FOV_RADIUS
     fovCircle.Position = UserInputService:GetMouseLocation()
     fovCircle.Visible = _G.FOV_VISIBLE
 
-    -- Lógica Aimbot (Auto ou Manual com Botão Direito)
-    local aiming = _G.aimbotAutoEnabled or (_G.aimbotManualEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
+    local active = _G.aimbotAutoEnabled or _G.aimbotNPCEnabled or (_G.aimbotManualEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
     
-    if aiming then
-        local target = getClosestVisibleEnemy()
+    if active then
+        local target = getTarget()
         if target then
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
         end
