@@ -1,134 +1,91 @@
--- [[ PARTE 1: CORE & GUI SYSTEM ]] --
+-- [[ UNIVERSAL PC HUB - VERSÃO FINAL REFATORADA ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Tabela de Configuração (Substitui _G para maior performance)
+-- Configurações de Performance
 local Settings = {
     Aimbot = false,
     Legit = false,
     ESP_E = true,
     ESP_A = false,
-    FOV = 65,
+    FOV = 80,
     FOV_Vis = true,
     Recoil = true,
     Ammo = true,
-    Reload = true,
-    Smooth = 0.25 -- Suavização para parecer humano no PC
+    Smooth = 0.2,
+    MenuKey = Enum.KeyCode.Insert
 }
 
--- Criar Menu Moderno para PC
+-- Criar Interface PC
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "UniversalHub_PC"
+ScreenGui.Name = "FinalHubPC"
 ScreenGui.ResetOnSpawn = false
 
 local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 220, 0, 300)
-Main.Position = UDim2.new(0.5, -110, 0.5, -150)
+Main.Size = UDim2.new(0, 200, 0, 280)
+Main.Position = UDim2.new(0.5, -100, 0.5, -140)
 Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Main.BorderSizePixel = 0
 Main.Active = true
-Main.Draggable = true -- Ativado para PC
+Main.Draggable = true
 
-local function CreateToggle(name, setting, y)
-    local btn = Instance.new("TextButton", Main)
-    btn.Size = UDim2.new(1, -20, 0, 28)
-    btn.Position = UDim2.new(0, 10, 0, y)
-    btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(45, 150, 60) or Color3.fromRGB(40, 40, 40)
-    btn.Text = name .. (Settings[setting] and ": ON" or ": OFF")
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.BorderSizePixel = 0
-    
-    btn.MouseButton1Click:Connect(function()
-        Settings[setting] = not Settings[setting]
-        btn.Text = name .. (Settings[setting] and ": ON" or ": OFF")
-        btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(45, 150, 60) or Color3.fromRGB(40, 40, 40)
-    end)
-end
+local UIList = Instance.new("UIListLayout", Main)
+UIList.Padding = UDim.new(0, 4)
+UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Botão de Fechar/Abrir Menu
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Insert then
-        Main.Visible = not Main.Visible
-    end
-end)
+-- FOV FIXO NO CENTRO (CORRIGIDO)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1
+FOVCircle.Color = Color3.new(1, 1, 1)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.8
 
--- [[ PARTE 2: TARGETING & ESP (FIXED & AUTO-RELOAD) ]] --
-local FOV_Drawing = Drawing.new("Circle")
-FOV_Drawing.Thickness = 1.5
-FOV_Drawing.Filled = false
-FOV_Drawing.Color = Color3.new(1, 1, 1)
-
--- Função para aplicar ESP em um personagem específico
+-- GESTÃO DE ESP E HIGHLIGHTS (AUTO-RELOAD)
 local function ApplyESP(player)
-    player.CharacterAdded:Connect(function(character)
-        -- Espera o personagem carregar totalmente para evitar bugs visual
-        character:WaitForChild("HumanoidRootPart")
+    local function Update()
+        local char = player.Character
+        if not char then return end
         
-        -- Remove Highlight antigo se existir
-        local oldHl = character:FindFirstChild("Highlight")
-        if oldHl then oldHl:Destroy() end
-
-        -- Cria o novo Highlight
-        local hl = Instance.new("Highlight")
-        hl.Name = "Highlight"
-        hl.Parent = character
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        local isAlly = (player.Team == LocalPlayer.Team)
+        local shouldShow = (isAlly and Settings.ESP_A) or (not isAlly and Settings.ESP_E)
         
-        -- Loop de atualização de cor (mais leve que RenderStepped global)
-        task.spawn(function()
-            while character and character.Parent do
-                local isAlly = (player.Team == LocalPlayer.Team)
-                hl.Enabled = (isAlly and Settings.ESP_A) or (not isAlly and Settings.ESP_E)
-                hl.FillColor = isAlly and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(255, 50, 50)
-                hl.OutlineColor = Color3.new(1, 1, 1)
-                hl.FillTransparency = 0.5
-                task.wait(1) -- Atualiza a cada 1 segundo (economiza CPU)
-            end
-        end)
-    end)
-end
-
--- Aplicar para quem já está no jogo
-for _, p in pairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then 
-        ApplyESP(p)
-        -- Se já tiver personagem vivo, força o trigger do evento
-        if p.Character then 
-            task.spawn(function() 
-                -- Simula o CharacterAdded para quem já nasceu
-                local char = p.Character
-                local hl = Instance.new("Highlight", char)
+        local hl = char:FindFirstChild("ESP_HL")
+        if shouldShow then
+            if not hl then
+                hl = Instance.new("Highlight", char)
+                hl.Name = "ESP_HL"
                 hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            end)
+            end
+            hl.FillColor = isAlly and Color3.fromRGB(0, 160, 255) or Color3.fromRGB(255, 50, 50)
+            hl.FillTransparency = 0.5
+        elseif hl then
+            hl:Destroy()
         end
     end
+    player.CharacterAdded:Connect(function() task.wait(0.5); Update() end)
+    task.spawn(function() while task.wait(2) do Update() end end) -- Garante que o ESP volte se sumir
 end
 
--- Aplicar para novos jogadores que entrarem
-Players.PlayerAdded:Connect(ApplyESP)
-
--- Lógica de busca de alvo (Otimizada)
+-- Lógica de Alvo
 local function GetClosestTarget()
-    local target, shortestDist = nil, Settings.FOV
-    local mousePos = UserInputService:GetMouseLocation()
+    local target, dist = nil, Settings.FOV
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
             local hum = p.Character:FindFirstChildOfClass("Humanoid")
             if hum and hum.Health > 0 then
-                local isAlly = (p.Team == LocalPlayer.Team)
-                if isAlly and not Settings.ESP_A then continue end
+                if p.Team == LocalPlayer.Team and not Settings.ESP_A then continue end
                 
-                local pos, visible = Camera:WorldToViewportPoint(p.Character.Head.Position)
-                if visible then
-                    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                    if dist < shortestDist then
+                local pos, vis = Camera:WorldToViewportPoint(p.Character.Head.Position)
+                if vis then
+                    local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if mag < dist then
                         target = p.Character.Head
-                        shortestDist = dist
+                        dist = mag
                     end
                 end
             end
@@ -137,55 +94,65 @@ local function GetClosestTarget()
     return target
 end
 
-local function UpdateESP()
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local hl = p.Character:FindFirstChild("Highlight") or Instance.new("Highlight", p.Character)
-            local isAlly = (p.Team == LocalPlayer.Team)
-            hl.Enabled = (isAlly and Settings.ESP_A) or (not isAlly and Settings.ESP_E)
-            hl.FillColor = isAlly and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(255, 50, 50)
-            hl.OutlineTransparency = 0
-            hl.FillTransparency = 0.5
-        end
-    end
-end
-
--- [[ PARTE 3: COMBAT & WEAPON MODS ]] --
-local function ModWeapon()
+-- LOOP DE RENDERIZAÇÃO (REWRITE)
+RunService.RenderStepped:Connect(function()
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    
+    -- Sync FOV Fixo
+    FOVCircle.Visible = Settings.FOV_Vis
+    FOVCircle.Radius = Settings.FOV
+    FOVCircle.Position = center
+    
+    -- Modificar Armas (Atributos Universais)
     local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
     if tool then
-        if Settings.Recoil then tool:SetAttribute("Recoil", 0) tool:SetAttribute("Spread", 0) end
-        if Settings.Ammo then tool:SetAttribute("Ammo", 999) tool:SetAttribute("MaxAmmo", 999) end
-        if Settings.Reload then tool:SetAttribute("ReloadTime", 0) end
+        if Settings.Recoil then tool:SetAttribute("Recoil", 0); tool:SetAttribute("Spread", 0) end
+        if Settings.Ammo then tool:SetAttribute("Ammo", 999); tool:SetAttribute("MaxAmmo", 999) end
     end
-end
 
-RunService.RenderStepped:Connect(function()
-    -- Sync FOV
-    FOV_Drawing.Visible = Settings.FOV_Vis
-    FOV_Drawing.Radius = Settings.FOV
-    FOV_Drawing.Position = UserInputService:GetMouseLocation()
-    
-    -- Sync Aimbot
+    -- Lógica Aimbot Smooth
     if Settings.Aimbot then
-        local t = GetClosestTarget()
-        if t and (not Settings.Legit or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)) then
-            local goal = CFrame.new(Camera.CFrame.Position, t.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(goal, Settings.Smooth)
+        local isAiming = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        if not Settings.Legit or isAiming then
+            local t = GetClosestTarget()
+            if t then
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, t.Position), Settings.Smooth)
+            end
         end
     end
-    
-    UpdateESP()
-    ModWeapon()
 end)
 
--- Inserindo os Toggles no Menu
-CreateToggle("Aimbot Master", "Aimbot", 40)
-CreateToggle("Legit Mode (RightClick)", "Legit", 75)
-CreateToggle("ESP Enemies", "ESP_E", 110)
-CreateToggle("ESP Allies", "ESP_A", 145)
-CreateToggle("No Recoil", "Recoil", 180)
-CreateToggle("Infinite Ammo", "Ammo", 215)
-CreateToggle("Show FOV Circle", "FOV_Vis", 250)
+-- Sistema de Menu (Botões e Atalho)
+UserInputService.InputBegan:Connect(function(i)
+    if i.KeyCode == Settings.MenuKey then Main.Visible = not Main.Visible end
+end)
 
-print("Hub Profissional Carregado! Pressione 'Insert' para abrir.")
+local function AddBtn(text, set)
+    local b = Instance.new("TextButton", Main)
+    b.Size = UDim2.new(0, 190, 0, 32)
+    b.Text = text .. ": OFF"
+    b.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.SourceSansBold
+    b.BorderSizePixel = 0
+    
+    b.MouseButton1Click:Connect(function()
+        Settings[set] = not Settings[set]
+        b.Text = text .. (Settings[set] and ": ON" or ": OFF")
+        b.BackgroundColor3 = Settings[set] and Color3.fromRGB(50, 130, 50) or Color3.fromRGB(35, 35, 35)
+    end)
+end
+
+-- Inicialização
+for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer then ApplyESP(p) end end
+Players.PlayerAdded:Connect(ApplyESP)
+
+AddBtn("Aimbot Master", "Aimbot")
+AddBtn("Legit (Botão Direito)", "Legit")
+AddBtn("ESP Inimigos", "ESP_E")
+AddBtn("ESP Aliados", "ESP_A")
+AddBtn("Sem Recuo", "Recoil")
+AddBtn("Munição Infinita", "Ammo")
+AddBtn("Mostrar FOV", "FOV_Vis")
+
+print("Universal Hub PC Carregado! Atalho: Tecla INSERT")
