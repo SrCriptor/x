@@ -1,169 +1,175 @@
+-- [[ TRAINER PROFISSIONAL - LUA ROBLOX ]] --
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- 1. SISTEMA ANTI-DUPLICAÇÃO
-local GUI_NAME = "MyTrainerHub_Unique"
+-- 1. SISTEMA ANTI-DUPLICAÇÃO (Fecha o antigo e abre o novo)
+local GUI_NAME = "EliteTrainer_v1"
 local oldGui = LocalPlayer.PlayerGui:FindFirstChild(GUI_NAME)
 if oldGui then oldGui:Destroy() end
 
--- 2. CONFIGURAÇÕES GERAIS
+-- 2. CONFIGURAÇÕES INICIAIS
 local Settings = {
     ESPAly = false,
     ESPEnm = false,
     Wallhack = false,
     Aimbot = false,
     AimbotLegit = false,
-    FOVValue = 90,
-    ShowFOVCircle = false,
-    FOVRadius = 100
+    ShowFOV = false,
+    FOVRadius = 150 -- Tamanho do círculo
 }
 
--- 3. INTERFACE PRINCIPAL (GUI)
+-- 3. INTERFACE (GUI) ADAPTÁVEL
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer.PlayerGui
 
 local isMobile = UserInputService.TouchEnabled
+local menuSize = isMobile and UDim2.new(0, 280, 0, 350) or UDim2.new(0, 230, 0, 320)
+
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = isMobile and UDim2.new(0, 280, 0, 320) or UDim2.new(0, 220, 0, 300)
-MainFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Name = "MainFrame"
+MainFrame.Size = menuSize
+MainFrame.Position = UDim2.new(0.5, -menuSize.X.Offset/2, 0.5, -menuSize.Y.Offset/2)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true
+MainFrame.Draggable = true -- Funcional em PC e Mobile
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = MainFrame
 
 -- Título
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-Title.Text = "TRAINER ELITE"
-Title.TextColor3 = Color3.new(1,1,1)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+Title.Text = "ELITE TRAINER"
+Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
 Title.Parent = MainFrame
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 10)
 
--- Círculo do FOV (Visual)
+-- Círculo Visual do FOV (Fixo no Meio)
 local FOVVisual = Instance.new("Frame")
 FOVVisual.Name = "FOVVisual"
+FOVVisual.BackgroundColor3 = Color3.new(1, 1, 1)
 FOVVisual.BackgroundTransparency = 1
-FOVVisual.Size = UDim2.new(0, Settings.FOVRadius * 2, 0, Settings.FOVRadius * 2)
 FOVVisual.Visible = false
 FOVVisual.Parent = ScreenGui
 
 local FOVStroke = Instance.new("UIStroke")
-FOVStroke.Thickness = 2
-FOVStroke.Color = Color3.new(1,1,1)
+FOVStroke.Thickness = 1.5
+FOVStroke.Color = Color3.new(1, 1, 1)
 FOVStroke.Parent = FOVVisual
 
 local FOVCorner = Instance.new("UICorner")
 FOVCorner.CornerRadius = UDim.new(1, 0)
 FOVCorner.Parent = FOVVisual
 
--- 4. FUNÇÕES DE CRIAÇÃO DO MENU
+-- 4. CONTAINER DE BOTÕES
 local Container = Instance.new("ScrollingFrame")
-Container.Size = UDim2.new(1, -20, 1, -50)
-Container.Position = UDim2.new(0, 10, 0, 40)
+Container.Size = UDim2.new(1, -20, 1, -60)
+Container.Position = UDim2.new(0, 10, 0, 50)
 Container.BackgroundTransparency = 1
 Container.ScrollBarThickness = 2
 Container.Parent = MainFrame
 
 local UIList = Instance.new("UIListLayout")
-UIList.Padding = UDim.new(0, 5)
+UIList.Padding = UDim.new(0, 8)
 UIList.Parent = Container
 
 local function makeToggle(text, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(180, 50, 50) -- Vermelho (OFF)
     btn.Text = text .. ": OFF"
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.Gotham
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamSemibold
     btn.Parent = Container
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
     local state = false
     btn.MouseButton1Click:Connect(function()
         state = not state
-        btn.BackgroundColor3 = state and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
+        btn.BackgroundColor3 = state and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(180, 50, 50)
         btn.Text = text .. (state and ": ON" or ": OFF")
         callback(state)
     end)
 end
 
--- Botões
+-- Adicionando Opções
 makeToggle("ESP Aliado", function(s) Settings.ESPAly = s end)
 makeToggle("ESP Inimigo", function(s) Settings.ESPEnm = s end)
 makeToggle("Wallhack Neon", function(s) Settings.Wallhack = s end)
-makeToggle("Aimbot", function(s) Settings.Aimbot = s end)
-makeToggle("Aimbot Legit", function(s) Settings.AimbotLegit = s end)
-makeToggle("Exibir FOV", function(s) Settings.ShowFOVCircle = s end)
+makeToggle("Aimbot (Rage)", function(s) Settings.Aimbot = s end)
+makeToggle("Aimbot (Legit)", function(s) Settings.AimbotLegit = s end)
+makeToggle("Exibir Circulo FOV", function(s) Settings.ShowFOV = s end)
 
--- Controle FOV (+ / -)
-local fovInfo = Instance.new("TextLabel")
-fovInfo.Size = UDim2.new(1,0,0,20)
-fovInfo.Text = "FOV: 90"
-fovInfo.BackgroundTransparency = 1
-fovInfo.TextColor3 = Color3.new(1,1,1)
-fovInfo.Parent = Container
+-- Controle de FOV (+ / -)
+local fovLabel = Instance.new("TextLabel")
+fovLabel.Size = UDim2.new(1, 0, 0, 20)
+fovLabel.Text = "Ajustar Raio FOV: 150"
+fovLabel.BackgroundTransparency = 1
+fovLabel.TextColor3 = Color3.new(1,1,1)
+fovLabel.Font = Enum.Font.Gotham
+fovLabel.Parent = Container
 
-local fovBtns = Instance.new("Frame")
-fovBtns.Size = UDim2.new(1,0,0,30)
-fovBtns.BackgroundTransparency = 1
-fovBtns.Parent = Container
+local fovCtrl = Instance.new("Frame")
+fovCtrl.Size = UDim2.new(1, 0, 0, 35)
+fovCtrl.BackgroundTransparency = 1
+fovCtrl.Parent = Container
 
-local function createFovBtn(txt, val, posX)
+local function fovBtn(txt, val, pos)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0.45, 0, 1, 0)
-    b.Position = UDim2.new(posX, 0, 0, 0)
+    b.Position = UDim2.new(pos, 0, 0, 0)
     b.Text = txt
-    b.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    b.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
     b.TextColor3 = Color3.new(1,1,1)
-    b.Parent = fovBtns
+    b.Parent = fovCtrl
+    Instance.new("UICorner", b)
     b.MouseButton1Click:Connect(function()
-        Settings.FOVValue = math.clamp(Settings.FOVValue + val, 30, 120)
-        fovInfo.Text = "FOV: "..Settings.FOVValue
-        Camera.FieldOfView = Settings.FOVValue
+        Settings.FOVRadius = math.clamp(Settings.FOVRadius + val, 30, 500)
+        fovLabel.Text = "Ajustar Raio FOV: " .. Settings.FOVRadius
     end)
 end
-createFovBtn("-", -5, 0)
-createFovBtn("+", 5, 0.55)
+fovBtn("-", -10, 0)
+fovBtn("+", 10, 0.55)
 
--- 5. LÓGICA FUNCIONAL (Aimbot & ESP)
-local function getClosest()
-    local target, dist = nil, Settings.FOVRadius
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-            if p.Team ~= LocalPlayer.Team then
-                local pos, visible = Camera:WorldToViewportPoint(p.Character.Head.Position)
-                if visible then
-                    local mag = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
-                    if mag < dist then
-                        target = p.Character.Head
-                        dist = mag
+-- 5. LÓGICA DE FUNCIONAMENTO (LOOP)
+RunService.RenderStepped:Connect(function()
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    -- Atualizar Círculo FOV
+    FOVVisual.Visible = Settings.ShowFOV
+    FOVVisual.Size = UDim2.new(0, Settings.FOVRadius * 2, 0, Settings.FOVRadius * 2)
+    FOVVisual.Position = UDim2.new(0, screenCenter.X - Settings.FOVRadius, 0, screenCenter.Y - Settings.FOVRadius)
+
+    -- Lógica de Aimbot (Focado no Centro)
+    if Settings.Aimbot or Settings.AimbotLegit then
+        local target, closestDist = nil, Settings.FOVRadius
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                if p.Team ~= LocalPlayer.Team then -- Apenas Inimigos
+                    local pos, onScreen = Camera:WorldToViewportPoint(p.Character.Head.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
+                        if dist < closestDist then
+                            target = p.Character.Head
+                            closestDist = dist
+                        end
                     end
                 end
             end
         end
-    end
-    return target
-end
 
-RunService.RenderStepped:Connect(function()
-    -- Círculo FOV
-    FOVVisual.Visible = Settings.ShowFOVCircle
-    FOVVisual.Position = UDim2.new(0, UserInputService:GetMouseLocation().X - Settings.FOVRadius, 0, UserInputService:GetMouseLocation().Y - Settings.FOVRadius)
-    
-    -- Lógica Aimbot
-    if Settings.Aimbot or Settings.AimbotLegit then
-        local target = getClosest()
         if target then
             if Settings.AimbotLegit then
                 Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Position), 0.08)
@@ -173,23 +179,29 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Lógica ESP/Wallhack
+    -- Lógica de ESP e Wallhack Neon
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
             local isAlly = (p.Team == LocalPlayer.Team)
-            local enabled = (isAlly and Settings.ESPAly) or (not isAlly and Settings.ESPEnm)
-            local hl = p.Character:FindFirstChild("EliteHighlight")
-            
-            if enabled then
-                if not hl then
-                    hl = Instance.new("Highlight", p.Character)
-                    hl.Name = "EliteHighlight"
+            local shouldShow = (isAlly and Settings.ESPAly) or (not isAlly and Settings.ESPEnm)
+            local highlight = p.Character:FindFirstChild("TrainerHighlight")
+
+            if shouldShow then
+                if not highlight then
+                    highlight = Instance.new("Highlight", p.Character)
+                    highlight.Name = "TrainerHighlight"
                 end
-                hl.OutlineColor = isAlly and Color3.new(0,1,0) or Color3.new(1,0,0)
-                hl.FillTransparency = Settings.Wallhack and 0 or 1
-                hl.FillColor = Color3.fromHSV(tick() % 5 / 5, 1, 1) -- RGB Effect
-            elseif hl then
-                hl:Destroy()
+                highlight.OutlineColor = isAlly and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+                
+                -- Se Wallhack ON -> Neon RGB / Se OFF -> Transparente (só borda)
+                if Settings.Wallhack then
+                    highlight.FillTransparency = 0
+                    highlight.FillColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+                else
+                    highlight.FillTransparency = 1
+                end
+            elseif highlight then
+                highlight:Destroy()
             end
         end
     end
