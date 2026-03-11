@@ -56,25 +56,80 @@ UserInputService.InputBegan:Connect(function(input)
     end
 end)
 
--- [[ PARTE 2: TARGETING & ESP ]] --
+-- [[ PARTE 2: TARGETING & ESP (FIXED & AUTO-RELOAD) ]] --
 local FOV_Drawing = Drawing.new("Circle")
 FOV_Drawing.Thickness = 1.5
 FOV_Drawing.Filled = false
 FOV_Drawing.Color = Color3.new(1, 1, 1)
 
+-- Função para aplicar ESP em um personagem específico
+local function ApplyESP(player)
+    player.CharacterAdded:Connect(function(character)
+        -- Espera o personagem carregar totalmente para evitar bugs visual
+        character:WaitForChild("HumanoidRootPart")
+        
+        -- Remove Highlight antigo se existir
+        local oldHl = character:FindFirstChild("Highlight")
+        if oldHl then oldHl:Destroy() end
+
+        -- Cria o novo Highlight
+        local hl = Instance.new("Highlight")
+        hl.Name = "Highlight"
+        hl.Parent = character
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        
+        -- Loop de atualização de cor (mais leve que RenderStepped global)
+        task.spawn(function()
+            while character and character.Parent do
+                local isAlly = (player.Team == LocalPlayer.Team)
+                hl.Enabled = (isAlly and Settings.ESP_A) or (not isAlly and Settings.ESP_E)
+                hl.FillColor = isAlly and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(255, 50, 50)
+                hl.OutlineColor = Color3.new(1, 1, 1)
+                hl.FillTransparency = 0.5
+                task.wait(1) -- Atualiza a cada 1 segundo (economiza CPU)
+            end
+        end)
+    end)
+end
+
+-- Aplicar para quem já está no jogo
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then 
+        ApplyESP(p)
+        -- Se já tiver personagem vivo, força o trigger do evento
+        if p.Character then 
+            task.spawn(function() 
+                -- Simula o CharacterAdded para quem já nasceu
+                local char = p.Character
+                local hl = Instance.new("Highlight", char)
+                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            end)
+        end
+    end
+end
+
+-- Aplicar para novos jogadores que entrarem
+Players.PlayerAdded:Connect(ApplyESP)
+
+-- Lógica de busca de alvo (Otimizada)
 local function GetClosestTarget()
     local target, shortestDist = nil, Settings.FOV
+    local mousePos = UserInputService:GetMouseLocation()
+
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-            local isAlly = (p.Team == LocalPlayer.Team)
-            if isAlly and not Settings.ESP_A then continue end
-            
-            local pos, visible = Camera:WorldToViewportPoint(p.Character.Head.Position)
-            if visible then
-                local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                if dist < shortestDist then
-                    target = p.Character.Head
-                    shortestDist = dist
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                local isAlly = (p.Team == LocalPlayer.Team)
+                if isAlly and not Settings.ESP_A then continue end
+                
+                local pos, visible = Camera:WorldToViewportPoint(p.Character.Head.Position)
+                if visible then
+                    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    if dist < shortestDist then
+                        target = p.Character.Head
+                        shortestDist = dist
+                    end
                 end
             end
         end
