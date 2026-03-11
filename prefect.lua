@@ -1,187 +1,135 @@
--- [[ TRAINER ELITE UNIVERSAL - V3 FINAL ]] --
-
+-- SERVIÇOS
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
--- 1. SISTEMA ANTI-DUPLICAÇÃO
-local GUI_NAME = "EliteTrainer_Final_v3"
-local oldGui = LocalPlayer.PlayerGui:FindFirstChild(GUI_NAME)
-if oldGui then oldGui:Destroy() end
+-- CONFIGURAÇÕES GLOBAIS (PC)
+_G.FOV_RADIUS = 80
+_G.FOV_VISIBLE = true
+_G.aimbotAutoEnabled = false
+_G.aimbotManualEnabled = false
+_G.espEnemiesEnabled = true
+_G.espAlliesEnabled = false
+_G.noRecoilEnabled = true
+_G.infiniteAmmoEnabled = true
+_G.instantReloadEnabled = true
 
--- 2. CONFIGURAÇÕES
-local Settings = {
-    ESPAly = false,
-    ESPEnm = false,
-    Wallhack = false,
-    Aimbot = false,
-    AimbotLegit = false,
-    ShowFOV = false,
-    FOVRadius = 150
-}
+-- GUI ADAPTADA PARA PC
+local gui = Instance.new("ScreenGui")
+gui.Name = "PC_CheatMenu"
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- 3. INTERFACE ADAPTÁVEL (PC/MOBILE)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = GUI_NAME
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer.PlayerGui
+local panel = Instance.new("Frame")
+panel.Size = UDim2.new(0, 220, 0, 360)
+panel.Position = UDim2.new(0.05, 0, 0.3, 0)
+panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+panel.BorderSizePixel = 2
+panel.Active = true
+panel.Draggable = true -- Nativo para Mouse no PC
+panel.Parent = gui
 
-local isMobile = UserInputService.TouchEnabled
-local menuSize = isMobile and UDim2.new(0, 280, 0, 360) or UDim2.new(0, 230, 0, 330)
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+title.Text = "MENU PC [INSERT]"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.Parent = panel
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = menuSize
-MainFrame.Position = UDim2.new(0.5, -menuSize.X.Offset/2, 0.5, -menuSize.Y.Offset/2)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+-- ALTERNAR VISIBILIDADE (TECLA INSERT)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.Insert then
+        panel.Visible = not panel.Visible
+    end
+end)
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-Title.Text = "ELITE TRAINER V3"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.GothamBold
-Title.Parent = MainFrame
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
-
--- Círculo do FOV (Centralizado)
-local FOVVisual = Instance.new("Frame")
-FOVVisual.BackgroundColor3 = Color3.new(1, 1, 1)
-FOVVisual.BackgroundTransparency = 1
-FOVVisual.Visible = false
-FOVVisual.Parent = ScreenGui
-Instance.new("UIStroke", FOVVisual).Thickness = 1.5
-Instance.new("UICorner", FOVVisual).CornerRadius = UDim.new(1, 0)
-
--- Container
-local Container = Instance.new("ScrollingFrame")
-Container.Size = UDim2.new(1, -20, 1, -60)
-Container.Position = UDim2.new(0, 10, 0, 50)
-Container.BackgroundTransparency = 1
-Container.ScrollBarThickness = 0
-Container.Parent = MainFrame
-Instance.new("UIListLayout", Container).Padding = UDim.new(0, 8)
-
--- Função de Botão
-local function makeToggle(text, callback)
+-- FUNÇÃO PARA CRIAR BOTÕES
+local function createButton(text, yPos, flagName, exclusiveFlag)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
-    btn.Text = text .. ": OFF"
+    btn.Size = UDim2.new(1, -20, 0, 30)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
     btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.GothamSemibold
-    btn.Parent = Container
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.Parent = panel
 
-    local state = false
+    local function updateUI()
+        btn.Text = text .. (_G[flagName] and ": [LIGADO]" or ": [DESLIGADO]")
+        btn.BackgroundColor3 = _G[flagName] and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(50, 50, 50)
+    end
+
     btn.MouseButton1Click:Connect(function()
-        state = not state
-        btn.BackgroundColor3 = state and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
-        btn.Text = text .. (state and ": ON" or ": OFF")
-        callback(state)
+        _G[flagName] = not _G[flagName]
+        if exclusiveFlag and _G[flagName] then _G[exclusiveFlag] = false end
+        updateUI()
+        -- Atualiza visualmente os botões dependentes
+        for _, v in pairs(panel:GetChildren()) do if v:IsA("TextButton") then v.Text = v.Text end end 
     end)
+
+    RunService.Heartbeat:Connect(updateUI) -- Mantém o texto atualizado se mudado por outro botão
+    return btn
 end
 
-makeToggle("ESP Aliado", function(s) Settings.ESPAly = s end)
-makeToggle("ESP Inimigo", function(s) Settings.ESPEnm = s end)
-makeToggle("Wallhack Neon", function(s) Settings.Wallhack = s end)
-makeToggle("Aimbot (Rage)", function(s) Settings.Aimbot = s end)
-makeToggle("Aimbot (Legit)", function(s) Settings.AimbotLegit = s end)
-makeToggle("Exibir FOV", function(s) Settings.ShowFOV = s end)
+-- ADICIONANDO FUNÇÕES AO PAINEL
+createButton("No Recoil", 45, "noRecoilEnabled")
+createButton("Infinite Ammo", 80, "infiniteAmmoEnabled")
+createButton("Aimbot Automático", 115, "aimbotAutoEnabled", "aimbotManualEnabled")
+createButton("Aimbot Legit (RMB)", 150, "aimbotManualEnabled", "aimbotAutoEnabled")
+createButton("ESP Inimigos", 185, "espEnemiesEnabled")
+createButton("ESP Aliados", 220, "espAlliesEnabled")
+createButton("Mostrar FOV", 255, "FOV_VISIBLE")
 
--- Ajuste de FOV
-local fovLabel = Instance.new("TextLabel")
-fovLabel.Size = UDim2.new(1, 0, 0, 20)
-fovLabel.Text = "FOV Radius: 150"
-fovLabel.BackgroundTransparency = 1
-fovLabel.TextColor3 = Color3.new(1,1,1)
-fovLabel.Parent = Container
+-- CÍRCULO DE FOV (PC DRAWING)
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1.5
+fovCircle.Color = Color3.new(1, 1, 1)
+fovCircle.Transparency = 0.7
+fovCircle.Filled = false
 
-local fovCtrl = Instance.new("Frame")
-fovCtrl.Size = UDim2.new(1, 0, 0, 30)
-fovCtrl.BackgroundTransparency = 1
-fovCtrl.Parent = Container
+-- LÓGICA DE ALVO
+local function getClosestEnemy()
+    local target = nil
+    local shortestDist = _G.FOV_RADIUS
+    local mousePos = UserInputService:GetMouseLocation()
 
-local function fBtn(t, v, p)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(0.45, 0, 1, 0)
-    b.Position = UDim2.new(p, 0, 0, 0)
-    b.Text = t
-    b.BackgroundColor3 = Color3.fromRGB(60,60,70)
-    b.TextColor3 = Color3.new(1,1,1)
-    b.Parent = fovCtrl
-    Instance.new("UICorner", b)
-    b.MouseButton1Click:Connect(function()
-        Settings.FOVRadius = math.clamp(Settings.FOVRadius + v, 30, 600)
-        fovLabel.Text = "FOV Radius: " .. Settings.FOVRadius
-    end)
-end
-fBtn("-", -10, 0)
-fBtn("+", 10, 0.55)
-
--- 4. LÓGICA UNIVERSAL (ESP & AIMBOT)
-local function getTargetPart(char)
-    return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
-end
-
-RunService.RenderStepped:Connect(function()
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    -- Atualizar Círculo FOV no Centro
-    FOVVisual.Visible = Settings.ShowFOV
-    FOVVisual.Size = UDim2.new(0, Settings.FOVRadius * 2, 0, Settings.FOVRadius * 2)
-    FOVVisual.Position = UDim2.new(0, screenCenter.X - Settings.FOVRadius, 0, screenCenter.Y - Settings.FOVRadius)
-
-    local closestTarget = nil
-    local shortestDist = Settings.FOVRadius
-
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local char = p.Character
-            local targetPart = getTargetPart(char)
-            local isAlly = (p.Team == LocalPlayer.Team)
-            local shouldShow = (isAlly and Settings.ESPAly) or (not isAlly and Settings.ESPEnm)
-
-            -- LÓGICA ESP/WALLHACK (Highlight Universal)
-            local hl = char:FindFirstChild("UniversalHighlight")
-            if shouldShow then
-                if not hl then
-                    hl = Instance.new("Highlight", char)
-                    hl.Name = "UniversalHighlight"
-                    hl.Adornee = char
-                end
-                hl.OutlineColor = isAlly and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-                hl.FillTransparency = Settings.Wallhack and 0 or 1
-                hl.FillColor = Color3.fromHSV(tick() % 5 / 5, 1, 1) -- Efeito Neon RGB
-            elseif hl then
-                hl:Destroy()
-            end
-
-            -- LÓGICA DE SELEÇÃO DE ALVO (AIMBOT)
-            if not isAlly and targetPart then
-                local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                if onScreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
-                    if dist < shortestDist then
-                        closestTarget = targetPart
-                        shortestDist = dist
-                    end
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            -- Verifica Time (Simples)
+            if not _G.espAlliesEnabled and player.Team == LocalPlayer.Team then continue end
+            
+            local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+            if onScreen then
+                local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    target = player
                 end
             end
         end
     end
+    return target
+end
 
-    -- EXECUÇÃO DO AIMBOT
-    if (Settings.Aimbot or Settings.AimbotLegit) and closestTarget then
-        if Settings.AimbotLegit then
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, closestTarget.Position), 0.08)
-        else
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestTarget.Position)
+-- LOOP PRINCIPAL (RENDER STEPPED)
+RunService.RenderStepped:Connect(function()
+    -- Atualiza FOV Circle
+    fovCircle.Visible = _G.FOV_VISIBLE
+    fovCircle.Radius = _G.FOV_RADIUS
+    fovCircle.Position = UserInputService:GetMouseLocation()
+
+    -- Lógica de Aimbot
+    local isRmbPressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+    
+    if _G.aimbotAutoEnabled or (_G.aimbotManualEnabled and isRmbPressed) then
+        local target = getClosestEnemy()
+        if target and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
         end
     end
 end)
+
+print("Script PC carregado com sucesso!")
