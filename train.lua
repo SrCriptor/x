@@ -1,4 +1,4 @@
--- 🔥 ANTI-DUPLICAÇÃO (mata script antigo)
+-- 🔥 ANTI-DUPLICAÇÃO
 if _G.AimbotScriptLoaded then
     if _G.AimbotCleanup then
         pcall(_G.AimbotCleanup)
@@ -19,6 +19,8 @@ local LocalPlayer = Players.LocalPlayer
 _G.FOV_RADIUS = 65
 _G.FOV_VISIBLE = true
 _G.aimbotMode = "OFF"
+_G.espEnemiesEnabled = true
+_G.espAlliesEnabled = false
 
 -- PARTES
 local selectedParts = {
@@ -41,6 +43,7 @@ updateParts()
 
 local aiming = false
 local shooting = false
+local currentTarget = nil
 
 -- GUI
 local gui = Instance.new("ScreenGui")
@@ -51,8 +54,8 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 -- PANEL
 local panel = Instance.new("Frame", gui)
-panel.Size = UDim2.new(0, 240, 0, 320)
-panel.Position = UDim2.new(0, 20, 0.5, -160)
+panel.Size = UDim2.new(0, 240, 0, 360)
+panel.Position = UDim2.new(0, 20, 0.5, -180)
 panel.BackgroundColor3 = Color3.fromRGB(25,25,25)
 panel.BackgroundTransparency = 0.1
 panel.Active = true
@@ -88,7 +91,7 @@ local function setupDrag(guiElement)
     end)
 
     guiElement.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        if dragging then
             local delta = input.Position - dragStart
             guiElement.Position = UDim2.new(
                 startPos.X.Scale,
@@ -109,26 +112,41 @@ minimizeBtn.Size = UDim2.new(0,30,0,30)
 minimizeBtn.Position = UDim2.new(1,-35,0,5)
 minimizeBtn.Text = "—"
 
-local function minimize()
+minimizeBtn.MouseButton1Click:Connect(function()
     panel.Visible = false
     hub.Position = panel.Position
     hub.Visible = true
-end
+end)
 
-local function maximize()
+hub.MouseButton1Click:Connect(function()
     panel.Visible = true
     hub.Visible = false
+end)
+
+-- BOTÕES
+local function createToggle(text, y, flag)
+    local btn = Instance.new("TextButton", panel)
+    btn.Size = UDim2.new(1,-20,0,30)
+    btn.Position = UDim2.new(0,10,0,y)
+
+    local function update()
+        btn.Text = text .. ": " .. (_G[flag] and "ON" or "OFF")
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        _G[flag] = not _G[flag]
+        update()
+    end)
+
+    update()
 end
 
-minimizeBtn.MouseButton1Click:Connect(minimize)
-hub.MouseButton1Click:Connect(maximize)
-
--- AIMBOT BUTTON
+-- AIMBOT
 local aimbotBtn = Instance.new("TextButton", panel)
 aimbotBtn.Size = UDim2.new(1,-20,0,30)
 aimbotBtn.Position = UDim2.new(0,10,0,50)
 
-local function updateAimbotText()
+local function updateAimbot()
     aimbotBtn.Text = "Aimbot: " .. _G.aimbotMode
 end
 
@@ -140,15 +158,19 @@ aimbotBtn.MouseButton1Click:Connect(function()
     else
         _G.aimbotMode = "OFF"
     end
-    updateAimbotText()
+    updateAimbot()
 end)
 
-updateAimbotText()
+updateAimbot()
+
+-- ESP BOTÕES
+createToggle("ESP Inimigos", 90, "espEnemiesEnabled")
+createToggle("ESP Aliados", 125, "espAlliesEnabled")
 
 -- TARGET MENU
 local partMenu = Instance.new("Frame", panel)
 partMenu.Size = UDim2.new(1,-20,0,120)
-partMenu.Position = UDim2.new(0,10,0,90)
+partMenu.Position = UDim2.new(0,10,0,160)
 partMenu.Visible = false
 
 local partsList = {"Head","HumanoidRootPart","UpperTorso"}
@@ -178,36 +200,50 @@ partToggleBtn.MouseButton1Click:Connect(function()
     partMenu.Visible = not partMenu.Visible
 end)
 
+-- ESP (Highlight)
+local highlights = {}
+
+local function updateESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local isAlly = player.Team == LocalPlayer.Team
+
+            local show = (isAlly and _G.espAlliesEnabled) or (not isAlly and _G.espEnemiesEnabled)
+            if not show then
+                if highlights[player] then highlights[player].Enabled = false end
+                continue
+            end
+
+            local h = highlights[player]
+            if not h then
+                h = Instance.new("Highlight")
+                h.Parent = workspace
+                highlights[player] = h
+            end
+
+            h.Adornee = player.Character
+            h.Enabled = true
+
+            if player == currentTarget then
+                h.FillColor = Color3.fromRGB(255,255,0)
+            else
+                h.FillColor = isAlly and Color3.fromRGB(0,170,255) or Color3.fromRGB(255,50,50)
+            end
+        end
+    end
+end
+
 -- FOV
 local fovCircle = Drawing.new("Circle")
-fovCircle.Transparency = 0.2
-fovCircle.Thickness = 1.5
-fovCircle.Filled = false
 
-local fovConnection = RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function()
     fovCircle.Radius = _G.FOV_RADIUS
     fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     fovCircle.Visible = _G.FOV_VISIBLE
+    updateESP()
 end)
 
--- INPUT
-UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = true
-    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-        shooting = true
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = false
-    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-        shooting = false
-    end
-end)
-
--- TARGET
+-- AIMBOT
 local function getClosest()
     local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     local closest, dist = nil, _G.FOV_RADIUS
@@ -222,7 +258,7 @@ local function getClosest()
                         local mag = (Vector2.new(pos.X,pos.Y)-center).Magnitude
                         if mag < dist then
                             dist = mag
-                            closest = part
+                            closest = player
                         end
                     end
                 end
@@ -233,36 +269,23 @@ local function getClosest()
     return closest
 end
 
-local aimConnection = RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function()
     if _G.aimbotMode == "OFF" then return end
+    if _G.aimbotMode == "LEGIT" and not (aiming and shooting) then return end
 
-    if _G.aimbotMode == "LEGIT" and not (aiming and shooting) then
-        return
-    end
+    local target = getClosest()
+    currentTarget = target
 
-    local targetPart = getClosest()
-    if targetPart then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+    if target and target.Character then
+        local part = target.Character:FindFirstChild(bodyParts[1])
+        if part then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, part.Position)
+        end
     end
 end)
 
--- 🧹 CLEANUP GLOBAL
+-- CLEANUP
 _G.AimbotCleanup = function()
-    if gui then
-        gui:Destroy()
-    end
-
-    if fovCircle then
-        pcall(function()
-            fovCircle:Remove()
-        end)
-    end
-
-    if fovConnection then
-        fovConnection:Disconnect()
-    end
-
-    if aimConnection then
-        aimConnection:Disconnect()
-    end
+    if gui then gui:Destroy() end
+    if fovCircle then pcall(function() fovCircle:Remove() end) end
 end
