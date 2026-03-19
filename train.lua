@@ -10,7 +10,6 @@ _G.AimbotScriptLoaded = true
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
@@ -23,19 +22,13 @@ _G.espEnemiesEnabled = true
 _G.espAlliesEnabled = false
 
 -- PARTES
-local selectedParts = {
-    Head = true,
-    HumanoidRootPart = false,
-    UpperTorso = false
-}
-
+local selectedParts = {Head = true, HumanoidRootPart = false}
 local bodyParts = {"Head"}
+
 local function updateParts()
     bodyParts = {}
-    for part, enabled in pairs(selectedParts) do
-        if enabled then
-            table.insert(bodyParts, part)
-        end
+    for p,v in pairs(selectedParts) do
+        if v then table.insert(bodyParts,p) end
     end
 end
 updateParts()
@@ -45,157 +38,127 @@ local currentTarget = nil
 
 -- GUI
 local gui = Instance.new("ScreenGui")
-gui.Name = "AimbotPremiumGUI"
+gui.Name = "MatrixUI"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-gui.IgnoreGuiInset = true
 
 -- PANEL
 local panel = Instance.new("Frame", gui)
-panel.Size = UDim2.new(0, 260, 0, 340)
-panel.Position = UDim2.new(0, 20, 0.5, -170)
-panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
+panel.Size = UDim2.new(0,260,0,320)
+panel.Position = UDim2.new(0,20,0.5,-160)
+panel.BackgroundColor3 = Color3.fromRGB(5,10,5)
+panel.BorderSizePixel = 0
 panel.Active = true
-Instance.new("UICorner", panel).CornerRadius = UDim.new(0,12)
 
-local gradient = Instance.new("UIGradient", panel)
-gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(30,30,35)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(15,15,20))
-}
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0,10)
+
+-- LIST LAYOUT (NÃO BUGA MAIS)
+local layout = Instance.new("UIListLayout", panel)
+layout.Padding = UDim.new(0,6)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local padding = Instance.new("UIPadding", panel)
+padding.PaddingTop = UDim.new(0,10)
+padding.PaddingLeft = UDim.new(0,10)
+padding.PaddingRight = UDim.new(0,10)
+
+-- DRAG
+local dragging, dragStart, startPos
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType.Name:find("Mouse") then
+        dragging=true
+        dragStart=input.Position
+        startPos=panel.Position
+        input.Changed:Connect(function()
+            if input.UserInputState==Enum.UserInputState.End then dragging=false end
+        end)
+    end
+end)
+
+panel.InputChanged:Connect(function(input)
+    if dragging then
+        local delta=input.Position-dragStart
+        panel.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
+    end
+end)
 
 -- HUB
 local hub = Instance.new("TextButton", gui)
 hub.Size = UDim2.new(0,50,0,50)
 hub.Position = panel.Position
-hub.Text = "⚙️"
-hub.TextScaled = true
-hub.BackgroundColor3 = Color3.fromRGB(35,35,35)
-hub.TextColor3 = Color3.new(1,1,1)
+hub.Text = "●"
 hub.Visible = false
+hub.BackgroundColor3 = Color3.fromRGB(0,255,0)
 Instance.new("UICorner", hub).CornerRadius = UDim.new(1,0)
-
--- DRAG
-local dragging, dragStart, startPos
-local function setupDrag(obj)
-    obj.InputBegan:Connect(function(input)
-        if input.UserInputType.Name:find("Mouse") or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = obj.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-
-    obj.InputChanged:Connect(function(input)
-        if dragging then
-            local delta = input.Position - dragStart
-            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-end
-setupDrag(panel)
-setupDrag(hub)
-
--- MINIMIZAR
-local minimizeBtn = Instance.new("TextButton", panel)
-minimizeBtn.Size = UDim2.new(0,30,0,30)
-minimizeBtn.Position = UDim2.new(1,-35,0,5)
-minimizeBtn.Text = "—"
-
-minimizeBtn.MouseButton1Click:Connect(function()
-    panel.Visible = false
-    hub.Position = panel.Position
-    hub.Visible = true
-end)
 
 hub.MouseButton1Click:Connect(function()
     panel.Visible = true
     hub.Visible = false
 end)
 
--- HEADER
-local header = Instance.new("TextLabel", panel)
-header.Size = UDim2.new(1,0,0,35)
-header.Text = "⚙️ Premium Menu"
-header.BackgroundTransparency = 1
-header.TextColor3 = Color3.new(1,1,1)
-header.Font = Enum.Font.GothamBold
+-- MINIMIZAR
+local minimize = Instance.new("TextButton")
+minimize.Size = UDim2.new(1,0,0,25)
+minimize.Text = "[ MINIMIZE ]"
+minimize.TextColor3 = Color3.fromRGB(0,255,0)
+minimize.BackgroundColor3 = Color3.fromRGB(10,20,10)
+minimize.Parent = panel
 
--- BOTÃO BONITO
-local function createButton(text,y,callback)
-    local btn = Instance.new("TextButton", panel)
-    btn.Size = UDim2.new(1,-20,0,32)
-    btn.Position = UDim2.new(0,10,0,y)
+minimize.MouseButton1Click:Connect(function()
+    panel.Visible = false
+    hub.Position = panel.Position
+    hub.Visible = true
+end)
+
+-- FUNÇÃO BOTÃO MATRIX
+local function createButton(text,callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1,0,0,28)
     btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.GothamSemibold
-    Instance.new("UICorner", btn)
+    btn.BackgroundColor3 = Color3.fromRGB(10,20,10)
+    btn.TextColor3 = Color3.fromRGB(0,255,0)
+    btn.Font = Enum.Font.Code
+    btn.Parent = panel
 
     btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(55,55,70)
+        btn.BackgroundColor3 = Color3.fromRGB(20,40,20)
     end)
+
     btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
+        btn.BackgroundColor3 = Color3.fromRGB(10,20,10)
     end)
 
     btn.MouseButton1Click:Connect(callback)
     return btn
 end
 
--- TOGGLE
-local function createToggle(text,y,flag)
-    local btn
-    local function update()
-        btn.Text = text..": "..(_G[flag] and "ON" or "OFF")
-        btn.BackgroundColor3 = _G[flag] and Color3.fromRGB(40,120,60) or Color3.fromRGB(120,40,40)
-    end
-    btn = createButton("",y,function()
-        _G[flag]=not _G[flag]
-        update()
-    end)
-    update()
-end
-
--- TARGET CONFIG
-local partMenu = Instance.new("Frame", panel)
-partMenu.Size = UDim2.new(1,-20,0,120)
-partMenu.Position = UDim2.new(0,10,0,80)
-partMenu.Visible = false
-
-local parts = {"Head","HumanoidRootPart","UpperTorso"}
-local y = 5
-for _,p in pairs(parts) do
-    local b = Instance.new("TextButton", partMenu)
-    b.Size = UDim2.new(1,-10,0,25)
-    b.Position = UDim2.new(0,5,0,y)
-    y+=30
-    b.Text = p.." [ON]"
-    b.MouseButton1Click:Connect(function()
-        selectedParts[p]=not selectedParts[p]
-        b.Text = p..(selectedParts[p] and " [ON]" or " [OFF]")
-        updateParts()
-    end)
-end
-
-createButton("🎯 Target Config",40,function()
-    partMenu.Visible = not partMenu.Visible
-end)
-
 -- AIMBOT
-local aimbotBtn = createButton("Aimbot: OFF",210,function()
+local aimbotBtn = createButton("AIMBOT: OFF", function()
     if _G.aimbotMode=="OFF" then _G.aimbotMode="AUTO"
     elseif _G.aimbotMode=="AUTO" then _G.aimbotMode="LEGIT"
     else _G.aimbotMode="OFF" end
-    aimbotBtn.Text="Aimbot: ".._G.aimbotMode
+    aimbotBtn.Text = "AIMBOT: ".._G.aimbotMode
 end)
 
 -- ESP
-createToggle("ESP Inimigos",250,"espEnemiesEnabled")
-createToggle("ESP Aliados",285,"espAlliesEnabled")
-createToggle("FOV",320,"FOV_VISIBLE")
+createButton("ESP ENEMIES", function()
+    _G.espEnemiesEnabled = not _G.espEnemiesEnabled
+end)
+
+createButton("ESP ALLIES", function()
+    _G.espAlliesEnabled = not _G.espAlliesEnabled
+end)
+
+createButton("TOGGLE FOV", function()
+    _G.FOV_VISIBLE = not _G.FOV_VISIBLE
+end)
+
+-- TARGET CONFIG
+createButton("TARGET CONFIG", function()
+    for p,v in pairs(selectedParts) do
+        selectedParts[p] = not v
+    end
+    updateParts()
+end)
 
 -- FOV
 local fovCircle = Drawing.new("Circle")
@@ -214,11 +177,12 @@ local function updateESP()
             highlights[p]=h
             h.Adornee=p.Character
             h.Enabled=true
+
             local ally = p.Team==LocalPlayer.Team
             if p==currentTarget then
                 h.FillColor=Color3.fromRGB(255,255,0)
             else
-                h.FillColor = ally and Color3.fromRGB(0,170,255) or Color3.fromRGB(255,50,50)
+                h.FillColor = ally and Color3.fromRGB(0,255,255) or Color3.fromRGB(0,255,0)
             end
         end
     end
@@ -250,7 +214,6 @@ RunService.RenderStepped:Connect(function()
     updateESP()
 
     if _G.aimbotMode=="OFF" then return end
-    if _G.aimbotMode=="LEGIT" and not (aiming and shooting) then return end
 
     local target=getClosest()
     currentTarget=target
