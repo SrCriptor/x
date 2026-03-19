@@ -1,3 +1,11 @@
+-- 🔥 ANTI-DUPLICAÇÃO (mata script antigo)
+if _G.AimbotScriptLoaded then
+    if _G.AimbotCleanup then
+        pcall(_G.AimbotCleanup)
+    end
+end
+_G.AimbotScriptLoaded = true
+
 -- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,9 +18,9 @@ local LocalPlayer = Players.LocalPlayer
 -- CONFIG
 _G.FOV_RADIUS = 65
 _G.FOV_VISIBLE = true
-_G.aimbotMode = "OFF" -- OFF / AUTO / LEGIT
+_G.aimbotMode = "OFF"
 
--- PARTES DO CORPO
+-- PARTES
 local selectedParts = {
     Head = true,
     HumanoidRootPart = false,
@@ -29,16 +37,17 @@ local function updateParts()
         end
     end
 end
-
 updateParts()
 
 local aiming = false
 local shooting = false
 
 -- GUI
-local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+local gui = Instance.new("ScreenGui")
+gui.Name = "AimbotPremiumGUI"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 -- PANEL
 local panel = Instance.new("Frame", gui)
@@ -99,48 +108,25 @@ local minimizeBtn = Instance.new("TextButton", panel)
 minimizeBtn.Size = UDim2.new(0,30,0,30)
 minimizeBtn.Position = UDim2.new(1,-35,0,5)
 minimizeBtn.Text = "—"
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
-minimizeBtn.TextColor3 = Color3.new(1,1,1)
-Instance.new("UICorner", minimizeBtn)
 
 local function minimize()
-    local tween = TweenService:Create(panel, TweenInfo.new(0.25), {
-        Size = UDim2.new(0,0,0,0),
-        BackgroundTransparency = 1
-    })
-    tween:Play()
-
-    task.wait(0.2)
     panel.Visible = false
-
     hub.Position = panel.Position
     hub.Visible = true
 end
 
 local function maximize()
     panel.Visible = true
-    panel.Size = UDim2.new(0,0,0,0)
-    panel.BackgroundTransparency = 1
-
-    local tween = TweenService:Create(panel, TweenInfo.new(0.25), {
-        Size = UDim2.new(0,240,0,320),
-        BackgroundTransparency = 0.1
-    })
-    tween:Play()
-
     hub.Visible = false
 end
 
 minimizeBtn.MouseButton1Click:Connect(minimize)
 hub.MouseButton1Click:Connect(maximize)
 
--- BOTÃO AIMBOT
+-- AIMBOT BUTTON
 local aimbotBtn = Instance.new("TextButton", panel)
 aimbotBtn.Size = UDim2.new(1,-20,0,30)
 aimbotBtn.Position = UDim2.new(0,10,0,50)
-aimbotBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-aimbotBtn.TextColor3 = Color3.new(1,1,1)
-Instance.new("UICorner", aimbotBtn)
 
 local function updateAimbotText()
     aimbotBtn.Text = "Aimbot: " .. _G.aimbotMode
@@ -159,13 +145,11 @@ end)
 
 updateAimbotText()
 
--- MENU PARTES
+-- TARGET MENU
 local partMenu = Instance.new("Frame", panel)
 partMenu.Size = UDim2.new(1,-20,0,120)
 partMenu.Position = UDim2.new(0,10,0,90)
-partMenu.BackgroundColor3 = Color3.fromRGB(35,35,35)
 partMenu.Visible = false
-Instance.new("UICorner", partMenu)
 
 local partsList = {"Head","HumanoidRootPart","UpperTorso"}
 
@@ -177,7 +161,6 @@ for _, partName in pairs(partsList) do
     y += 30
 
     btn.Text = partName .. " [ON]"
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
 
     btn.MouseButton1Click:Connect(function()
         selectedParts[partName] = not selectedParts[partName]
@@ -186,13 +169,10 @@ for _, partName in pairs(partsList) do
     end)
 end
 
--- BOTÃO TARGET CONFIG
 local partToggleBtn = Instance.new("TextButton", panel)
 partToggleBtn.Size = UDim2.new(1,-20,0,30)
 partToggleBtn.Position = UDim2.new(0,10,0,15)
 partToggleBtn.Text = "🎯 Target Config"
-partToggleBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-Instance.new("UICorner", partToggleBtn)
 
 partToggleBtn.MouseButton1Click:Connect(function()
     partMenu.Visible = not partMenu.Visible
@@ -204,7 +184,7 @@ fovCircle.Transparency = 0.2
 fovCircle.Thickness = 1.5
 fovCircle.Filled = false
 
-RunService.RenderStepped:Connect(function()
+local fovConnection = RunService.RenderStepped:Connect(function()
     fovCircle.Radius = _G.FOV_RADIUS
     fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     fovCircle.Visible = _G.FOV_VISIBLE
@@ -253,8 +233,7 @@ local function getClosest()
     return closest
 end
 
--- AIMBOT
-RunService.RenderStepped:Connect(function()
+local aimConnection = RunService.RenderStepped:Connect(function()
     if _G.aimbotMode == "OFF" then return end
 
     if _G.aimbotMode == "LEGIT" and not (aiming and shooting) then
@@ -262,8 +241,28 @@ RunService.RenderStepped:Connect(function()
     end
 
     local targetPart = getClosest()
-
     if targetPart then
         Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
     end
 end)
+
+-- 🧹 CLEANUP GLOBAL
+_G.AimbotCleanup = function()
+    if gui then
+        gui:Destroy()
+    end
+
+    if fovCircle then
+        pcall(function()
+            fovCircle:Remove()
+        end)
+    end
+
+    if fovConnection then
+        fovConnection:Disconnect()
+    end
+
+    if aimConnection then
+        aimConnection:Disconnect()
+    end
+end
