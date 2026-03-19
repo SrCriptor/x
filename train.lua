@@ -1,233 +1,193 @@
 -- 🔥 ANTI-DUPLICAÇÃO
-if _G.AimbotScriptLoaded then
-    if _G.AimbotCleanup then
-        pcall(_G.AimbotCleanup)
+if _G.MatrixUI_Loaded then
+    if _G.MatrixUI_Cleanup then
+        pcall(_G.MatrixUI_Cleanup)
     end
 end
-_G.AimbotScriptLoaded = true
+_G.MatrixUI_Loaded = true
 
 -- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
 
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 -- CONFIG
-_G.FOV_RADIUS = 65
-_G.FOV_VISIBLE = true
-_G.aimbotMode = "OFF"
-_G.espEnemiesEnabled = true
-_G.espAlliesEnabled = false
+_G.Config = {
+    Aimbot = "OFF",
+    ESP_Enemy = true,
+    ESP_Ally = false,
 
--- PARTES
-local selectedParts = {Head = true, HumanoidRootPart = false}
-local bodyParts = {"Head"}
-
-local function updateParts()
-    bodyParts = {}
-    for p,v in pairs(selectedParts) do
-        if v then table.insert(bodyParts,p) end
-    end
-end
-updateParts()
-
-local aiming, shooting = false, false
-local currentTarget = nil
+    ESP_Box = false,
+    ESP_Name = false,
+    ESP_Distance = false,
+    ESP_Line = false
+}
 
 -- GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "MatrixUI"
-gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "MatrixPremiumUI"
 
 -- PANEL
 local panel = Instance.new("Frame", gui)
-panel.Size = UDim2.new(0,260,0,320)
-panel.Position = UDim2.new(0,20,0.5,-160)
-panel.BackgroundColor3 = Color3.fromRGB(5,10,5)
-panel.BorderSizePixel = 0
+panel.Size = UDim2.new(0,300,0,350)
+panel.Position = UDim2.new(0,20,0.5,-175)
+panel.BackgroundColor3 = Color3.fromRGB(10,15,10)
 panel.Active = true
+Instance.new("UICorner", panel)
 
-Instance.new("UICorner", panel).CornerRadius = UDim.new(0,10)
+-- DRAG FIX
+local dragging, dragStart, startPos
 
--- LIST LAYOUT (NÃO BUGA MAIS)
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = panel.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- LAYOUT
 local layout = Instance.new("UIListLayout", panel)
 layout.Padding = UDim.new(0,6)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local padding = Instance.new("UIPadding", panel)
 padding.PaddingTop = UDim.new(0,10)
 padding.PaddingLeft = UDim.new(0,10)
 padding.PaddingRight = UDim.new(0,10)
 
--- DRAG
-local dragging, dragStart, startPos
-panel.InputBegan:Connect(function(input)
-    if input.UserInputType.Name:find("Mouse") then
-        dragging=true
-        dragStart=input.Position
-        startPos=panel.Position
-        input.Changed:Connect(function()
-            if input.UserInputState==Enum.UserInputState.End then dragging=false end
-        end)
-    end
-end)
+-- FUNÇÃO ROW (BOTÃO + CONFIG)
+local function createRow(text, mainCallback, configCallback)
+    local row = Instance.new("Frame", panel)
+    row.Size = UDim2.new(1,0,0,32)
+    row.BackgroundTransparency = 1
 
-panel.InputChanged:Connect(function(input)
-    if dragging then
-        local delta=input.Position-dragStart
-        panel.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
-    end
-end)
+    local main = Instance.new("TextButton", row)
+    main.Size = UDim2.new(0.75,-5,1,0)
+    main.Text = text
+    main.BackgroundColor3 = Color3.fromRGB(20,40,20)
+    main.TextColor3 = Color3.fromRGB(0,255,0)
+    main.Font = Enum.Font.Code
 
--- HUB
-local hub = Instance.new("TextButton", gui)
-hub.Size = UDim2.new(0,50,0,50)
-hub.Position = panel.Position
-hub.Text = "●"
-hub.Visible = false
-hub.BackgroundColor3 = Color3.fromRGB(0,255,0)
-Instance.new("UICorner", hub).CornerRadius = UDim.new(1,0)
+    local config = Instance.new("TextButton", row)
+    config.Size = UDim2.new(0.25,-5,1,0)
+    config.Position = UDim2.new(0.75,5,0,0)
+    config.Text = "⚙"
+    config.BackgroundColor3 = Color3.fromRGB(30,60,30)
+    config.TextColor3 = Color3.fromRGB(0,255,0)
 
-hub.MouseButton1Click:Connect(function()
-    panel.Visible = true
-    hub.Visible = false
-end)
+    main.MouseButton1Click:Connect(mainCallback)
+    config.MouseButton1Click:Connect(configCallback)
 
--- MINIMIZAR
-local minimize = Instance.new("TextButton")
-minimize.Size = UDim2.new(1,0,0,25)
-minimize.Text = "[ MINIMIZE ]"
-minimize.TextColor3 = Color3.fromRGB(0,255,0)
-minimize.BackgroundColor3 = Color3.fromRGB(10,20,10)
-minimize.Parent = panel
-
-minimize.MouseButton1Click:Connect(function()
-    panel.Visible = false
-    hub.Position = panel.Position
-    hub.Visible = true
-end)
-
--- FUNÇÃO BOTÃO MATRIX
-local function createButton(text,callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1,0,0,28)
-    btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(10,20,10)
-    btn.TextColor3 = Color3.fromRGB(0,255,0)
-    btn.Font = Enum.Font.Code
-    btn.Parent = panel
-
-    btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(20,40,20)
-    end)
-
-    btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(10,20,10)
-    end)
-
-    btn.MouseButton1Click:Connect(callback)
-    return btn
+    return main
 end
 
 -- AIMBOT
-local aimbotBtn = createButton("AIMBOT: OFF", function()
-    if _G.aimbotMode=="OFF" then _G.aimbotMode="AUTO"
-    elseif _G.aimbotMode=="AUTO" then _G.aimbotMode="LEGIT"
-    else _G.aimbotMode="OFF" end
-    aimbotBtn.Text = "AIMBOT: ".._G.aimbotMode
+local aimbotBtn
+aimbotBtn = createRow("Aimbot: OFF",
+function()
+    local modes = {"OFF","AUTO","LEGIT"}
+    local i = table.find(modes,_G.Config.Aimbot) or 1
+    i = i % #modes + 1
+    _G.Config.Aimbot = modes[i]
+    aimbotBtn.Text = "Aimbot: ".._G.Config.Aimbot
+end,
+function()
+    print("Aimbot config (placeholder)")
 end)
 
--- ESP
-createButton("ESP ENEMIES", function()
-    _G.espEnemiesEnabled = not _G.espEnemiesEnabled
+-- ESP ENEMY
+createRow("ESP Enemy",
+function()
+    _G.Config.ESP_Enemy = not _G.Config.ESP_Enemy
+end,
+function()
+    print("Enemy config")
 end)
 
-createButton("ESP ALLIES", function()
-    _G.espAlliesEnabled = not _G.espAlliesEnabled
+-- ESP ALLY
+createRow("ESP Ally",
+function()
+    _G.Config.ESP_Ally = not _G.Config.ESP_Ally
+end,
+function()
+    print("Ally config")
 end)
 
-createButton("TOGGLE FOV", function()
-    _G.FOV_VISIBLE = not _G.FOV_VISIBLE
-end)
+-- 👁️ ESP CONFIG MENU
+local espMenu = Instance.new("Frame", panel)
+espMenu.Size = UDim2.new(1,0,0,120)
+espMenu.Visible = false
+espMenu.BackgroundTransparency = 1
 
--- TARGET CONFIG
-createButton("TARGET CONFIG", function()
-    for p,v in pairs(selectedParts) do
-        selectedParts[p] = not v
+local espLayout = Instance.new("UIListLayout", espMenu)
+espLayout.Padding = UDim.new(0,4)
+
+local function createESPOption(name,key)
+    local b = Instance.new("TextButton", espMenu)
+    b.Size = UDim2.new(1,0,0,25)
+    b.Text = name..": OFF"
+    b.BackgroundColor3 = Color3.fromRGB(15,30,15)
+    b.TextColor3 = Color3.fromRGB(0,255,0)
+
+    b.MouseButton1Click:Connect(function()
+        _G.Config[key] = not _G.Config[key]
+        b.Text = name..": "..(_G.Config[key] and "ON" or "OFF")
+    end)
+end
+
+createESPOption("Box","ESP_Box")
+createESPOption("Name","ESP_Name")
+createESPOption("Distance","ESP_Distance")
+createESPOption("Line","ESP_Line")
+
+-- BOTÃO ESP ADV
+createRow("👁️ ESP Advanced",
+function()
+    espMenu.Visible = not espMenu.Visible
+end,
+function() end)
+
+-- SAVE CONFIG
+createRow("💾 Save Config",
+function()
+    if writefile then
+        writefile("matrix_config.json", HttpService:JSONEncode(_G.Config))
     end
-    updateParts()
-end)
+end,
+function() end)
 
 -- FOV
 local fovCircle = Drawing.new("Circle")
 RunService.RenderStepped:Connect(function()
-    fovCircle.Radius = _G.FOV_RADIUS
+    fovCircle.Radius = 65
     fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
-    fovCircle.Visible = _G.FOV_VISIBLE
-end)
-
--- ESP
-local highlights = {}
-local function updateESP()
-    for _,p in pairs(Players:GetPlayers()) do
-        if p~=LocalPlayer and p.Character then
-            local h = highlights[p] or Instance.new("Highlight",workspace)
-            highlights[p]=h
-            h.Adornee=p.Character
-            h.Enabled=true
-
-            local ally = p.Team==LocalPlayer.Team
-            if p==currentTarget then
-                h.FillColor=Color3.fromRGB(255,255,0)
-            else
-                h.FillColor = ally and Color3.fromRGB(0,255,255) or Color3.fromRGB(0,255,0)
-            end
-        end
-    end
-end
-
--- AIMBOT
-local function getClosest()
-    local center=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
-    local closest,dist=nil,_G.FOV_RADIUS
-
-    for _,p in pairs(Players:GetPlayers()) do
-        if p~=LocalPlayer and p.Character then
-            for _,partName in pairs(bodyParts) do
-                local part=p.Character:FindFirstChild(partName)
-                if part then
-                    local pos,vis=Camera:WorldToViewportPoint(part.Position)
-                    if vis then
-                        local mag=(Vector2.new(pos.X,pos.Y)-center).Magnitude
-                        if mag<dist then dist=mag closest=p end
-                    end
-                end
-            end
-        end
-    end
-    return closest
-end
-
-RunService.RenderStepped:Connect(function()
-    updateESP()
-
-    if _G.aimbotMode=="OFF" then return end
-
-    local target=getClosest()
-    currentTarget=target
-
-    if target and target.Character then
-        local part=target.Character:FindFirstChild(bodyParts[1])
-        if part then
-            Camera.CFrame=CFrame.new(Camera.CFrame.Position,part.Position)
-        end
-    end
+    fovCircle.Visible = true
 end)
 
 -- CLEANUP
-_G.AimbotCleanup = function()
+_G.MatrixUI_Cleanup = function()
     if gui then gui:Destroy() end
     if fovCircle then pcall(function() fovCircle:Remove() end) end
 end
