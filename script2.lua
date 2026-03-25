@@ -208,184 +208,97 @@ local function getClosestVisibleEnemy()
     return closestEnemy
 end
 
--- 💡 ESP CORRIGIDO AQUI
+-- 💡 SISTEMA DE ESP E AIMBOT CORRIGIDO
 local highlights = {}
 
-local function getCharacterPart(character)
-    return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
-end
-
-local function updateHighlight(player, isTarget)
-    if not player.Character then return end
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then
-        if highlights[player] then highlights[player].Enabled = false end
-        return
-    end
-
-    local isAlly = (player.Team == LocalPlayer.Team)
-    local ffa = isFFA()
-    local show = false
-
-    if ffa then
-        show = _G.espEnemiesEnabled
-    else
-        show = (isAlly and _G.espAlliesEnabled) or (not isAlly and _G.espEnemiesEnabled)
-    end
-
-    if not show then
-        if highlights[player] then highlights[player].Enabled = false end
-        return
-    end
-
-    local highlight = highlights[player]
-    if not highlight then
-        highlight = Instance.new("Highlight")
-        highlight.Parent = workspace
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.FillTransparency = 0.5
-        highlights[player] = highlight
-    end
-
-    highlight.Adornee = player.Character
-    highlight.Enabled = true
-
-    if isTarget then
-        highlight.FillColor = Color3.fromRGB(255, 255, 0)
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
-        highlight.FillTransparency = 0.3
-    else
-        if isAlly then
-            highlight.FillColor = Color3.fromRGB(0, 170, 255)
-            highlight.OutlineColor = Color3.fromRGB(0, 85, 170)
-        else
-            highlight.FillColor = Color3.fromRGB(255, 50, 50)
-            highlight.OutlineColor = Color3.fromRGB(150, 0, 0)
-        end
-    end
-end
-
-local function updateAllHighlights()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            updateHighlight(player, player == currentTarget)
-        elseif highlights[player] then
-            highlights[player].Enabled = false
-        end
-    end
-end
-
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        task.wait(1)
-        updateAllHighlights()
-    end)
-end)
-
-Players.PlayerRemoving:Connect(function(player)
+-- Função para limpar o brilho de quem morreu ou saiu
+local function clearHighlight(player)
     if highlights[player] then
         highlights[player]:Destroy()
         highlights[player] = nil
     end
-end)
-
-RunService.RenderStepped:Connect(function()
-    updateAllHighlights()
-end)
-
-local function disableOtherAimbot(activeFlag)
-    if activeFlag == "aimbotAutoEnabled" then
-        _G.aimbotManualEnabled = false
-        aimbotLegitBtn.Text = "Aimbot Legit: OFF"
-    elseif activeFlag == "aimbotManualEnabled" then
-        _G.aimbotAutoEnabled = false
-        aimbotAutoBtn.Text = "Aimbot Auto: OFF"
-    end
 end
 
-aimbotAutoBtn.MouseButton1Click:Connect(function()
-    if _G.aimbotAutoEnabled then disableOtherAimbot("aimbotAutoEnabled") end
-end)
-aimbotLegitBtn.MouseButton1Click:Connect(function()
-    if _G.aimbotManualEnabled then disableOtherAimbot("aimbotManualEnabled") end
-end)
-
-UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = true
-    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-        shooting = true
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = false
-    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-        shooting = false
-    end
-end)
-
-local function shootGun(tool)
-    if not tool then return end
-    for i = 1, 5 do
-        task.wait(0.04)
-    end
-end
-
+-- Loop Principal (Unificado para não dar lag e nem conflito)
 RunService.RenderStepped:Connect(function()
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    -- 1. LÓGICA DO ESP (CHAMS)
+    for _, player in pairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+        
+        local character = player.Character
+        if character and isAlive(character) then
+            -- Identifica se é aliado de forma rigorosa
+            local isAlly = (player.Team ~= nil and player.Team == LocalPlayer.Team)
+            
+            -- Verifica as Flags do seu Menu
+            local show = false
+            if isAlly then
+                show = _G.espAlliesEnabled
+            else
+                show = _G.espEnemiesEnabled
+            end
 
-    if _G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming and shooting) then
-        local target = getClosestVisibleEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local headPos, visible = Camera:WorldToViewportPoint(head.Position)
-            if visible and (Vector2.new(headPos.X, headPos.Y) - center).Magnitude <= _G.FOV_RADIUS and hasLineOfSight(head) then
-                currentTarget = target
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
-                if tool then
-                    shootGun(tool)
+            if show then
+                local highlight = highlights[player]
+                if not highlight or highlight.Parent ~= character then
+                    clearHighlight(player)
+                    highlight = Instance.new("Highlight")
+                    highlight.Parent = character
+                    highlights[player] = highlight
+                end
+
+                highlight.Adornee = character
+                highlight.Enabled = true
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                
+                -- COR: Verde para Aliado, Vermelho para Inimigo, Amarelo se for o alvo do Aimbot
+                if player == currentTarget then
+                    highlight.FillColor = Color3.fromRGB(255, 255, 0)
+                elseif isAlly then
+                    highlight.FillColor = Color3.fromRGB(0, 255, 100)
+                else
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
                 end
             else
-                currentTarget = nil
+                clearHighlight(player)
             end
+        else
+            clearHighlight(player)
+        end
+    end
+
+    -- 2. LÓGICA DO AIMBOT
+    if _G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming) then
+        local target = getClosestVisibleEnemy()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            currentTarget = target
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
         else
             currentTarget = nil
         end
     else
         currentTarget = nil
     end
+
+    -- 3. ATUALIZA CÍRCULO FOV
+    if fovCircle then
+        fovCircle.Radius = _G.FOV_RADIUS
+        fovCircle.Position = center
+        fovCircle.Visible = _G.FOV_VISIBLE
+    end
 end)
 
-local function applyGunAttributes(tool)
-    if not tool then return end
-    if _G.noRecoilEnabled then
-        tool:SetAttribute("recoilAimReduction", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMax", Vector2.new(0, 0))
-        tool:SetAttribute("recoilMin", Vector2.new(0, 0))
-        tool:SetAttribute("spread", 0)
-    end
-    if _G.infiniteAmmoEnabled then
-        tool:SetAttribute("_ammo", 200)
-        tool:SetAttribute("magazineSize", 200)
-    end
-    if _G.instantReloadEnabled then
-        tool:SetAttribute("reloadTime", 0)
-    end
-end
+-- Eventos de Limpeza e Armas
+Players.PlayerRemoving:Connect(clearHighlight)
 
-local function onCharacterAdded(character)
-    local tool
-    repeat
-        tool = character:FindFirstChildWhichIsA("Tool")
-        task.wait()
-    until tool
-    applyGunAttributes(tool)
-end
-
-LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
-if LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
-LocalPlayer.CharacterRemoving:Connect(function()
-    currentTarget = nil
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(1)
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool then
+        if _G.noRecoilEnabled then tool:SetAttribute("recoilMax", Vector2.new(0,0)) end
+        if _G.infiniteAmmoEnabled then tool:SetAttribute("_ammo", 999) end
+    end
 end)
+
