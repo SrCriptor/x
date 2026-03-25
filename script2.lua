@@ -241,7 +241,21 @@ RunService.RenderStepped:Connect(function()
         local character = player.Character
         if character and isAlive(character) then
             -- Identifica se é aliado de forma rigorosa
-            local isAlly = (player.Team ~= nil and player.Team == LocalPlayer.Team)
+local function isSameTeam(p1, p2)
+    if not p1 or not p2 then return false end
+
+    if p1.Team and p2.Team then
+        return p1.Team == p2.Team
+    end
+
+    if p1.TeamColor and p2.TeamColor then
+        return p1.TeamColor == p2.TeamColor
+    end
+
+    return false
+end
+
+local isAlly = isSameTeam(player, LocalPlayer)
             
             -- Verifica as Flags do seu Menu
             local show = false
@@ -265,14 +279,14 @@ RunService.RenderStepped:Connect(function()
                 highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                 
                 -- COR: Verde para Aliado, Vermelho para Inimigo, Amarelo se for o alvo do Aimbot
-                if player == currentTarget then
-                    highlight.FillColor = Color3.fromRGB(255, 255, 0)
-                elseif isAlly then
-                    highlight.FillColor = Color3.fromRGB(0, 255, 100)
+if player == currentTarget then
+    highlight.FillColor = Color3.fromRGB(255, 255, 0) -- alvo (amarelo)
+elseif isAlly then
+    highlight.FillColor = Color3.fromRGB(0, 120, 255) -- aliado (azul)
+else
+    highlight.FillColor = Color3.fromRGB(255, 0, 0) -- inimigo (vermelho)
+end
                 else
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                end
-            else
                 clearHighlight(player)
             end
         else
