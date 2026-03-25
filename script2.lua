@@ -1,3 +1,14 @@
+-- 🗑️ LIMPEZA DE SCRIPTS ANTERIORES
+local oldGui = game:GetService("CoreGui"):FindFirstChild("MobileAimbotGUI") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("MobileAimbotGUI")
+if oldGui then oldGui:Destroy() end
+
+for _, obj in pairs(workspace:GetDescendants()) do
+    if obj:IsA("Highlight") then
+        obj:Destroy()
+    end
+end
+-- FIM DA LIMPEZA
+
 -- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
