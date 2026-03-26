@@ -6,7 +6,7 @@ end
 _G.SupremeHubRunning = true
 
 for _, obj in pairs(workspace:GetDescendants()) do
-    if obj:IsA("Highlight") then obj:Destroy() end
+    if obj:IsA("Highlight") then pcall(function() obj:Destroy() end) end
 end
 if _G.clearDrawings then _G.clearDrawings() end
 
@@ -15,7 +15,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
-local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -37,16 +36,9 @@ _G.wallCheckEnabled = false
 _G.aimPredictionEnabled, _G.aimPredictionForce = false, 0.135
 _G.triggerBotEnabled, _G.triggerBotDelay = false, 0.05
 
--- ESP Séries (Ativados por Padrão para Inimigo)
-_G.espEnemyBox = true     
-_G.espEnemyChams = true   
-_G.espEnemyTracers = false
-_G.espEnemySkeleton = false
-_G.espEnemyText = true
-
+-- ESP Séries
+_G.espEnemyBox, _G.espEnemyChams, _G.espEnemyTracers, _G.espEnemySkeleton, _G.espEnemyText = true, true, false, false, true
 _G.espAllyBox, _G.espAllyChams, _G.espAllyTracers, _G.espAllySkeleton, _G.espAllyText = false, false, false, false, false
-
--- Filtros de Texto
 _G.espName, _G.espHP, _G.espDistance, _G.espWeapon = true, true, true, true
 
 -- Mods
@@ -60,6 +52,7 @@ if coreGui:FindFirstChild("SupremeDrawSpace") then coreGui.SupremeDrawSpace:Dest
 local supremeDrawSpace = Instance.new("ScreenGui", coreGui)
 supremeDrawSpace.Name = "SupremeDrawSpace"
 supremeDrawSpace.IgnoreGuiInset = true 
+supremeDrawSpace.ResetOnSpawn = false -- IMUNIDADE A MORTE DO JOGADOR (ISSO CAUSAVA O BUG DE DESAPARECER)
 
 local fovFrame = Instance.new("Frame", supremeDrawSpace)
 fovFrame.BackgroundTransparency = 1
@@ -130,7 +123,7 @@ local function createBonecoInterface()
     local targetCore = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
     if targetCore:FindFirstChild("BonequinhoHitboxUI") then targetCore.BonequinhoHitboxUI:Destroy() end
 
-    local gui = Instance.new("ScreenGui", targetCore); gui.Name = "BonequinhoHitboxUI"
+    local gui = Instance.new("ScreenGui", targetCore); gui.Name = "BonequinhoHitboxUI"; gui.ResetOnSpawn = false
     local frame = Instance.new("Frame", gui)
     frame.Size, frame.Position = UDim2.new(0, 200, 0, 280), UDim2.new(0.5, 150, 0.5, -140)
     frame.BackgroundColor3, frame.BorderSizePixel = Color3.fromRGB(28, 28, 30), 0
@@ -187,7 +180,7 @@ end
 local function createMobileButton()
     local targetCore = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
     if targetCore:FindFirstChild("SupremeMobileHub") then targetCore.SupremeMobileHub:Destroy() end
-    local mobileGui = Instance.new("ScreenGui", targetCore); mobileGui.Name = "SupremeMobileHub"
+    local mobileGui = Instance.new("ScreenGui", targetCore); mobileGui.Name = "SupremeMobileHub"; mobileGui.ResetOnSpawn = false
     local btn = Instance.new("TextButton", mobileGui)
     btn.Size, btn.Position = UDim2.new(0, 55, 0, 55), UDim2.new(1, -70, 0, 100)
     btn.BackgroundColor3, btn.BorderSizePixel = Color3.fromRGB(20, 20, 20), 0
@@ -287,10 +280,18 @@ OrionLib:Init()
 local function isAlive(c) local h = c and c:FindFirstChildOfClass("Humanoid"); return h and h.Health > 0 end
 local function isSameTeam(p1, p2) if not p1 or not p2 then return false end; if p1.Team and p2.Team then return p1.Team == p2.Team end; if p1.TeamColor and p2.TeamColor then return p1.TeamColor == p2.TeamColor end; return false end
 local function isFFA() local t = {}; local c = 0; for _, p in pairs(Players:GetPlayers()) do if p.Team or p.TeamColor then t[p.Team and p.Team.Name or p.TeamColor.Name] = true end end; for _ in pairs(t) do c = c + 1 end; return c < 2 end
-local function hasLineOfSight(tp) local r = RaycastParams.new(); r.FilterDescendantsInstances = {LocalPlayer.Character}; r.FilterType = Enum.RaycastFilterType.Blacklist; return not workspace:Raycast(Camera.CFrame.Position, (tp.Position - Camera.CFrame.Position).Unit * 5000, r) or workspace:Raycast(Camera.CFrame.Position, (tp.Position - Camera.CFrame.Position).Unit * 5000, r).Instance:IsDescendantOf(tp.Parent) end
+
+local function hasLineOfSight(tp) 
+    local cam = workspace.CurrentCamera
+    if not cam then return false end
+    local r = RaycastParams.new(); r.FilterDescendantsInstances = {LocalPlayer.Character}; r.FilterType = Enum.RaycastFilterType.Blacklist
+    return not workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r) or workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r).Instance:IsDescendantOf(tp.Parent) 
+end
 
 local function getClosestEnemyAndPart()
-    local c = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local cam = workspace.CurrentCamera
+    if not cam then return nil, nil end
+    local c = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
     local clTarget, fAimPart, sDist = nil, nil, _G.FOV_RADIUS
     local ffa = isFFA()
 
@@ -310,7 +311,7 @@ local function getClosestEnemyAndPart()
 
         for _, aimPart in ipairs(chosenPartList) do
             if aimPart then
-                local sPos, v = Camera:WorldToViewportPoint(aimPart.Position)
+                local sPos, v = cam:WorldToViewportPoint(aimPart.Position)
                 local dist = (Vector2.new(sPos.X, sPos.Y) - c).Magnitude
                 if v and dist <= 12000 and dist <= sDist then
                     if _G.wallCheckEnabled and not hasLineOfSight(aimPart) then continue end
@@ -331,8 +332,9 @@ OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     if not checkcaller() and _G.silentAimEnabled and math.random(1, 100) <= _G.silentAimHitChance then
         if m == "FindPartOnRayWithIgnoreList" or m == "FindPartOnRayWithWhitelist" or m == "FindPartOnRay" or m == "Raycast" then
             local t, ap = getClosestEnemyAndPart()
-            if t and ap then
-                local origin = Camera.CFrame.Position
+            local cam = workspace.CurrentCamera
+            if t and ap and cam then
+                local origin = cam.CFrame.Position
                 if typeof(args[1]) == "Ray" then args[1] = Ray.new(origin, (ap.Position - origin).Unit * 1000)
                 elseif m == "Raycast" then args[1] = origin; args[2] = (ap.Position - origin).Unit * 1500 end
                 return OldNamecall(self, unpack(args))
@@ -344,7 +346,9 @@ end)
 
 -- ==================== RENDER LOOP (NATIVE ESP) ====================
 _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
-    local c = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local c = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
     
     if tick() >= nextAimSwitchTime then currentFocusLevel = (currentFocusLevel == 1) and 2 or 1; nextAimSwitchTime = tick() + ((currentFocusLevel == 1) and 1.8 or 0.35) end
     
@@ -388,11 +392,11 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             -- NATIVE BOX 2D
             if bEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
                 local rootPart = char.HumanoidRootPart
-                local sPos, on = Camera:WorldToViewportPoint(rootPart.Position)
+                local sPos, on = cam:WorldToViewportPoint(rootPart.Position)
                 local box = boxes[player] or createBox()
                 boxes[player] = box
                 if on then
-                    local headPos = Camera:WorldToViewportPoint(char:FindFirstChild("Head") and char.Head.Position + Vector3.new(0, 1.5, 0) or rootPart.Position + Vector3.new(0, 3, 0))
+                    local headPos = cam:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or rootPart.Position) + Vector3.new(0, 1.5, 0))
                     local height = math.abs(headPos.Y - sPos.Y) * 2.2
                     local width = height * 0.55
                     box.Visible = true; box.Size = UDim2.new(0, width, 0, height); box.Position = UDim2.new(0, sPos.X - width / 2, 0, headPos.Y)
@@ -410,7 +414,7 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
 
             -- NATIVE TEXTOS
             if txtEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
-                local sPos, on = Camera:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position) + Vector3.new(0, 2, 0))
+                local sPos, on = cam:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position) + Vector3.new(0, 2, 0))
                 local txt = espTexts[player] or createText(); espTexts[player] = txt
                 if on then
                     txt.Visible = true; txt.Position = UDim2.new(0, sPos.X, 0, sPos.Y - 15)
@@ -418,7 +422,7 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
                     local info = _G.espName and (player.DisplayName .. "\n") or ""
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     if _G.espHP and hum then info = info .. "[" .. math.floor(hum.Health) .. " HP] " end
-                    if _G.espDistance then info = info .. "[" .. math.floor((Camera.CFrame.Position - char.HumanoidRootPart.Position).Magnitude) .. "m]\n" else info = info .. (info ~= "" and "\n" or "") end
+                    if _G.espDistance then info = info .. "[" .. math.floor((cam.CFrame.Position - char.HumanoidRootPart.Position).Magnitude) .. "m]\n" else info = info .. (info ~= "" and "\n" or "") end
                     if _G.espWeapon then local tool = char:FindFirstChildOfClass("Tool"); info = info .. (tool and "["..tool.Name.."]" or "[Mãos]") end
                     txt.Text = info
                 else txt.Visible = false end
@@ -426,10 +430,10 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
 
             -- NATIVE TRACERS
             if tEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
-                local sPos, on = Camera:WorldToViewportPoint(char.HumanoidRootPart.Position)
+                local sPos, on = cam:WorldToViewportPoint(char.HumanoidRootPart.Position)
                 local tracer = tracers[player] or createLine(); tracers[player] = tracer
                 if on then
-                    local p1, p2 = Vector2.new(c.X, Camera.ViewportSize.Y), Vector2.new(sPos.X, sPos.Y)
+                    local p1, p2 = Vector2.new(c.X, cam.ViewportSize.Y), Vector2.new(sPos.X, sPos.Y)
                     local dist = (p2 - p1).Magnitude
                     tracer.Size = UDim2.new(0, dist, 0, 1.5)
                     tracer.Position = UDim2.new(0, (p1.X + p2.X) / 2, 0, (p1.Y + p2.Y) / 2)
@@ -446,7 +450,7 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
                 for i, con in ipairs(skeletonConnections) do
                     local pa, pb = char:FindFirstChild(con[1]), char:FindFirstChild(con[2])
                     if pa and pb then
-                        local posA, oA = Camera:WorldToViewportPoint(pa.Position); local posB, oB = Camera:WorldToViewportPoint(pb.Position)
+                        local posA, oA = cam:WorldToViewportPoint(pa.Position); local posB, oB = cam:WorldToViewportPoint(pb.Position)
                         if oA or oB then
                             local line = skelParts[i] or createLine(); skelParts[i] = line
                             local pA, pB = Vector2.new(posA.X, posA.Y), Vector2.new(posB.X, posB.Y)
@@ -476,9 +480,9 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
                 local targetVelocity = aimPart.AssemblyLinearVelocity or Vector3.new(0,0,0)
                 aimPosition = aimPosition + (targetVelocity * _G.aimPredictionForce)
             end
-            local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPosition)
-            if _G.aimbotSmoothness == 1 then Camera.CFrame = targetCFrame
-            else Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, math.clamp(1 / _G.aimbotSmoothness, 0.01, 1)) end
+            local targetCFrame = CFrame.new(cam.CFrame.Position, aimPosition)
+            if _G.aimbotSmoothness == 1 then cam.CFrame = targetCFrame
+            else cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / _G.aimbotSmoothness, 0.01, 1)) end
         else currentTarget = nil end
     else
         if _G.silentAimEnabled then currentTarget, _ = getClosestEnemyAndPart() else currentTarget = nil end
