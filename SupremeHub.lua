@@ -38,8 +38,8 @@ _G.aimPredictionEnabled, _G.aimPredictionForce = false, 0.135
 _G.triggerBotEnabled, _G.triggerBotDelay = false, 0.05
 
 -- ESP Séries (Ativados por Padrão para Inimigo)
-_G.espEnemyBox = true     -- NOVO: Caixa 2D que NUNCA FALHA
-_G.espEnemyChams = true   -- Pode falhar dependendo do limite de Highlight do Jogo
+_G.espEnemyBox = true     
+_G.espEnemyChams = true   
 _G.espEnemyTracers = false
 _G.espEnemySkeleton = false
 _G.espEnemyText = true
@@ -53,13 +53,41 @@ _G.espName, _G.espHP, _G.espDistance, _G.espWeapon = true, true, true, true
 _G.antiAimLegitEnabled, _G.noRecoilEnabled, _G.infiniteAmmoEnabled, _G.instantReloadEnabled = false, false, false, false
 _G.hitboxExpander, _G.walkSpeed, _G.jumpPower = 2, 16, 50
 
--- ==================== DRAWINGS SYSTEM ====================
-local fovCircle = Drawing.new("Circle")
-fovCircle.Transparency, fovCircle.Thickness, fovCircle.Filled = 0.8, 1.5, false
-fovCircle.Color = Color3.fromRGB(255, 255, 255)
+-- ==================== NATIVE DRAWING SYSTEM (100% EXECUTOR PROOF) ====================
+local coreGui = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+if coreGui:FindFirstChild("SupremeDrawSpace") then coreGui.SupremeDrawSpace:Destroy() end
+
+local supremeDrawSpace = Instance.new("ScreenGui", coreGui)
+supremeDrawSpace.Name = "SupremeDrawSpace"
+supremeDrawSpace.IgnoreGuiInset = true 
+
+local fovFrame = Instance.new("Frame", supremeDrawSpace)
+fovFrame.BackgroundTransparency = 1
+local fovStroke = Instance.new("UIStroke", fovFrame); fovStroke.Color = Color3.fromRGB(255, 255, 255); fovStroke.Thickness = 1.5; fovStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local fovCorner = Instance.new("UICorner", fovFrame); fovCorner.CornerRadius = UDim.new(1, 0)
 
 local tracers, espTexts, highlights, skeletons, boxes = {}, {}, {}, {}, {}
-local function createDrawing(typeStr) return Drawing.new(typeStr) end
+
+local function createBox()
+    local f = Instance.new("Frame", supremeDrawSpace)
+    f.BackgroundTransparency = 1; f.BorderSizePixel = 0
+    local stroke = Instance.new("UIStroke", f); stroke.Thickness = 1.5
+    return f
+end
+
+local function createLine()
+    local f = Instance.new("Frame", supremeDrawSpace)
+    f.BorderSizePixel = 0; f.AnchorPoint = Vector2.new(0.5, 0.5)
+    return f
+end
+
+local function createText()
+    local t = Instance.new("TextLabel", supremeDrawSpace)
+    t.BackgroundTransparency = 1; t.Size = UDim2.new(0, 200, 0, 50); t.AnchorPoint = Vector2.new(0.5, 0.5)
+    t.Font = Enum.Font.GothamBold; t.TextSize = 13; t.TextColor3 = Color3.fromRGB(255, 255, 255)
+    t.TextStrokeTransparency = 0.2; t.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    return t
+end
 
 local skeletonConnections = {
     {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
@@ -71,15 +99,15 @@ local skeletonConnections = {
 }
 
 local function removeESP(player)
-    if tracers[player] then tracers[player]:Remove(); tracers[player] = nil end
-    if espTexts[player] then espTexts[player]:Remove(); espTexts[player] = nil end
-    if boxes[player] then boxes[player]:Remove(); boxes[player] = nil end
+    if tracers[player] then tracers[player]:Destroy(); tracers[player] = nil end
+    if espTexts[player] then espTexts[player]:Destroy(); espTexts[player] = nil end
+    if boxes[player] then boxes[player]:Destroy(); boxes[player] = nil end
     if highlights[player] then highlights[player]:Destroy(); highlights[player] = nil end
-    if skeletons[player] then for _, line in pairs(skeletons[player]) do line:Remove() end; skeletons[player] = nil end
+    if skeletons[player] then for _, line in pairs(skeletons[player]) do line:Destroy() end; skeletons[player] = nil end
 end
 
 _G.clearDrawings = function()
-    if fovCircle then fovCircle:Remove() end
+    if supremeDrawSpace then supremeDrawSpace:Destroy() end
     for player, _ in pairs(tracers) do removeESP(player) end
     for player, _ in pairs(espTexts) do removeESP(player) end
     for player, _ in pairs(boxes) do removeESP(player) end
@@ -278,7 +306,7 @@ local function getClosestEnemyAndPart()
     return clTarget, fAimPart
 end
 
--- ==================== METATABLE HOOKS (SILENT AIM UNIVERSAL) ====================
+-- ==================== SILENT AIM HOOK ====================
 local OldNamecall
 OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local m = getnamecallmethod()
@@ -298,12 +326,17 @@ OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return OldNamecall(self, ...)
 end)
 
--- ==================== RENDER LOOP (VISUAIS E MACROS) ====================
+-- ==================== RENDER LOOP (NATIVE ESP) ====================
 _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     local c = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
     if tick() >= nextAimSwitchTime then currentFocusLevel = (currentFocusLevel == 1) and 2 or 1; nextAimSwitchTime = tick() + ((currentFocusLevel == 1) and 1.8 or 0.35) end
-    if fovCircle then fovCircle.Radius = _G.FOV_RADIUS; fovCircle.Position = c; fovCircle.Visible = not _G.streamerMode and _G.FOV_VISIBLE end
+    
+    if fovFrame then 
+        fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
+        fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
+        fovFrame.Visible = not _G.streamerMode and _G.FOV_VISIBLE 
+    end
     
     if LocalPlayer.Character and isAlive(LocalPlayer.Character) then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -336,20 +369,20 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             local sEn = isAlly and _G.espAllySkeleton or (not isAlly and _G.espEnemySkeleton)
             local txtEn = isAlly and _G.espAllyText or (not isAlly and _G.espEnemyText)
 
-            -- BOX 2D (Sempre funciona)
+            -- NATIVE BOX 2D
             if bEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
                 local rootPart = char.HumanoidRootPart
                 local sPos, on = Camera:WorldToViewportPoint(rootPart.Position)
-                local box = boxes[player] or createDrawing("Square")
+                local box = boxes[player] or createBox()
                 boxes[player] = box
                 if on then
-                    local headPos = Camera:WorldToViewportPoint(char:FindFirstChild("Head") and char.Head.Position + Vector3.new(0, 1, 0) or rootPart.Position + Vector3.new(0, 2.5, 0))
-                    local height = math.abs(headPos.Y - sPos.Y) * 1.5
+                    local headPos = Camera:WorldToViewportPoint(char:FindFirstChild("Head") and char.Head.Position + Vector3.new(0, 1.5, 0) or rootPart.Position + Vector3.new(0, 3, 0))
+                    local height = math.abs(headPos.Y - sPos.Y) * 2
                     local width = height * 0.6
-                    box.Visible = true; box.Size = Vector2.new(width, height); box.Position = Vector2.new(sPos.X - width / 2, sPos.Y - height / 2); box.Thickness = 1.5; box.Filled = false
-                    box.Color = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 0, 0)
+                    box.Visible = true; box.Size = UDim2.new(0, width, 0, height); box.Position = UDim2.new(0, sPos.X - width / 2, 0, headPos.Y)
+                    box.UIStroke.Color = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 0, 0)
                 else box.Visible = false end
-            else if boxes[player] then boxes[player]:Remove(); boxes[player] = nil end end
+            else if boxes[player] then boxes[player]:Destroy(); boxes[player] = nil end end
 
             -- CHAMS (Aura do Roblox)
             if cEn and not _G.streamerMode then
@@ -359,13 +392,13 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
                 high.OutlineColor = (player == currentTarget and Color3.fromRGB(245, 127, 23)) or (isAlly and Color3.fromRGB(13, 71, 161)) or Color3.fromRGB(183, 28, 28)
             else if highlights[player] then highlights[player]:Destroy(); highlights[player] = nil end end
 
-            -- TEXTOS
+            -- NATIVE TEXTOS
             if txtEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
-                local sPos, on = Camera:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position) + Vector3.new(0, 1.5, 0))
-                local txt = espTexts[player] or createDrawing("Text"); espTexts[player] = txt
+                local sPos, on = Camera:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position) + Vector3.new(0, 2, 0))
+                local txt = espTexts[player] or createText(); espTexts[player] = txt
                 if on then
-                    txt.Visible = true; txt.Position = Vector2.new(sPos.X, sPos.Y); txt.Center = true; txt.Outline = true; txt.Size = 14; 
-                    txt.Color = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 255, 255)
+                    txt.Visible = true; txt.Position = UDim2.new(0, sPos.X, 0, sPos.Y - 15)
+                    txt.TextColor3 = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 255, 255)
                     local info = _G.espName and (player.DisplayName .. "\n") or ""
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     if _G.espHP and hum then info = info .. "[" .. math.floor(hum.Health) .. " HP] " end
@@ -373,20 +406,24 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
                     if _G.espWeapon then local tool = char:FindFirstChildOfClass("Tool"); info = info .. (tool and "["..tool.Name.."]" or "[Mãos]") end
                     txt.Text = info
                 else txt.Visible = false end
-            else if espTexts[player] then espTexts[player]:Remove(); espTexts[player] = nil end end
+            else if espTexts[player] then espTexts[player]:Destroy(); espTexts[player] = nil end end
 
-            -- TRACERS
+            -- NATIVE TRACERS
             if tEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
                 local sPos, on = Camera:WorldToViewportPoint(char.HumanoidRootPart.Position)
-                local tracer = tracers[player] or createDrawing("Line"); tracers[player] = tracer
+                local tracer = tracers[player] or createLine(); tracers[player] = tracer
                 if on then
-                    tracer.Visible = true; tracer.Thickness = 1.5; tracer.Transparency = 1
-                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y); tracer.To = Vector2.new(sPos.X, sPos.Y)
-                    tracer.Color = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 0, 0)
+                    local p1, p2 = Vector2.new(c.X, Camera.ViewportSize.Y), Vector2.new(sPos.X, sPos.Y)
+                    local dist = (p2 - p1).Magnitude
+                    tracer.Size = UDim2.new(0, dist, 0, 1.5)
+                    tracer.Position = UDim2.new(0, (p1.X + p2.X) / 2, 0, (p1.Y + p2.Y) / 2)
+                    tracer.Rotation = math.deg(math.atan2(p2.Y - p1.Y, p2.X - p1.X))
+                    tracer.BackgroundColor3 = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 0, 0)
+                    tracer.Visible = true
                 else tracer.Visible = false end
-            else if tracers[player] then tracers[player]:Remove(); tracers[player] = nil end end
+            else if tracers[player] then tracers[player]:Destroy(); tracers[player] = nil end end
 
-            -- SKELETON
+            -- NATIVE SKELETON
             if sEn and not _G.streamerMode then
                 if not skeletons[player] then skeletons[player] = {} end
                 local skelParts = skeletons[player]
@@ -395,13 +432,18 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
                     if pa and pb then
                         local posA, oA = Camera:WorldToViewportPoint(pa.Position); local posB, oB = Camera:WorldToViewportPoint(pb.Position)
                         if oA or oB then
-                            local line = skelParts[i] or createDrawing("Line"); skelParts[i] = line
-                            line.Visible = true; line.Thickness = 1.2; line.Color = isAlly and Color3.fromRGB(150,200,255) or Color3.fromRGB(255,255,255)
-                            line.From = Vector2.new(posA.X, posA.Y); line.To = Vector2.new(posB.X, posB.Y)
+                            local line = skelParts[i] or createLine(); skelParts[i] = line
+                            local pA, pB = Vector2.new(posA.X, posA.Y), Vector2.new(posB.X, posB.Y)
+                            local dist = (pB - pA).Magnitude
+                            line.Size = UDim2.new(0, dist, 0, 1.2)
+                            line.Position = UDim2.new(0, (pA.X + pB.X) / 2, 0, (pA.Y + pB.Y) / 2)
+                            line.Rotation = math.deg(math.atan2(pB.Y - pA.Y, pB.X - pA.X))
+                            line.BackgroundColor3 = isAlly and Color3.fromRGB(150,200,255) or Color3.fromRGB(255,255,255)
+                            line.Visible = true
                         else if skelParts[i] then skelParts[i].Visible = false end end
                     else if skelParts[i] then skelParts[i].Visible = false end end
                 end
-            else if skeletons[player] then for _, line in pairs(skeletons[player]) do line:Remove() end; skeletons[player] = nil end end
+            else if skeletons[player] then for _, line in pairs(skeletons[player]) do line:Destroy() end; skeletons[player] = nil end end
 
         else
             removeESP(player)
