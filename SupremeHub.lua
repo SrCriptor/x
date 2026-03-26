@@ -18,11 +18,8 @@ local HttpService = game:GetService("HttpService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Identifica Plataforma (Mobile vs PC)
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-
-local currentTarget = nil
-local aiming = false
+local currentTarget, aiming = nil, false
 local aimbotKey = Enum.UserInputType.MouseButton2 
 local triggerBotCooldown, lastAntiAimTick = false, tick()
 local nextAimSwitchTime, currentFocusLevel = tick() + 2.0, 1 
@@ -40,16 +37,20 @@ _G.wallCheckEnabled = false
 _G.aimPredictionEnabled, _G.aimPredictionForce = false, 0.135
 _G.triggerBotEnabled, _G.triggerBotDelay = false, 0.05
 
--- ESP
-_G.espEnemyChams, _G.espEnemyTracers, _G.espEnemySkeleton, _G.espEnemyText = true, false, false, false
-_G.espAllyChams, _G.espAllyTracers, _G.espAllySkeleton, _G.espAllyText = false, false, false, false
+-- ESP Séries (Ativados por Padrão para Inimigo)
+_G.espEnemyBox = true     -- NOVO: Caixa 2D que NUNCA FALHA
+_G.espEnemyChams = true   -- Pode falhar dependendo do limite de Highlight do Jogo
+_G.espEnemyTracers = false
+_G.espEnemySkeleton = false
+_G.espEnemyText = true
+
+_G.espAllyBox, _G.espAllyChams, _G.espAllyTracers, _G.espAllySkeleton, _G.espAllyText = false, false, false, false, false
 
 -- Filtros de Texto
 _G.espName, _G.espHP, _G.espDistance, _G.espWeapon = true, true, true, true
 
 -- Mods
-_G.antiAimLegitEnabled = false
-_G.noRecoilEnabled, _G.infiniteAmmoEnabled, _G.instantReloadEnabled = false, false, false
+_G.antiAimLegitEnabled, _G.noRecoilEnabled, _G.infiniteAmmoEnabled, _G.instantReloadEnabled = false, false, false, false
 _G.hitboxExpander, _G.walkSpeed, _G.jumpPower = 2, 16, 50
 
 -- ==================== DRAWINGS SYSTEM ====================
@@ -57,7 +58,7 @@ local fovCircle = Drawing.new("Circle")
 fovCircle.Transparency, fovCircle.Thickness, fovCircle.Filled = 0.8, 1.5, false
 fovCircle.Color = Color3.fromRGB(255, 255, 255)
 
-local tracers, espTexts, highlights, skeletons = {}, {}, {}, {}
+local tracers, espTexts, highlights, skeletons, boxes = {}, {}, {}, {}, {}
 local function createDrawing(typeStr) return Drawing.new(typeStr) end
 
 local skeletonConnections = {
@@ -72,6 +73,7 @@ local skeletonConnections = {
 local function removeESP(player)
     if tracers[player] then tracers[player]:Remove(); tracers[player] = nil end
     if espTexts[player] then espTexts[player]:Remove(); espTexts[player] = nil end
+    if boxes[player] then boxes[player]:Remove(); boxes[player] = nil end
     if highlights[player] then highlights[player]:Destroy(); highlights[player] = nil end
     if skeletons[player] then for _, line in pairs(skeletons[player]) do line:Remove() end; skeletons[player] = nil end
 end
@@ -80,10 +82,11 @@ _G.clearDrawings = function()
     if fovCircle then fovCircle:Remove() end
     for player, _ in pairs(tracers) do removeESP(player) end
     for player, _ in pairs(espTexts) do removeESP(player) end
+    for player, _ in pairs(boxes) do removeESP(player) end
     for player, _ in pairs(skeletons) do removeESP(player) end
 end
 
--- ==================== HITBOX SYSTEM (PERSISTENTE) ====================
+-- ==================== HITBOX SYSTEM ====================
 _G.HitboxStates = { ["Head"] = 1, ["Torso"] = 0, ["Left Arm"] = 0, ["Right Arm"] = 0, ["Left Leg"] = 0, ["Right Leg"] = 0 }
 local function saveBoneco() if writefile then pcall(function() writefile("SupremeHubBoneco.json", HttpService:JSONEncode(_G.HitboxStates)) end) end end
 local function loadBoneco()
@@ -140,7 +143,7 @@ local function createBonecoInterface()
 end
 bonecoFrame = createBonecoInterface()
 
--- ==================== MOBILE HUB BUTTON (Bolinha Arrastável) ====================
+-- ==================== MOBILE HUB BUTTON ====================
 local function findOrionGui()
     local targetCore = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
     for _, child in pairs(targetCore:GetChildren()) do
@@ -152,27 +155,19 @@ end
 local function createMobileButton()
     local targetCore = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
     if targetCore:FindFirstChild("SupremeMobileHub") then targetCore.SupremeMobileHub:Destroy() end
-
     local mobileGui = Instance.new("ScreenGui", targetCore); mobileGui.Name = "SupremeMobileHub"
     local btn = Instance.new("TextButton", mobileGui)
     btn.Size, btn.Position = UDim2.new(0, 55, 0, 55), UDim2.new(1, -70, 0, 100)
     btn.BackgroundColor3, btn.BorderSizePixel = Color3.fromRGB(20, 20, 20), 0
     btn.Text, btn.TextColor3, btn.Font, btn.TextSize = "HUB", Color3.fromRGB(255, 60, 60), Enum.Font.GothamBold, 14
     btn.Active, btn.Draggable = true, true
-
     Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Color, stroke.Thickness = Color3.fromRGB(255, 60, 60), 2
-
-    btn.MouseButton1Click:Connect(function()
-        local orion = findOrionGui()
-        if orion then orion.Enabled = not orion.Enabled end
-    end)
+    local stroke = Instance.new("UIStroke", btn); stroke.Color, stroke.Thickness = Color3.fromRGB(255, 60, 60), 2
+    btn.MouseButton1Click:Connect(function() local o = findOrionGui(); if o then o.Enabled = not o.Enabled end end)
 end
-
 if isMobile then createMobileButton() end
 
--- ==================== INTERFACE ORION (UI BEAUTIFUL) ====================
+-- ==================== INTERFACE ORION ====================
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jensonhirst/Orion/main/source')))()
 local Window = OrionLib:MakeWindow({ Name = "⚡ Supreme Hub | Premium Script 🔥", HidePremium = false, SaveConfig = true, ConfigFolder = "SupremeHubConfig" })
 
@@ -181,70 +176,63 @@ local TabESP = Window:MakeTab({ Name = "Visuals (ESP)", Icon = "rbxassetid://448
 local TabMods = Window:MakeTab({ Name = "Gun & Anti-Aim", Icon = "rbxassetid://4483345998", PremiumOnly = false })
 local TabConfig = Window:MakeTab({ Name = "Settings", Icon = "rbxassetid://4483345998", PremiumOnly = false })
 
--- 🎯 ABS AIMBOT
+-- 🎯 AIMBOT
 local SAimModos = TabAimbot:AddSection({ Name = "🎯 MODOS DE TIRO" })
-SAimModos:AddToggle({ Name = "Aimbot Automático", Default = _G.aimbotAutoEnabled, Save = true, Flag = "AA", Callback = function(V) _G.aimbotAutoEnabled = V; if V then _G.silentAimEnabled = false end; end })
-SAimModos:AddToggle({ Name = "Aimbot Manual", Default = _G.aimbotManualEnabled, Save = true, Flag = "AM", Callback = function(V) _G.aimbotManualEnabled = V end })
+SAimModos:AddToggle({ Name = "Aimbot Automático", Default = _G.aimbotAutoEnabled, Save = true, Flag = "AAuto", Callback = function(V) _G.aimbotAutoEnabled = V; if V then _G.silentAimEnabled = false end; end })
+SAimModos:AddToggle({ Name = "Aimbot Manual (RMB)", Default = _G.aimbotManualEnabled, Save = true, Flag = "AMan", Callback = function(V) _G.aimbotManualEnabled = V end })
 SAimModos:AddToggle({ Name = "✨ Silent Aim (Mágico)", Default = _G.silentAimEnabled, Save = true, Flag = "SAim", Callback = function(V) _G.silentAimEnabled = V; if V then _G.aimbotAutoEnabled = false end end })
 
 local SAimConfigs = TabAimbot:AddSection({ Name = "⚙️ REFINAR MIRA E HITBOX" })
 SAimConfigs:AddButton({ Name = "👤 Abrir Seletor Avançado do Corpo (Boneco)", Callback = function() if bonecoFrame then bonecoFrame.Visible = not bonecoFrame.Visible end end })
 SAimConfigs:AddToggle({ Name = "Wall Check", Default = _G.wallCheckEnabled, Save = true, Flag = "WCheck", Callback = function(V) _G.wallCheckEnabled = V end })
 SAimConfigs:AddToggle({ Name = "Aim Prediction (Inércia)", Default = _G.aimPredictionEnabled, Save = true, Flag = "APred", Callback = function(V) _G.aimPredictionEnabled = V end })
-SAimConfigs:AddSlider({ Name = "Smoothness Aimbot", Min = 1, Max = 10, Default = _G.aimbotSmoothness, Color = Color3.fromRGB(0, 255, 100), Increment = 0.5, ValueName = "Lerp", Save = true, Flag = "ASmooth", Callback = function(V) _G.aimbotSmoothness = V end })
-SAimConfigs:AddSlider({ Name = "Chance Acerto (Silent Aim)", Min = 1, Max = 100, Default = _G.silentAimHitChance, Color = Color3.fromRGB(200, 100, 255), Increment = 1, ValueName = "%", Save = true, Flag = "SHitC", Callback = function(V) _G.silentAimHitChance = V end })
+SAimConfigs:AddSlider({ Name = "Smoothness Aimbot", Min = 1, Max = 10, Default = _G.aimbotSmoothness, Color = Color3.fromRGB(0, 255, 100), Increment = 0.5, ValueName = "Lerp", Save = true, Flag = "ASmoth", Callback = function(V) _G.aimbotSmoothness = V end })
+SAimConfigs:AddSlider({ Name = "Chance Acerto (Silent)", Min = 1, Max = 100, Default = _G.silentAimHitChance, Color = Color3.fromRGB(200, 100, 255), Increment = 1, ValueName = "%", Save = true, Flag = "SHit", Callback = function(V) _G.silentAimHitChance = V end })
 
-local SAimFOV, STrigger = TabAimbot:AddSection({ Name = "⭕ CAMPO VISUAL (FOV)" }), TabAimbot:AddSection({ Name = "🔫 AUTO-ATIRADOR (TRIGGERBOT)" })
-SAimFOV:AddToggle({ Name = "Mostrar Círculo do FOV", Default = _G.FOV_VISIBLE, Save = true, Flag = "FovV", Callback = function(V) _G.FOV_VISIBLE = V end })
-SAimFOV:AddSlider({ Name = "Tamanho Máximo do FOV", Min = 10, Max = 600, Default = _G.FOV_RADIUS, Color = Color3.fromRGB(255, 0, 0), Increment = 5, ValueName = "Raio", Save = true, Flag = "FovR", Callback = function(V) _G.FOV_RADIUS = V end })
-STrigger:AddToggle({ Name = "Ativar TriggerBot", Default = _G.triggerBotEnabled, Save = true, Flag = "TBEnable", Callback = function(V) _G.triggerBotEnabled = V end })
-STrigger:AddSlider({ Name = "Delay (Milissegundos)", Min = 0, Max = 1, Default = _G.triggerBotDelay, Color = Color3.fromRGB(255, 100, 0), Increment = 0.01, ValueName = "s", Save = true, Flag = "TBDelay", Callback = function(V) _G.triggerBotDelay = V end })
+local SAimFOV, STrigger = TabAimbot:AddSection({ Name = "⭕ CAMPO VISUAL (FOV)" }), TabAimbot:AddSection({ Name = "🔫 TRIGGERBOT" })
+SAimFOV:AddToggle({ Name = "Mostrar Círculo FOV", Default = _G.FOV_VISIBLE, Save = true, Flag = "FovV", Callback = function(V) _G.FOV_VISIBLE = V end })
+SAimFOV:AddSlider({ Name = "Tamanho Máximo FOV", Min = 10, Max = 600, Default = _G.FOV_RADIUS, Color = Color3.fromRGB(255, 0, 0), Increment = 5, ValueName = "Raio", Save = true, Flag = "FovR", Callback = function(V) _G.FOV_RADIUS = V end })
+STrigger:AddToggle({ Name = "Ativar TriggerBot", Default = _G.triggerBotEnabled, Save = true, Flag = "TBE", Callback = function(V) _G.triggerBotEnabled = V end })
+STrigger:AddSlider({ Name = "Delay (Segundos)", Min = 0, Max = 1, Default = _G.triggerBotDelay, Color = Color3.fromRGB(255, 100, 0), Increment = 0.01, ValueName = "s", Save = true, Flag = "TBDely", Callback = function(V) _G.triggerBotDelay = V end })
 
--- 👁️ ABS VISUALS / ESP
+-- 👁️ VISUALS / ESP
 local SEspInimigo = TabESP:AddSection({ Name = "🔴 INIMIGOS (ESPs SEPARADOS)" })
+SEspInimigo:AddToggle({ Name = "Caixa 2D (Box Invisível à AntiCheat)", Default = _G.espEnemyBox, Save = true, Flag = "EBox", Callback = function(V) _G.espEnemyBox = V end })
 SEspInimigo:AddToggle({ Name = "Aura Colorida (Chams)", Default = _G.espEnemyChams, Save = true, Flag = "EChams", Callback = function(V) _G.espEnemyChams = V end })
-SEspInimigo:AddToggle({ Name = "Linha (Tracers)", Default = _G.espEnemyTracers, Save = true, Flag = "ETracers", Callback = function(V) _G.espEnemyTracers = V end })
+SEspInimigo:AddToggle({ Name = "Linha (Tracers)", Default = _G.espEnemyTracers, Save = true, Flag = "ETracer", Callback = function(V) _G.espEnemyTracers = V end })
 SEspInimigo:AddToggle({ Name = "Ossos 3D (Skeleton)", Default = _G.espEnemySkeleton, Save = true, Flag = "ESkel", Callback = function(V) _G.espEnemySkeleton = V end })
 SEspInimigo:AddToggle({ Name = "Letreiros (Textos)", Default = _G.espEnemyText, Save = true, Flag = "EText", Callback = function(V) _G.espEnemyText = V end })
 
 local SEspAliado = TabESP:AddSection({ Name = "🔵 ALIADOS (ESPs SEPARADOS)" })
+SEspAliado:AddToggle({ Name = "Caixa 2D (Box)", Default = _G.espAllyBox, Save = true, Flag = "ABox", Callback = function(V) _G.espAllyBox = V end })
 SEspAliado:AddToggle({ Name = "Aura Colorida (Chams)", Default = _G.espAllyChams, Save = true, Flag = "AChams", Callback = function(V) _G.espAllyChams = V end })
-SEspAliado:AddToggle({ Name = "Linha (Tracers)", Default = _G.espAllyTracers, Save = true, Flag = "ATracers", Callback = function(V) _G.espAllyTracers = V end })
+SEspAliado:AddToggle({ Name = "Linha (Tracers)", Default = _G.espAllyTracers, Save = true, Flag = "ATracer", Callback = function(V) _G.espAllyTracers = V end })
 SEspAliado:AddToggle({ Name = "Ossos 3D (Skeleton)", Default = _G.espAllySkeleton, Save = true, Flag = "ASkel", Callback = function(V) _G.espAllySkeleton = V end })
 SEspAliado:AddToggle({ Name = "Letreiros (Textos)", Default = _G.espAllyText, Save = true, Flag = "AText", Callback = function(V) _G.espAllyText = V end })
 
 local SEspTextConfigs = TabESP:AddSection({ Name = "⚙️ FILTROS DOS LETREIROS" })
-SEspTextConfigs:AddToggle({ Name = "Mostrar Nome", Default = _G.espName, Save = true, Flag = "TxtName", Callback = function(V) _G.espName = V end })
-SEspTextConfigs:AddToggle({ Name = "Mostrar HP", Default = _G.espHP, Save = true, Flag = "TxtHP", Callback = function(V) _G.espHP = V end })
-SEspTextConfigs:AddToggle({ Name = "Mostrar Distância", Default = _G.espDistance, Save = true, Flag = "TxtDist", Callback = function(V) _G.espDistance = V end })
-SEspTextConfigs:AddToggle({ Name = "Mostrar Arma", Default = _G.espWeapon, Save = true, Flag = "TxtWeap", Callback = function(V) _G.espWeapon = V end })
+SEspTextConfigs:AddToggle({ Name = "Mostrar Nome do Player", Default = _G.espName, Save = true, Flag = "TxNm", Callback = function(V) _G.espName = V end })
+SEspTextConfigs:AddToggle({ Name = "Mostrar Vida (HP)", Default = _G.espHP, Save = true, Flag = "TxHP", Callback = function(V) _G.espHP = V end })
+SEspTextConfigs:AddToggle({ Name = "Mostrar Distância", Default = _G.espDistance, Save = true, Flag = "TxDist", Callback = function(V) _G.espDistance = V end })
+SEspTextConfigs:AddToggle({ Name = "Mostrar Arma Atual", Default = _G.espWeapon, Save = true, Flag = "TxW", Callback = function(V) _G.espWeapon = V end })
 
--- 🔫 ABS MODS
+-- 🔫 MODS
 local SModsLegit, SModsArma, SModsPlayer = TabMods:AddSection({ Name = "👻 ANTI-AIM (DESYNC)" }), TabMods:AddSection({ Name = "🔫 ARMAS E HITBOX" }), TabMods:AddSection({ Name = "👟 PLAYER MODS" })
-SModsLegit:AddToggle({ Name = "Legit Desync (Bugar Inércia)", Default = _G.antiAimLegitEnabled, Save = true, Flag = "AALegit", Callback = function(V) _G.antiAimLegitEnabled = V end })
-SModsArma:AddToggle({ Name = "No Recoil", Default = _G.noRecoilEnabled, Save = true, Flag = "NRecoil", Callback = function(V) _G.noRecoilEnabled = V end })
+SModsLegit:AddToggle({ Name = "Legit Desync (Bugar Velocidade)", Default = _G.antiAimLegitEnabled, Save = true, Flag = "AALg", Callback = function(V) _G.antiAimLegitEnabled = V end })
+SModsArma:AddToggle({ Name = "No Recoil", Default = _G.noRecoilEnabled, Save = true, Flag = "NRec", Callback = function(V) _G.noRecoilEnabled = V end })
 SModsArma:AddToggle({ Name = "Infinite Ammo / Fast Reload", Default = _G.infiniteAmmoEnabled, Save = true, Flag = "IAmmo", Callback = function(V) _G.infiniteAmmoEnabled = V; _G.instantReloadEnabled = V end })
-SModsArma:AddSlider({ Name = "Aumentar Cabeça Global", Min = 2, Max = 15, Default = _G.hitboxExpander, Color = Color3.fromRGB(150, 0, 255), Increment = 1, ValueName = "Tam", Save = true, Flag = "HExp", Callback = function(V) _G.hitboxExpander = V end })
+SModsArma:AddSlider({ Name = "Aumentar Cabeça Global", Min = 2, Max = 15, Default = _G.hitboxExpander, Color = Color3.fromRGB(150, 0, 255), Increment = 1, ValueName = "T", Save = true, Flag = "HEx", Callback = function(V) _G.hitboxExpander = V end })
 SModsPlayer:AddSlider({ Name = "WalkSpeed", Min = 16, Max = 250, Default = _G.walkSpeed, Color = Color3.fromRGB(200, 200, 200), Increment = 1, ValueName = "W", Save = true, Flag = "PWS", Callback = function(V) _G.walkSpeed = V end })
 SModsPlayer:AddSlider({ Name = "JumpPower", Min = 50, Max = 300, Default = _G.jumpPower, Color = Color3.fromRGB(200, 200, 200), Increment = 1, ValueName = "P", Save = true, Flag = "PJP", Callback = function(V) _G.jumpPower = V end })
 
--- ⚙️ ABS CONFIG (Ocultação, Pânico, Hotkey)
+-- ⚙️ CONFIG
 local SConfigGerais = TabConfig:AddSection({ Name = "🛡️ Ocultação e Desligamento" })
 SConfigGerais:AddBind({ Name = "👁️ Modo Streamer (Ocultar Desenhos)", Default = Enum.KeyCode.F4, Hold = false, Callback = function() _G.streamerMode = not _G.streamerMode end })
 
 if not isMobile then
-    SConfigGerais:AddBind({ 
-        Name = "⌨️ Tecla para Abrir/Fechar a Interface do Menu", 
-        Default = Enum.KeyCode.RightControl, -- (Padrão RightControl no teclado, ele pode clicar e mudar pra Insert se quiser)
-        Hold = false, 
-        Callback = function() 
-            local orion = findOrionGui()
-            if orion then orion.Enabled = not orion.Enabled end
-        end 
-    })
+    SConfigGerais:AddBind({ Name = "⌨️ Tecla para Abrir/Fechar a Interface", Default = Enum.KeyCode.RightControl, Hold = false, Callback = function() local o = findOrionGui(); if o then o.Enabled = not o.Enabled end end })
 else
-    -- Apenas informa o usuário Mobile que a bolinha dele já ta na tela.
-    SConfigGerais:AddButton({ Name = "🔴 Uma Bolinha HUB Flutuante foi criada para você (Mobile)", Callback = function() end })
+    SConfigGerais:AddButton({ Name = "🔴 Uma Bolinha HUB foi criada para mobile", Callback = function() end })
 end
 
 SConfigGerais:AddButton({ Name = "🛑 BOTÃO DE PÂNICO (Apagar Script Completamente)", Callback = function() _G.SupremeHubRunning = false; if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end; _G.clearDrawings(); if bonecoFrame then bonecoFrame:Destroy() end; local mGui = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui"); if mGui:FindFirstChild("SupremeMobileHub") then mGui.SupremeMobileHub:Destroy() end; OrionLib:Destroy() end })
@@ -256,11 +244,6 @@ local function isAlive(c) local h = c and c:FindFirstChildOfClass("Humanoid"); r
 local function isSameTeam(p1, p2) if not p1 or not p2 then return false end; if p1.Team and p2.Team then return p1.Team == p2.Team end; if p1.TeamColor and p2.TeamColor then return p1.TeamColor == p2.TeamColor end; return false end
 local function isFFA() local t = {}; local c = 0; for _, p in pairs(Players:GetPlayers()) do if p.Team or p.TeamColor then t[p.Team and p.Team.Name or p.TeamColor.Name] = true end end; for _ in pairs(t) do c = c + 1 end; return c < 2 end
 local function hasLineOfSight(tp) local r = RaycastParams.new(); r.FilterDescendantsInstances = {LocalPlayer.Character}; r.FilterType = Enum.RaycastFilterType.Blacklist; return not workspace:Raycast(Camera.CFrame.Position, (tp.Position - Camera.CFrame.Position).Unit * 5000, r) or workspace:Raycast(Camera.CFrame.Position, (tp.Position - Camera.CFrame.Position).Unit * 5000, r).Instance:IsDescendantOf(tp.Parent) end
-
-local function getRbxPartNames(vName)
-    local m = { ["Head"]={"Head"}, ["Torso"]={"HumanoidRootPart", "Torso", "UpperTorso", "LowerTorso"}, ["Left Arm"]={"Left Arm", "LeftUpperArm", "LeftHand"}, ["Right Arm"]={"Right Arm", "RightUpperArm", "RightHand"}, ["Left Leg"]={"Left Leg", "LeftUpperLeg", "LeftFoot"}, ["Right Leg"]={"Right Leg", "RightUpperLeg", "RightFoot"} }
-    return m[vName] or {}
-end
 
 local function getClosestEnemyAndPart()
     local c = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -274,8 +257,7 @@ local function getClosestEnemyAndPart()
         local chosenPartList = {}
         for k, state in pairs(_G.HitboxStates) do
             if (state == 1 or (state == 2 and currentFocusLevel == 2)) then
-                local t = player.Character:FindFirstChild(k)
-                if not t and k == "Torso" then t = player.Character:FindFirstChild("HumanoidRootPart") end
+                local t = player.Character:FindFirstChild(k); if not t and k == "Torso" then t = player.Character:FindFirstChild("HumanoidRootPart") end
                 if t then table.insert(chosenPartList, t) end
             end
         end
@@ -286,7 +268,7 @@ local function getClosestEnemyAndPart()
             if aimPart then
                 local sPos, v = Camera:WorldToViewportPoint(aimPart.Position)
                 local dist = (Vector2.new(sPos.X, sPos.Y) - c).Magnitude
-                if v and dist <= 12000 and dist <= sDist then -- Limite pra não bugar na math global
+                if v and dist <= 12000 and dist <= sDist then
                     if _G.wallCheckEnabled and not hasLineOfSight(aimPart) then continue end
                     sDist, clTarget, fAimPart = dist, player, aimPart
                 end
@@ -331,10 +313,8 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     if _G.antiAimLegitEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local root = LocalPlayer.Character.HumanoidRootPart
         if tick() - lastAntiAimTick > 0.05 then
-            local ov = root.Velocity
-            root.Velocity = Vector3.new(math.random(-100, 100), math.random(-50, 50), math.random(-100, 100))
-            task.spawn(function() RunService.RenderStepped:Wait(); root.Velocity = ov end)
-            lastAntiAimTick = tick()
+            local ov = root.Velocity; root.Velocity = Vector3.new(math.random(-100, 100), math.random(-50, 50), math.random(-100, 100))
+            task.spawn(function() RunService.RenderStepped:Wait(); root.Velocity = ov end); lastAntiAimTick = tick()
         end
     end
 
@@ -350,12 +330,28 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
                 if head and head:IsA("BasePart") then head.Size = Vector3.new(_G.hitboxExpander, _G.hitboxExpander, _G.hitboxExpander); head.Transparency = 0.5; head.CanCollide = false end
             end
 
+            local bEn = isAlly and _G.espAllyBox or (not isAlly and _G.espEnemyBox)
             local cEn = isAlly and _G.espAllyChams or (not isAlly and _G.espEnemyChams)
             local tEn = isAlly and _G.espAllyTracers or (not isAlly and _G.espEnemyTracers)
             local sEn = isAlly and _G.espAllySkeleton or (not isAlly and _G.espEnemySkeleton)
             local txtEn = isAlly and _G.espAllyText or (not isAlly and _G.espEnemyText)
 
-            -- CHAMS
+            -- BOX 2D (Sempre funciona)
+            if bEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
+                local rootPart = char.HumanoidRootPart
+                local sPos, on = Camera:WorldToViewportPoint(rootPart.Position)
+                local box = boxes[player] or createDrawing("Square")
+                boxes[player] = box
+                if on then
+                    local headPos = Camera:WorldToViewportPoint(char:FindFirstChild("Head") and char.Head.Position + Vector3.new(0, 1, 0) or rootPart.Position + Vector3.new(0, 2.5, 0))
+                    local height = math.abs(headPos.Y - sPos.Y) * 1.5
+                    local width = height * 0.6
+                    box.Visible = true; box.Size = Vector2.new(width, height); box.Position = Vector2.new(sPos.X - width / 2, sPos.Y - height / 2); box.Thickness = 1.5; box.Filled = false
+                    box.Color = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 0, 0)
+                else box.Visible = false end
+            else if boxes[player] then boxes[player]:Remove(); boxes[player] = nil end end
+
+            -- CHAMS (Aura do Roblox)
             if cEn and not _G.streamerMode then
                 local high = highlights[player] or Instance.new("Highlight")
                 high.Parent = char; highlights[player] = high; high.Adornee = char; high.Enabled = true; high.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -366,8 +362,7 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             -- TEXTOS
             if txtEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
                 local sPos, on = Camera:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position) + Vector3.new(0, 1.5, 0))
-                local txt = espTexts[player] or createDrawing("Text")
-                espTexts[player] = txt
+                local txt = espTexts[player] or createDrawing("Text"); espTexts[player] = txt
                 if on then
                     txt.Visible = true; txt.Position = Vector2.new(sPos.X, sPos.Y); txt.Center = true; txt.Outline = true; txt.Size = 14; 
                     txt.Color = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 255, 255)
@@ -383,8 +378,7 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             -- TRACERS
             if tEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
                 local sPos, on = Camera:WorldToViewportPoint(char.HumanoidRootPart.Position)
-                local tracer = tracers[player] or createDrawing("Line")
-                tracers[player] = tracer
+                local tracer = tracers[player] or createDrawing("Line"); tracers[player] = tracer
                 if on then
                     tracer.Visible = true; tracer.Thickness = 1.5; tracer.Transparency = 1
                     tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y); tracer.To = Vector2.new(sPos.X, sPos.Y)
@@ -392,15 +386,14 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
                 else tracer.Visible = false end
             else if tracers[player] then tracers[player]:Remove(); tracers[player] = nil end end
 
-            -- SKELETON ESP
+            -- SKELETON
             if sEn and not _G.streamerMode then
                 if not skeletons[player] then skeletons[player] = {} end
                 local skelParts = skeletons[player]
                 for i, con in ipairs(skeletonConnections) do
                     local pa, pb = char:FindFirstChild(con[1]), char:FindFirstChild(con[2])
                     if pa and pb then
-                        local posA, oA = Camera:WorldToViewportPoint(pa.Position)
-                        local posB, oB = Camera:WorldToViewportPoint(pb.Position)
+                        local posA, oA = Camera:WorldToViewportPoint(pa.Position); local posB, oB = Camera:WorldToViewportPoint(pb.Position)
                         if oA or oB then
                             local line = skelParts[i] or createDrawing("Line"); skelParts[i] = line
                             line.Visible = true; line.Thickness = 1.2; line.Color = isAlly and Color3.fromRGB(150,200,255) or Color3.fromRGB(255,255,255)
