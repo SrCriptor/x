@@ -50,6 +50,10 @@ local coreGui = pcall(function() return game:GetService("CoreGui") end) and game
 if coreGui:FindFirstChild("SupremeDrawSpace") then coreGui.SupremeDrawSpace:Destroy() end
 
 local supremeDrawSpace = Instance.new("ScreenGui", coreGui)
+if not supremeDrawSpace or not supremeDrawSpace.Parent then
+    supremeDrawSpace = Instance.new("ScreenGui", game.CoreGui)
+end
+
 supremeDrawSpace.Name = "SupremeDrawSpace"
 supremeDrawSpace.IgnoreGuiInset = true 
 supremeDrawSpace.ResetOnSpawn = false -- IMUNIDADE A MORTE DO JOGADOR (ISSO CAUSAVA O BUG DE DESAPARECER)
@@ -100,7 +104,10 @@ local function removeESP(player)
 end
 
 _G.clearDrawings = function()
-    if supremeDrawSpace then supremeDrawSpace:Destroy() end
+    for _, v in pairs(supremeDrawSpace:GetChildren()) do
+        v:Destroy()
+    end
+
     for player, _ in pairs(tracers) do removeESP(player) end
     for player, _ in pairs(espTexts) do removeESP(player) end
     for player, _ in pairs(boxes) do removeESP(player) end
@@ -352,12 +359,24 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     
     if tick() >= nextAimSwitchTime then currentFocusLevel = (currentFocusLevel == 1) and 2 or 1; nextAimSwitchTime = tick() + ((currentFocusLevel == 1) and 1.8 or 0.35) end
     
-    if fovFrame then 
-        fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
-        fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
-        fovFrame.Visible = not _G.streamerMode and _G.FOV_VISIBLE 
-    end
+if not fovFrame or not fovFrame.Parent then
+    fovFrame = Instance.new("Frame", supremeDrawSpace)
+    fovFrame.BackgroundTransparency = 1
     
+    local stroke = Instance.new("UIStroke", fovFrame)
+    stroke.Color = Color3.fromRGB(255,255,255)
+    stroke.Thickness = 1.5
+
+    local corner = Instance.new("UICorner", fovFrame)
+    corner.CornerRadius = UDim.new(1,0)
+end
+
+if fovFrame then
+    fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
+    fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
+    fovFrame.Visible = not _G.streamerMode and _G.FOV_VISIBLE 
+end
+
     if LocalPlayer.Character and isAlive(LocalPlayer.Character) then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum then hum.WalkSpeed = _G.walkSpeed; hum.JumpPower = _G.jumpPower end
@@ -391,7 +410,7 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
 
             -- NATIVE BOX 2D
             if bEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
-                local rootPart = char.HumanoidRootPart
+            local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
                 local sPos, on = cam:WorldToViewportPoint(rootPart.Position)
                 local box = boxes[player] or createBox()
                 boxes[player] = box
