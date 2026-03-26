@@ -6,7 +6,7 @@ end
 _G.SupremeHubRunning = true
 
 for _, obj in pairs(workspace:GetDescendants()) do
-    if obj:IsA("Highlight") then pcall(function() obj:Destroy() end) end
+    if obj:IsA("Highlight") and obj.Name == "ESPHighlight" then pcall(function() obj:Destroy() end) end
 end
 if _G.clearDrawings then _G.clearDrawings() end
 
@@ -28,6 +28,11 @@ _G.streamerMode = false
 _G.FOV_RADIUS = 150
 _G.FOV_VISIBLE = true
 
+-- Radar
+_G.espRadar = false
+_G.RADAR_SIZE = 150
+_G.MAP_SCALE = 2
+
 -- Aimbot
 _G.aimbotAutoEnabled, _G.aimbotManualEnabled = false, false
 _G.silentAimEnabled, _G.silentAimHitChance = false, 100
@@ -39,31 +44,50 @@ _G.triggerBotEnabled, _G.triggerBotDelay = false, 0.05
 -- ESP Séries
 _G.espEnemyBox, _G.espEnemyChams, _G.espEnemyTracers, _G.espEnemySkeleton, _G.espEnemyText = true, true, false, false, true
 _G.espAllyBox, _G.espAllyChams, _G.espAllyTracers, _G.espAllySkeleton, _G.espAllyText = false, false, false, false, false
-_G.espName, _G.espHP, _G.espDistance, _G.espWeapon = true, true, true, true
+_G.espName, _G.espHP, _G.espDistance, _G.espWeapon = false, false, false, false
+_G.espMaxDistance = 5000
 
 -- Mods
 _G.antiAimLegitEnabled, _G.noRecoilEnabled, _G.infiniteAmmoEnabled, _G.instantReloadEnabled = false, false, false, false
 _G.hitboxExpander, _G.walkSpeed, _G.jumpPower = 2, 16, 50
 
--- ==================== NATIVE DRAWING SYSTEM (100% EXECUTOR PROOF) ====================
+-- ==================== NATIVE DRAWING SYSTEM ====================
 local coreGui = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+
 if coreGui:FindFirstChild("SupremeDrawSpace") then coreGui.SupremeDrawSpace:Destroy() end
-
 local supremeDrawSpace = Instance.new("ScreenGui", coreGui)
-if not supremeDrawSpace or not supremeDrawSpace.Parent then
-    supremeDrawSpace = Instance.new("ScreenGui", game.CoreGui)
-end
-
 supremeDrawSpace.Name = "SupremeDrawSpace"
 supremeDrawSpace.IgnoreGuiInset = true 
-supremeDrawSpace.ResetOnSpawn = false -- IMUNIDADE A MORTE DO JOGADOR (ISSO CAUSAVA O BUG DE DESAPARECER)
+supremeDrawSpace.ResetOnSpawn = false
+
+if coreGui:FindFirstChild("SupremeRadar") then coreGui.SupremeRadar:Destroy() end
+local radarGui = Instance.new("ScreenGui", coreGui)
+radarGui.Name = "SupremeRadar"
+radarGui.ResetOnSpawn = false
+
+local radarBg = Instance.new("Frame", radarGui)
+radarBg.Size = UDim2.new(0, _G.RADAR_SIZE, 0, _G.RADAR_SIZE)
+radarBg.Position = UDim2.new(1, -(_G.RADAR_SIZE + 20), 0, 20) 
+radarBg.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+radarBg.BackgroundTransparency = 0.5
+radarBg.ClipsDescendants = true
+radarBg.Visible = _G.espRadar and not _G.streamerMode
+radarBg.Active = true
+radarBg.Draggable = true
+Instance.new("UICorner", radarBg).CornerRadius = UDim.new(1, 0)
+
+local centerPoint = Instance.new("Frame", radarBg)
+centerPoint.Size = UDim2.new(0, 6, 0, 6)
+centerPoint.Position = UDim2.new(0.5, -3, 0.5, -3)
+centerPoint.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", centerPoint).CornerRadius = UDim.new(1, 0)
 
 local fovFrame = Instance.new("Frame", supremeDrawSpace)
 fovFrame.BackgroundTransparency = 1
 local fovStroke = Instance.new("UIStroke", fovFrame); fovStroke.Color = Color3.fromRGB(255, 255, 255); fovStroke.Thickness = 1.5; fovStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 local fovCorner = Instance.new("UICorner", fovFrame); fovCorner.CornerRadius = UDim.new(1, 0)
 
-local tracers, espTexts, highlights, skeletons, boxes = {}, {}, {}, {}, {}
+local tracers, espTexts, highlights, skeletons, boxes, radarBlips = {}, {}, {}, {}, {}, {}
 
 local function createBox()
     local f = Instance.new("Frame", supremeDrawSpace)
@@ -71,19 +95,26 @@ local function createBox()
     local stroke = Instance.new("UIStroke", f); stroke.Thickness = 1.5
     return f
 end
-
 local function createLine()
     local f = Instance.new("Frame", supremeDrawSpace)
     f.BorderSizePixel = 0; f.AnchorPoint = Vector2.new(0.5, 0.5)
     return f
 end
-
 local function createText()
     local t = Instance.new("TextLabel", supremeDrawSpace)
     t.BackgroundTransparency = 1; t.Size = UDim2.new(0, 200, 0, 50); t.AnchorPoint = Vector2.new(0.5, 0.5)
     t.Font = Enum.Font.GothamBold; t.TextSize = 13; t.TextColor3 = Color3.fromRGB(255, 255, 255)
     t.TextStrokeTransparency = 0.2; t.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     return t
+end
+local function createRadarBlip(player)
+    local blip = Instance.new("Frame")
+    blip.Size = UDim2.new(0, 6, 0, 6)
+    blip.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    Instance.new("UICorner", blip).CornerRadius = UDim.new(1, 0)
+    blip.Parent = radarBg
+    radarBlips[player] = blip
+    return blip
 end
 
 local skeletonConnections = {
@@ -101,17 +132,13 @@ local function removeESP(player)
     if boxes[player] then boxes[player]:Destroy(); boxes[player] = nil end
     if highlights[player] then highlights[player]:Destroy(); highlights[player] = nil end
     if skeletons[player] then for _, line in pairs(skeletons[player]) do line:Destroy() end; skeletons[player] = nil end
+    if radarBlips[player] then radarBlips[player]:Destroy(); radarBlips[player] = nil end
 end
 
 _G.clearDrawings = function()
-    for _, v in pairs(supremeDrawSpace:GetChildren()) do
-        v:Destroy()
-    end
-
+    for _, v in pairs(supremeDrawSpace:GetChildren()) do v:Destroy() end
     for player, _ in pairs(tracers) do removeESP(player) end
-    for player, _ in pairs(espTexts) do removeESP(player) end
-    for player, _ in pairs(boxes) do removeESP(player) end
-    for player, _ in pairs(skeletons) do removeESP(player) end
+    if radarGui then radarGui:Destroy() end
 end
 
 -- ==================== HITBOX SYSTEM ====================
@@ -127,10 +154,9 @@ loadBoneco()
 
 local bonecoFrame
 local function createBonecoInterface()
-    local targetCore = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
-    if targetCore:FindFirstChild("BonequinhoHitboxUI") then targetCore.BonequinhoHitboxUI:Destroy() end
+    if coreGui:FindFirstChild("BonequinhoHitboxUI") then coreGui.BonequinhoHitboxUI:Destroy() end
 
-    local gui = Instance.new("ScreenGui", targetCore); gui.Name = "BonequinhoHitboxUI"; gui.ResetOnSpawn = false
+    local gui = Instance.new("ScreenGui", coreGui); gui.Name = "BonequinhoHitboxUI"; gui.ResetOnSpawn = false
     local frame = Instance.new("Frame", gui)
     frame.Size, frame.Position = UDim2.new(0, 200, 0, 280), UDim2.new(0.5, 150, 0.5, -140)
     frame.BackgroundColor3, frame.BorderSizePixel = Color3.fromRGB(28, 28, 30), 0
@@ -173,8 +199,7 @@ bonecoFrame = createBonecoInterface()
 
 -- ==================== FIND ORION GUI SECURELY ====================
 local function findOrionGui()
-    local targetCore = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
-    for _, child in pairs(targetCore:GetDescendants()) do
+    for _, child in pairs(coreGui:GetDescendants()) do
         if child:IsA("TextLabel") and (string.find(child.Text, "Supreme Hub") or string.find(child.Text, "Premium Script")) then
             local p = child:FindFirstAncestorOfClass("ScreenGui")
             if p then return p end
@@ -185,9 +210,8 @@ end
 
 -- ==================== MOBILE HUB BUTTON ====================
 local function createMobileButton()
-    local targetCore = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
-    if targetCore:FindFirstChild("SupremeMobileHub") then targetCore.SupremeMobileHub:Destroy() end
-    local mobileGui = Instance.new("ScreenGui", targetCore); mobileGui.Name = "SupremeMobileHub"; mobileGui.ResetOnSpawn = false
+    if coreGui:FindFirstChild("SupremeMobileHub") then coreGui.SupremeMobileHub:Destroy() end
+    local mobileGui = Instance.new("ScreenGui", coreGui); mobileGui.Name = "SupremeMobileHub"; mobileGui.ResetOnSpawn = false
     local btn = Instance.new("TextButton", mobileGui)
     btn.Size, btn.Position = UDim2.new(0, 55, 0, 55), UDim2.new(1, -70, 0, 100)
     btn.BackgroundColor3, btn.BorderSizePixel = Color3.fromRGB(20, 20, 20), 0
@@ -203,7 +227,6 @@ if isMobile then createMobileButton() end
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jensonhirst/Orion/main/source')))()
 local Window = OrionLib:MakeWindow({ Name = "⚡ Supreme Hub | Premium Script 🔥", HidePremium = false, SaveConfig = true, ConfigFolder = "SupremeHubConfig", ConfigName = "SAutoSave" })
 
--- Auto Saver para garantir que o SaveConfig do OrionLib funcione real-time
 local function zSave() pcall(function() OrionLib:SaveConfig() end) end
 
 local TabAimbot = Window:MakeTab({ Name = "Aimbot & Magic", Icon = "rbxassetid://4483345998", PremiumOnly = false })
@@ -224,22 +247,40 @@ SAimConfigs:AddToggle({ Name = "Aim Prediction (Inércia)", Default = _G.aimPred
 SAimConfigs:AddSlider({ Name = "Smoothness Aimbot", Min = 1, Max = 10, Default = _G.aimbotSmoothness, Color = Color3.fromRGB(0, 255, 100), Increment = 0.5, ValueName = "Lerp", Save = true, Flag = "ASmoth", Callback = function(V) _G.aimbotSmoothness = V; zSave() end })
 SAimConfigs:AddSlider({ Name = "Chance Acerto (Silent)", Min = 1, Max = 100, Default = _G.silentAimHitChance, Color = Color3.fromRGB(200, 100, 255), Increment = 1, ValueName = "%", Save = true, Flag = "SHit", Callback = function(V) _G.silentAimHitChance = V; zSave() end })
 
-local SAimFOV, STrigger = TabAimbot:AddSection({ Name = "⭕ CAMPO VISUAL (FOV)" }), TabAimbot:AddSection({ Name = "🔫 TRIGGERBOT" })
+local SAimFOV = TabAimbot:AddSection({ Name = "⭕ CAMPO VISUAL (FOV)" })
 SAimFOV:AddToggle({ Name = "Mostrar Círculo FOV", Default = _G.FOV_VISIBLE, Save = true, Flag = "FovV", Callback = function(V) _G.FOV_VISIBLE = V; zSave() end })
 SAimFOV:AddSlider({ Name = "Tamanho Máximo FOV", Min = 10, Max = 600, Default = _G.FOV_RADIUS, Color = Color3.fromRGB(255, 0, 0), Increment = 5, ValueName = "Raio", Save = true, Flag = "FovR", Callback = function(V) _G.FOV_RADIUS = V; zSave() end })
+
+local STrigger = TabAimbot:AddSection({ Name = "🔫 TRIGGERBOT" })
 STrigger:AddToggle({ Name = "Ativar TriggerBot", Default = _G.triggerBotEnabled, Save = true, Flag = "TBE", Callback = function(V) _G.triggerBotEnabled = V; zSave() end })
 STrigger:AddSlider({ Name = "Delay (Segundos)", Min = 0, Max = 1, Default = _G.triggerBotDelay, Color = Color3.fromRGB(255, 100, 0), Increment = 0.01, ValueName = "s", Save = true, Flag = "TBDely", Callback = function(V) _G.triggerBotDelay = V; zSave() end })
 
 -- 👁️ VISUALS / ESP
-local SEspInimigo = TabESP:AddSection({ Name = "🔴 INIMIGOS (ESPs SEPARADOS)" })
-SEspInimigo:AddToggle({ Name = "Caixa 2D (Box Invisível à AntiCheat)", Default = _G.espEnemyBox, Save = true, Flag = "EBox", Callback = function(V) _G.espEnemyBox = V; zSave() end })
+local SEspRadar = TabESP:AddSection({ Name = "📡 RADAR / MINIMAPA" })
+SEspRadar:AddToggle({ Name = "Mostrar Minimapa (Hacker Map)", Default = _G.espRadar, Save = true, Flag = "RdrE", Callback = function(V) 
+    _G.espRadar = V; 
+    if radarBg then radarBg.Visible = V and not _G.streamerMode end
+    zSave() 
+end })
+SEspRadar:AddSlider({ Name = "Tamanho do Radar", Min = 100, Max = 300, Default = _G.RADAR_SIZE, Color = Color3.fromRGB(0, 255, 100), Increment = 10, ValueName = "px", Save = true, Flag = "RdrS", Callback = function(V) 
+    _G.RADAR_SIZE = V; 
+    if radarBg then radarBg.Size = UDim2.new(0, V, 0, V); radarBg.Position = UDim2.new(1, -(V + 20), 0, 20) end
+    zSave() 
+end })
+SEspRadar:AddSlider({ Name = "Zoom do Radar (Escala)", Min = 1, Max = 10, Default = _G.MAP_SCALE, Color = Color3.fromRGB(200, 100, 255), Increment = 1, ValueName = "x", Save = true, Flag = "RdrZ", Callback = function(V) 
+    _G.MAP_SCALE = V; 
+    zSave() 
+end })
+
+local SEspInimigo = TabESP:AddSection({ Name = "🔴 INIMIGOS" })
+SEspInimigo:AddToggle({ Name = "Caixa 2D", Default = _G.espEnemyBox, Save = true, Flag = "EBox", Callback = function(V) _G.espEnemyBox = V; zSave() end })
 SEspInimigo:AddToggle({ Name = "Aura Colorida (Chams)", Default = _G.espEnemyChams, Save = true, Flag = "EChms", Callback = function(V) _G.espEnemyChams = V; zSave() end })
 SEspInimigo:AddToggle({ Name = "Linha (Tracers)", Default = _G.espEnemyTracers, Save = true, Flag = "ETrc", Callback = function(V) _G.espEnemyTracers = V; zSave() end })
 SEspInimigo:AddToggle({ Name = "Ossos 3D (Skeleton)", Default = _G.espEnemySkeleton, Save = true, Flag = "ESkl", Callback = function(V) _G.espEnemySkeleton = V; zSave() end })
 SEspInimigo:AddToggle({ Name = "Letreiros (Textos)", Default = _G.espEnemyText, Save = true, Flag = "ETxt", Callback = function(V) _G.espEnemyText = V; zSave() end })
 
-local SEspAliado = TabESP:AddSection({ Name = "🔵 ALIADOS (ESPs SEPARADOS)" })
-SEspAliado:AddToggle({ Name = "Caixa 2D (Box)", Default = _G.espAllyBox, Save = true, Flag = "ABox", Callback = function(V) _G.espAllyBox = V; zSave() end })
+local SEspAliado = TabESP:AddSection({ Name = "🔵 ALIADOS" })
+SEspAliado:AddToggle({ Name = "Caixa 2D", Default = _G.espAllyBox, Save = true, Flag = "ABox", Callback = function(V) _G.espAllyBox = V; zSave() end })
 SEspAliado:AddToggle({ Name = "Aura Colorida (Chams)", Default = _G.espAllyChams, Save = true, Flag = "AChm", Callback = function(V) _G.espAllyChams = V; zSave() end })
 SEspAliado:AddToggle({ Name = "Linha (Tracers)", Default = _G.espAllyTracers, Save = true, Flag = "ATrc", Callback = function(V) _G.espAllyTracers = V; zSave() end })
 SEspAliado:AddToggle({ Name = "Ossos 3D (Skeleton)", Default = _G.espAllySkeleton, Save = true, Flag = "ASkl", Callback = function(V) _G.espAllySkeleton = V; zSave() end })
@@ -250,6 +291,9 @@ SEspTextConfigs:AddToggle({ Name = "Mostrar Nome do Player", Default = _G.espNam
 SEspTextConfigs:AddToggle({ Name = "Mostrar Vida (HP)", Default = _G.espHP, Save = true, Flag = "TxHP", Callback = function(V) _G.espHP = V; zSave() end })
 SEspTextConfigs:AddToggle({ Name = "Mostrar Distância", Default = _G.espDistance, Save = true, Flag = "TxDist", Callback = function(V) _G.espDistance = V; zSave() end })
 SEspTextConfigs:AddToggle({ Name = "Mostrar Arma Atual", Default = _G.espWeapon, Save = true, Flag = "TxW", Callback = function(V) _G.espWeapon = V; zSave() end })
+
+local SEspGerais = TabESP:AddSection({ Name = "⚙️ CONFIGURAÇÕES GERAIS DE ESP" })
+SEspGerais:AddSlider({ Name = "Distância Máxima do ESP", Min = 50, Max = 10000, Default = _G.espMaxDistance, Color = Color3.fromRGB(0, 255, 100), Increment = 50, ValueName = "Studs", Save = true, Flag = "EspDist", Callback = function(V) _G.espMaxDistance = V; zSave() end })
 
 -- 🔫 MODS
 local SModsLegit, SModsArma, SModsPlayer = TabMods:AddSection({ Name = "👻 ANTI-AIM (DESYNC)" }), TabMods:AddSection({ Name = "🔫 ARMAS E HITBOX" }), TabMods:AddSection({ Name = "👟 PLAYER MODS" })
@@ -262,12 +306,15 @@ SModsPlayer:AddSlider({ Name = "JumpPower", Min = 50, Max = 300, Default = _G.ju
 
 -- ⚙️ CONFIG
 local SConfigGerais = TabConfig:AddSection({ Name = "🛡️ Ocultação e Desligamento" })
-SConfigGerais:AddBind({ Name = "👁️ Modo Streamer (Ocultar Desenhos)", Default = Enum.KeyCode.F4, Hold = false, Callback = function() _G.streamerMode = not _G.streamerMode end })
+SConfigGerais:AddBind({ Name = "👁️ Modo Streamer (Ocultar Desenhos)", Default = Enum.KeyCode.F4, Hold = false, Callback = function() 
+    _G.streamerMode = not _G.streamerMode; 
+    if radarBg then radarBg.Visible = _G.espRadar and not _G.streamerMode end
+end })
 
 if not isMobile then
     SConfigGerais:AddBind({ 
         Name = "⌨️ Tecla para Abrir/Fechar a Interface", 
-        Default = Enum.KeyCode.RightControl, 
+        Default = Enum.KeyCode.Home, 
         Hold = false, 
         Callback = function() 
             local o = findOrionGui()
@@ -279,7 +326,7 @@ else
 end
 
 SConfigGerais:AddButton({ Name = "💾 FORÇAR SALVAMENTO (MANUAL)", Callback = function() zSave(); OrionLib:MakeNotification({Name = "Supreme Hub", Content = "Configurações Globais Salvas!", Image = "rbxassetid://4483345998", Time = 3}) end })
-SConfigGerais:AddButton({ Name = "🛑 BOTÃO DE PÂNICO (Apagar Script Completamente)", Callback = function() _G.SupremeHubRunning = false; if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end; _G.clearDrawings(); if bonecoFrame then bonecoFrame:Destroy() end; local mGui = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui"); if mGui:FindFirstChild("SupremeMobileHub") then mGui.SupremeMobileHub:Destroy() end; OrionLib:Destroy() end })
+SConfigGerais:AddBind({ Name = "🛑 BOTÃO DE PÂNICO (Apagar Script Completamente)", Default = Enum.KeyCode.End, Hold = false, Callback = function() _G.SupremeHubRunning = false; if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end; _G.clearDrawings(); if bonecoFrame then bonecoFrame:Destroy() end; local mGui = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui"); if mGui:FindFirstChild("SupremeMobileHub") then mGui.SupremeMobileHub:Destroy() end; OrionLib:Destroy() end })
 
 OrionLib:Init()
 
@@ -359,23 +406,21 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     
     if tick() >= nextAimSwitchTime then currentFocusLevel = (currentFocusLevel == 1) and 2 or 1; nextAimSwitchTime = tick() + ((currentFocusLevel == 1) and 1.8 or 0.35) end
     
-if not fovFrame or not fovFrame.Parent then
-    fovFrame = Instance.new("Frame", supremeDrawSpace)
-    fovFrame.BackgroundTransparency = 1
-    
-    local stroke = Instance.new("UIStroke", fovFrame)
-    stroke.Color = Color3.fromRGB(255,255,255)
-    stroke.Thickness = 1.5
+    if not fovFrame or not fovFrame.Parent then
+        fovFrame = Instance.new("Frame", supremeDrawSpace)
+        fovFrame.BackgroundTransparency = 1
+        local stroke = Instance.new("UIStroke", fovFrame)
+        stroke.Color = Color3.fromRGB(255,255,255)
+        stroke.Thickness = 1.5
+        local corner = Instance.new("UICorner", fovFrame)
+        corner.CornerRadius = UDim.new(1,0)
+    end
 
-    local corner = Instance.new("UICorner", fovFrame)
-    corner.CornerRadius = UDim.new(1,0)
-end
-
-if fovFrame then
-    fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
-    fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
-    fovFrame.Visible = not _G.streamerMode and _G.FOV_VISIBLE 
-end
+    if fovFrame then
+        fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
+        fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
+        fovFrame.Visible = not _G.streamerMode and _G.FOV_VISIBLE 
+    end
 
     if LocalPlayer.Character and isAlive(LocalPlayer.Character) then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -397,6 +442,20 @@ end
         if char and isAlive(char) then
             local isAlly = not ffa and isSameTeam(player, LocalPlayer)
             
+            local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+            local localRoot = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or LocalPlayer.Character:FindFirstChild("Torso") or LocalPlayer.Character:FindFirstChild("UpperTorso"))
+            
+            local playerDist = math.huge
+            if targetRoot and localRoot then
+                playerDist = (targetRoot.Position - localRoot.Position).Magnitude
+            end
+
+            if playerDist > _G.espMaxDistance then
+                removeESP(player)
+                if currentTarget == player then currentTarget = nil end
+                continue
+            end
+
             if _G.hitboxExpander > 2 and not isAlly then
                 local head = char:FindFirstChild("Head")
                 if head and head:IsA("BasePart") then head.Size = Vector3.new(_G.hitboxExpander, _G.hitboxExpander, _G.hitboxExpander); head.Transparency = 0.5; head.CanCollide = false end
@@ -410,10 +469,9 @@ end
 
             -- NATIVE BOX 2D
             if bEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
-            local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
                 local sPos, on = cam:WorldToViewportPoint(rootPart.Position)
-                local box = boxes[player] or createBox()
-                boxes[player] = box
+                local box = boxes[player] or createBox(); boxes[player] = box
                 if on then
                     local headPos = cam:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or rootPart.Position) + Vector3.new(0, 1.5, 0))
                     local height = math.abs(headPos.Y - sPos.Y) * 2.2
@@ -423,21 +481,11 @@ end
                 else box.Visible = false end
             else if boxes[player] then boxes[player]:Destroy(); boxes[player] = nil end end
 
-            -- CHAMS (Aura do Roblox) Misto com o Simple ESP
+            -- CHAMS
             if cEn and not _G.streamerMode then
                 local high = highlights[player]
-                
-                -- Lógica otimizada e de caching do Simple ESP
-                if high and high.Parent ~= char then
-                    high:Destroy()
-                    highlights[player] = nil
-                    high = nil
-                end
-                
-                if not high then
-                    high = char:FindFirstChild("ESPHighlight")
-                end
-                
+                if high and high.Parent ~= char then high:Destroy(); highlights[player] = nil; high = nil end
+                if not high then high = char:FindFirstChild("ESPHighlight") end
                 if not high then
                     high = Instance.new("Highlight")
                     high.Name = "ESPHighlight"
@@ -447,7 +495,6 @@ end
                     high.Parent = char
                     highlights[player] = high
                 end
-                
                 high.Enabled = true
                 high.Adornee = char
                 high.FillColor = (player == currentTarget and Color3.fromRGB(255, 235, 59)) or (isAlly and Color3.fromRGB(46, 204, 113)) or Color3.fromRGB(231, 76, 60)
@@ -507,6 +554,31 @@ end
                 end
             else if skeletons[player] then for _, line in pairs(skeletons[player]) do line:Destroy() end; skeletons[player] = nil end end
 
+            -- RADAR MINIMAPA (Universal / Qualquer Jogo)
+            local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+            local localRoot = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or LocalPlayer.Character:FindFirstChild("Torso") or LocalPlayer.Character:FindFirstChild("UpperTorso"))
+
+            if _G.espRadar and not _G.streamerMode and targetRoot and localRoot then
+                local blip = radarBlips[player] or createRadarBlip(player)
+                if isAlly then blip.BackgroundColor3 = Color3.fromRGB(46, 204, 113) else blip.BackgroundColor3 = Color3.fromRGB(231, 76, 60) end
+                
+                local flatLook = Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z).Unit
+                local flatRight = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z).Unit
+                local offset = targetRoot.Position - localRoot.Position
+                
+                local rX = offset:Dot(flatRight)
+                local rY = -offset:Dot(flatLook)
+                local distance = math.sqrt(rX*rX + rY*rY)
+
+                if distance <= (_G.RADAR_SIZE / 2) * _G.MAP_SCALE then
+                    blip.Visible = true
+                    blip.Position = UDim2.new(0.5, (rX / _G.MAP_SCALE) - 3, 0.5, (rY / _G.MAP_SCALE) - 3)
+                else
+                    blip.Visible = false
+                end
+            else
+                if radarBlips[player] then radarBlips[player].Visible = false end
+            end
         else
             removeESP(player)
             if player == currentTarget then currentTarget = nil end
