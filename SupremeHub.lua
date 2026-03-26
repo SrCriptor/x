@@ -419,16 +419,39 @@ end
                     local height = math.abs(headPos.Y - sPos.Y) * 2.2
                     local width = height * 0.55
                     box.Visible = true; box.Size = UDim2.new(0, width, 0, height); box.Position = UDim2.new(0, sPos.X - width / 2, 0, headPos.Y)
-                    box.UIStroke.Color = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 0, 0)
+                    box.UIStroke.Color = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(46, 204, 113)) or Color3.fromRGB(231, 76, 60)
                 else box.Visible = false end
             else if boxes[player] then boxes[player]:Destroy(); boxes[player] = nil end end
 
-            -- CHAMS (Aura do Roblox)
+            -- CHAMS (Aura do Roblox) Misto com o Simple ESP
             if cEn and not _G.streamerMode then
-                local high = highlights[player] or Instance.new("Highlight")
-                high.Parent = char; highlights[player] = high; high.Adornee = char; high.Enabled = true; high.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                high.FillColor = (player == currentTarget and Color3.fromRGB(255, 235, 59)) or (isAlly and Color3.fromRGB(33, 150, 243)) or Color3.fromRGB(244, 67, 54)
-                high.OutlineColor = (player == currentTarget and Color3.fromRGB(245, 127, 23)) or (isAlly and Color3.fromRGB(13, 71, 161)) or Color3.fromRGB(183, 28, 28)
+                local high = highlights[player]
+                
+                -- Lógica otimizada e de caching do Simple ESP
+                if high and high.Parent ~= char then
+                    high:Destroy()
+                    highlights[player] = nil
+                    high = nil
+                end
+                
+                if not high then
+                    high = char:FindFirstChild("ESPHighlight")
+                end
+                
+                if not high then
+                    high = Instance.new("Highlight")
+                    high.Name = "ESPHighlight"
+                    high.FillTransparency = 0.5
+                    high.OutlineTransparency = 0.1
+                    high.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    high.Parent = char
+                    highlights[player] = high
+                end
+                
+                high.Enabled = true
+                high.Adornee = char
+                high.FillColor = (player == currentTarget and Color3.fromRGB(255, 235, 59)) or (isAlly and Color3.fromRGB(46, 204, 113)) or Color3.fromRGB(231, 76, 60)
+                high.OutlineColor = (player == currentTarget and Color3.fromRGB(245, 127, 23)) or (isAlly and Color3.fromRGB(46, 204, 113)) or Color3.fromRGB(231, 76, 60)
             else if highlights[player] then highlights[player]:Destroy(); highlights[player] = nil end end
 
             -- NATIVE TEXTOS
@@ -437,7 +460,7 @@ end
                 local txt = espTexts[player] or createText(); espTexts[player] = txt
                 if on then
                     txt.Visible = true; txt.Position = UDim2.new(0, sPos.X, 0, sPos.Y - 15)
-                    txt.TextColor3 = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 255, 255)
+                    txt.TextColor3 = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(46, 204, 113)) or Color3.fromRGB(255, 255, 255)
                     local info = _G.espName and (player.DisplayName .. "\n") or ""
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     if _G.espHP and hum then info = info .. "[" .. math.floor(hum.Health) .. " HP] " end
@@ -457,7 +480,7 @@ end
                     tracer.Size = UDim2.new(0, dist, 0, 1.5)
                     tracer.Position = UDim2.new(0, (p1.X + p2.X) / 2, 0, (p1.Y + p2.Y) / 2)
                     tracer.Rotation = math.deg(math.atan2(p2.Y - p1.Y, p2.X - p1.X))
-                    tracer.BackgroundColor3 = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(255, 0, 0)
+                    tracer.BackgroundColor3 = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(46, 204, 113)) or Color3.fromRGB(231, 76, 60)
                     tracer.Visible = true
                 else tracer.Visible = false end
             else if tracers[player] then tracers[player]:Destroy(); tracers[player] = nil end end
