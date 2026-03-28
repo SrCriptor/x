@@ -342,39 +342,40 @@ local function hasLineOfSight(tp)
     return not workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r) or workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r).Instance:IsDescendantOf(tp.Parent) 
 end
 
-local function getClosestEnemyAndPart()
+local function getClosestEnemy()
     local cam = workspace.CurrentCamera
-    if not cam then return nil, nil end
-    local c = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
-    local clTarget, fAimPart, sDist = nil, nil, _G.FOV_RADIUS
-    local ffa = isFFA()
+    local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player == LocalPlayer or not player.Character or not isAlive(player.Character) then continue end
-        if not ffa and isSameTeam(player, LocalPlayer) then continue end 
+    local closestPlayer = nil
+    local closestPart = nil
+    local shortestDistance = _G.FOV_RADIUS
 
-        local chosenPartList = {}
-        for k, state in pairs(_G.HitboxStates) do
-            if (state == 1 or (state == 2 and currentFocusLevel == 2)) then
-                local t = player.Character:FindFirstChild(k); if not t and k == "Torso" then t = player.Character:FindFirstChild("HumanoidRootPart") end
-                if t then table.insert(chosenPartList, t) end
-            end
-        end
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
 
-        if #chosenPartList == 0 then table.insert(chosenPartList, player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Head")) end
+        local char = player.Character
+        if not char then continue end
 
-        for _, aimPart in ipairs(chosenPartList) do
-            if aimPart then
-                local sPos, v = cam:WorldToViewportPoint(aimPart.Position)
-                local dist = (Vector2.new(sPos.X, sPos.Y) - c).Magnitude
-                if v and dist <= 12000 and dist <= sDist then
-                    if _G.wallCheckEnabled and not hasLineOfSight(aimPart) then continue end
-                    sDist, clTarget, fAimPart = dist, player, aimPart
-                end
-            end
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then continue end
+
+        -- 🔥 FOCO SIMPLES (igual antes)
+        local part = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+        if not part then continue end
+
+        local screenPos, visible = cam:WorldToViewportPoint(part.Position)
+        if not visible then continue end
+
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+
+        if dist < shortestDistance then
+            shortestDistance = dist
+            closestPlayer = player
+            closestPart = part
         end
     end
-    return clTarget, fAimPart
+
+    return closestPlayer, closestPart
 end
 
 -- ==================== SILENT AIM HOOK ====================
@@ -385,7 +386,7 @@ OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
 
     if not checkcaller() and _G.silentAimEnabled and math.random(1, 100) <= _G.silentAimHitChance then
         if m == "FindPartOnRayWithIgnoreList" or m == "FindPartOnRayWithWhitelist" or m == "FindPartOnRay" or m == "Raycast" then
-            local t, ap = getClosestEnemyAndPart()
+            local t, ap = getClosestEnemy()
             local cam = workspace.CurrentCamera
             if t and ap and cam then
                 local origin = cam.CFrame.Position
@@ -417,9 +418,10 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     end
 
     if fovFrame then
-        fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
-        fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
-        fovFrame.Visible = not _G.streamerMode and _G.FOV_VISIBLE 
+fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
+fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
+fovFrame.Visible = _G.FOV_VISIBLE
+fovFrame.ZIndex = 999
     end
 
     if LocalPlayer.Character and isAlive(LocalPlayer.Character) then
@@ -584,40 +586,135 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             if player == currentTarget then currentTarget = nil end
         end
     end
+        -- AIMBOT
+if (_G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming)) and not _G.silentAimEnabled then
+    local target, aimPart = getClosestEnemy()
 
-    if (_G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming)) and not _G.silentAimEnabled then
-        local target, aimPart = getClosestEnemyAndPart()
-        if target and aimPart then
-            currentTarget = target
-            local aimPosition = aimPart.Position
-            if _G.aimPredictionEnabled then
-                local targetVelocity = aimPart.AssemblyLinearVelocity or Vector3.new(0,0,0)
-                aimPosition = aimPosition + (targetVelocity * _G.aimPredictionForce)
-            end
-            local targetCFrame = CFrame.new(cam.CFrame.Position, aimPosition)
-            if _G.aimbotSmoothness == 1 then cam.CFrame = targetCFrame
-            else cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / _G.aimbotSmoothness, 0.01, 1)) end
-        else currentTarget = nil end
-    else
-        if _G.silentAimEnabled then currentTarget, _ = getClosestEnemyAndPart() else currentTarget = nil end
+    if target and aimPart then
+        currentTarget = target
+        local aimPosition = aimPart.Position
+
+        if _G.aimPredictionEnabled then
+            local targetVelocity = aimPart.AssemblyLinearVelocity or Vector3.new(0,0,0)
+            aimPosition = aimPosition + (targetVelocity * _G.aimPredictionForce)
+        end
+
+        local targetCFrame = CFrame.new(cam.CFrame.Position, aimPosition)
+
+        if _G.aimbotSmoothness == 1 then 
+            cam.CFrame = targetCFrame
+        else 
+            cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / _G.aimbotSmoothness, 0.01, 1)) 
+        end
+    else 
+        currentTarget = nil 
     end
-end)
+else
+    if _G.silentAimEnabled then 
+        currentTarget, _ = getClosestEnemy() 
+    else 
+        currentTarget = nil 
+    end
+end
 
-UserInputService.InputBegan:Connect(function(input, isProcessed) 
-    if isProcessed then return end; if input.UserInputType == aimbotKey or input.UserInputType == Enum.UserInputType.Touch then aiming = true end
-end)
-UserInputService.InputEnded:Connect(function(input, isProcessed) 
-    if input.UserInputType == aimbotKey or input.UserInputType == Enum.UserInputType.Touch then aiming = false end
-end)
+-- 🔫 TRIGGERBOT (CORRIGIDO E MAIS ESTÁVEL)
+if _G.triggerBotEnabled and not triggerBotCooldown then
+    local target, part = getClosestEnemy()
 
-Players.PlayerRemoving:Connect(function(player) removeESP(player); if currentTarget == player then currentTarget = nil end end)
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(1)
-    for _, tool in pairs(char:GetChildren()) do
-        if tool:IsA("Tool") then
-            if _G.noRecoilEnabled then tool:SetAttribute("recoilMax", Vector2.new(0,0)) end
-            if _G.infiniteAmmoEnabled then tool:SetAttribute("_ammo", 999) end
-            if _G.instantReloadEnabled then tool:SetAttribute("ReloadTime", 0) end
+    if target and part then
+        local direction = (part.Position - cam.CFrame.Position).Unit * 1000
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+        local result = workspace:Raycast(cam.CFrame.Position, direction, raycastParams)
+
+        if result and result.Instance and result.Instance:IsDescendantOf(target.Character) then
+            triggerBotCooldown = true
+
+            task.spawn(function()
+                mouse1press()
+                task.wait(0.02)
+                mouse1release()
+
+                task.wait(_G.triggerBotDelay)
+                triggerBotCooldown = false
+            end)
         end
     end
+end
+
+-- ==================== WEAPON MODS (UNIFICADO) ====================
+local char = LocalPlayer.Character
+if char then
+    local tool = char:FindFirstChildOfClass("Tool")
+
+    if tool then
+        for _, v in pairs(tool:GetDescendants()) do
+            local name = string.lower(v.Name)
+
+            -- 🔫 INFINITE AMMO
+            if _G.infiniteAmmoEnabled then
+                if v:IsA("IntValue") or v:IsA("NumberValue") then
+                    if name:find("ammo") or name:find("clip") or name:find("mag") then
+                        v.Value = 999
+                    end
+                end
+            end
+
+            -- ⚡ FAST RELOAD
+            if _G.instantReloadEnabled then
+                if v:IsA("NumberValue") then
+                    if name:find("reload") or name:find("cooldown") or name:find("delay") then
+                        v.Value = 0
+                    end
+                end
+
+                if v:IsA("BoolValue") then
+                    if name:find("reloading") then
+                        v.Value = false
+                    end
+                end
+            end
+
+            -- 💥 NO SPREAD
+            if _G.noRecoilEnabled then
+                if v:IsA("NumberValue") then
+                    if name:find("spread") or name:find("cone") then
+                        v.Value = 0
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- 🎯 NO RECOIL (camera fix)
+if _G.noRecoilEnabled then
+    local camCF = cam.CFrame
+    local _, y, _ = camCF:ToOrientation()
+    cam.CFrame = CFrame.new(camCF.Position) * CFrame.Angles(0, y, 0)
+end
+
+-- ==================== INPUT ====================
+UserInputService.InputBegan:Connect(function(input, isProcessed) 
+    if isProcessed then return end
+    if input.UserInputType == aimbotKey or input.UserInputType == Enum.UserInputType.Touch then 
+        aiming = true 
+    end
 end)
+
+UserInputService.InputEnded:Connect(function(input) 
+    if input.UserInputType == aimbotKey or input.UserInputType == Enum.UserInputType.Touch then 
+        aiming = false 
+    end
+end)
+
+-- ==================== CLEANUP ====================
+Players.PlayerRemoving:Connect(function(player) 
+    removeESP(player) 
+    if currentTarget == player then 
+        currentTarget = nil 
+    end 
+end)
+        
