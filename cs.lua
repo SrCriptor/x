@@ -27,6 +27,8 @@ _G.FOV_RADIUS = _G.FOV_RADIUS or 65
 _G.FOV_VISIBLE = true
 _G.legitDeadzone = 10
 _G.espNPCEnabled = false
+_G.magicBulletNPC = false       -- Novo: Silent Aim para NPCs
+_G.magicBulletEnemy = false     -- Novo: Silent Aim para Players
 _G.espEnemyBox = true; _G.espEnemyChams = true; _G.espEnemyTracers = false
 _G.espEnemySkeleton = false; _G.espEnemyText = true
 _G.espAllyBox = false; _G.espAllyChams = false; _G.espAllyTracers = false
@@ -442,17 +444,25 @@ end
 local function getClosestTarget()
     local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     local best, bestModel, bestDist = nil, nil, _G.FOV_RADIUS
-    for _,p in pairs(Players:GetPlayers()) do
-        if p==LP or not p.Character or not isAlive(p.Character) then continue end
-        if not isEnemy(p) then continue end
-        local part = getTargetPart(p.Character)
-        if part then
-            local sp,vis = Camera:WorldToViewportPoint(part.Position)
-            local d = (Vector2.new(sp.X,sp.Y)-center).Magnitude
-            if vis and d<=bestDist and hasLOS(part) then bestDist=d; best=p; bestModel=p.Character end
+    
+    -- Determina o que devemos procurar baseado nas flags ativas
+    local searchEnemies = _G.magicBulletEnemy or _G.aimbotAutoEnabled or _G.aimbotManualEnabled or _G.espEnemiesEnabled
+    local searchNPCs = _G.magicBulletNPC or _G.espNPCEnabled
+    
+    if searchEnemies then
+        for _,p in pairs(Players:GetPlayers()) do
+            if p==LP or not p.Character or not isAlive(p.Character) then continue end
+            if not isEnemy(p) then continue end
+            local part = getTargetPart(p.Character)
+            if part then
+                local sp,vis = Camera:WorldToViewportPoint(part.Position)
+                local d = (Vector2.new(sp.X,sp.Y)-center).Magnitude
+                if vis and d<=bestDist and hasLOS(part) then bestDist=d; best=p; bestModel=p.Character end
+            end
         end
     end
-    if _G.espNPCEnabled then
+    
+    if searchNPCs then
         for _,npc in pairs(getNPCs()) do
             -- Re-checa se NPC está vivo (cache pode estar desatualizado)
             if not isAlive(npc) then continue end
@@ -506,7 +516,11 @@ pcall(function()
     if not hookmetamethod or not getnamecallmethod then return end
     local oldNc; oldNc = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
-        if _G.silentAimEnabled and currentTargetModel and _G.SupremeHubRunning then
+        
+        local isNPC = currentTargetModel and not game:GetService("Players"):GetPlayerFromCharacter(currentTargetModel)
+        local silentAllowed = (isNPC and _G.magicBulletNPC) or (not isNPC and (_G.magicBulletEnemy or _G.silentAimEnabled))
+        
+        if silentAllowed and currentTargetModel and _G.SupremeHubRunning then
             if math.random(1,100) <= _G.silentAimHitChance then
                 local tPart = getTargetPart(currentTargetModel)
                 if tPart then
@@ -749,9 +763,11 @@ local function zSave() pcall(function() OrionLib:SaveConfig() end) end
 -- TAB: COMBAT
 local TabCombat = Window:MakeTab({Name="💥 Combat", Icon="rbxassetid://4483345998", PremiumOnly=false})
 local SCombat1 = TabCombat:AddSection({Name="🎯 AIMBOT & SILENT AIM"})
-SCombat1:AddToggle({Name="Aimbot Automático", Default=_G.aimbotAutoEnabled, Save=true, Flag="AAuto", Callback=function(V) _G.aimbotAutoEnabled=V; if V then _G.silentAimEnabled=false end; zSave() end})
+SCombat1:AddToggle({Name="Aimbot Automático", Default=_G.aimbotAutoEnabled, Save=true, Flag="AAuto", Callback=function(V) _G.aimbotAutoEnabled=V; if V then _G.silentAimEnabled=false; _G.magicBulletNPC=false; _G.magicBulletEnemy=false end; zSave() end})
 SCombat1:AddToggle({Name="Aimbot Manual (RMB)", Default=_G.aimbotManualEnabled, Save=true, Flag="AMan", Callback=function(V) _G.aimbotManualEnabled=V; zSave() end})
-SCombat1:AddToggle({Name="✨ Silent Aim (Mágico)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
+SCombat1:AddToggle({Name="✨ Silent Aim (Antigo)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
+SCombat1:AddToggle({Name="🔮 Magic Bullet (Inimigo)", Default=_G.magicBulletEnemy, Save=true, Flag="MgEnemy", Callback=function(V) _G.magicBulletEnemy=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
+SCombat1:AddToggle({Name="🤖 Magic Bullet (NPC)", Default=_G.magicBulletNPC, Save=true, Flag="MgNPC", Callback=function(V) _G.magicBulletNPC=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
 
 local SCombat2 = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
 SCombat2:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
