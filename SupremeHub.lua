@@ -473,10 +473,10 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     end
 
     if fovFrame then
-fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
-fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
-fovFrame.Visible = _G.FOV_VISIBLE
-fovFrame.ZIndex = 999
+        fovFrame.Size = UDim2.new(0, _G.FOV_RADIUS * 2, 0, _G.FOV_RADIUS * 2)
+        fovFrame.Position = UDim2.new(0, c.X - _G.FOV_RADIUS, 0, c.Y - _G.FOV_RADIUS)
+        fovFrame.Visible = _G.FOV_VISIBLE
+        fovFrame.ZIndex = 999
     end
 
     if LocalPlayer.Character and isAlive(LocalPlayer.Character) then
@@ -639,22 +639,19 @@ fovFrame.ZIndex = 999
             removeESP(player)
         end
     end
-        -- AIMBOT
+-- AIMBOT
 if (_G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming)) and not _G.silentAimEnabled then
-local target = currentTarget
-local aimPart = currentTargetPart
-
-if target and aimPart then
-    if target ~= lastLegitTarget then
+    if currentTarget and currentTargetPart then
+        if currentTarget ~= lastLegitTarget then
         legitReactionTimer = tick() + (_G.aimbotMode == "Legit" and (math.random(5, 15) / 100) or 0)
         lastLegitTarget = target
     end
 
     if tick() >= legitReactionTimer then
-        local aimPosition = aimPart.Position
+        local aimPosition = currentTargetPart.Position
 
         if _G.aimPredictionEnabled then
-            local targetVelocity = aimPart.AssemblyLinearVelocity or Vector3.new(0,0,0)
+            local targetVelocity = currentTargetPart.AssemblyLinearVelocity or Vector3.new(0,0,0)
             local predScale = 1
             if _G.aimbotMode == "Legit" then
                 local dist = (aimPosition - cam.CFrame.Position).Magnitude
@@ -692,18 +689,15 @@ end
 
 -- 🔫 TRIGGERBOT (CORRIGIDO E MAIS ESTÁVEL)
 if _G.triggerBotEnabled and not triggerBotCooldown then
-    local target = currentTarget
-local part = currentTargetPart
-
-    if target and part then
-        local direction = (part.Position - cam.CFrame.Position).Unit * 1000
+    if currentTarget and currentTargetPart then
+        local direction = (currentTargetPart.Position - cam.CFrame.Position).Unit * 1000
         local raycastParams = RaycastParams.new()
         raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 
         local result = workspace:Raycast(cam.CFrame.Position, direction, raycastParams)
 
-        if result and result.Instance and result.Instance:IsDescendantOf(target.Character) then
+        if result and result.Instance and result.Instance:IsDescendantOf(currentTarget.Character) then
             triggerBotCooldown = true
 
             task.spawn(function()
