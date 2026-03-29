@@ -3,6 +3,13 @@
 pcall(function() for _,g in pairs(game:GetService("CoreGui"):GetChildren()) do if g.Name=="BonequinhoHitboxUI" or g.Name=="SupremeMobileHub" then g:Destroy() end end end)
 for _,o in pairs(workspace:GetDescendants()) do if o:IsA("Highlight") then pcall(function() o:Destroy() end) end end
 
+-- Cleanup Drawings from previous runs
+if _G.SupremeHubDrawings then
+    for _, d in pairs(_G.SupremeHubDrawings) do pcall(function() d:Remove() end) end
+end
+_G.SupremeHubDrawings = {}
+local allDrawings = _G.SupremeHubDrawings
+
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -65,7 +72,6 @@ local currentTarget = nil
 local currentTargetModel = nil
 local aiming = false
 local rapidFireThread = nil
-local allDrawings = {}
 local espCache = {}
 local npcHighlights = {}
 local lastWeaponTick = 0
@@ -245,13 +251,16 @@ local function applyWeaponMods(tool)
     if _G.rapidFireEnabled then scanSet(tool, FIRERATE_KW, 0.01) end
 end
 
--- ═══════════ FOV CIRCLE ═══════════
-local fovCircle = Drawing.new("Circle")
-fovCircle.Transparency=0.2; fovCircle.Thickness=1.5; fovCircle.Filled=false; fovCircle.Color=Color3.new(1,1,1)
-table.insert(allDrawings, fovCircle)
-
 -- ═══════════ ESP DRAWING SYSTEM ═══════════
-local function regDraw(d) table.insert(allDrawings, d); return d end
+local function regDraw(d)
+    table.insert(allDrawings, d)
+    pcall(function() d.StreamProof = _G.streamproofEnabled or false end)
+    return d
+end
+
+-- ═══════════ FOV CIRCLE ═══════════
+local fovCircle = regDraw(Drawing.new("Circle"))
+fovCircle.Transparency=0.2; fovCircle.Thickness=1.5; fovCircle.Filled=false; fovCircle.Color=Color3.new(1,1,1)
 local function createESP()
     local e = {lastTextUpdate = 0}
     -- Box (Cantoneiras / Corners)
@@ -565,9 +574,9 @@ local function teleportToLowPopServer()
 end
 
 -- ═══════════ RADAR 2D ═══════════
-local radarCircle = Drawing.new("Circle")
+local radarCircle = regDraw(Drawing.new("Circle"))
 radarCircle.Thickness = 2; radarCircle.NumSides = 60; radarCircle.Radius = 75; radarCircle.Filled = false; radarCircle.Color = Color3.fromRGB(255,255,255); radarCircle.Visible = false
-local radarCenter = Drawing.new("Circle")
+local radarCenter = regDraw(Drawing.new("Circle"))
 radarCenter.Radius = 3; radarCenter.Filled = true; radarCenter.Color = Color3.fromRGB(255,255,255); radarCenter.Visible = false
 
 local draggingRadar = false
@@ -584,7 +593,7 @@ RunService.RenderStepped:Connect(function() if draggingRadar then _G.radarPos = 
 -- ═══════════ RADAR DOT POOL (ULTRA-LEVE) ═══════════
 local radarPool = {}
 for i=1,50 do
-    local d = Drawing.new("Circle"); d.Radius=3.5; d.Filled=true; d.Visible=false
+    local d = regDraw(Drawing.new("Circle")); d.Radius=3.5; d.Filled=true; d.Visible=false
     table.insert(radarPool, d)
 end
 
@@ -594,9 +603,9 @@ local function updateRadar()
         for _,d in pairs(radarPool) do d.Visible=false end; return
     end
     
-    local pos = _G.radarPos
-    radarCircle.Position = pos; radarCircle.Visible = not _G.radarDotsOnly; radarCircle.Transparency = 0.5
-    radarCenter.Position = pos; radarCenter.Visible = not _G.radarDotsOnly
+    local isVisible = _G.SupremeHubRunning
+    radarCircle.Position = pos; radarCircle.Visible = not _G.radarDotsOnly and isVisible; radarCircle.Transparency = 0.5
+    radarCenter.Position = pos; radarCenter.Visible = not _G.radarDotsOnly and isVisible
 
     local dotIndex = 1
     local function drawDot(targetPos, color)
@@ -616,7 +625,7 @@ local function updateRadar()
             if d then
                 d.Color = color
                 d.Position = finalPos
-                d.Visible = not _G.streamproofEnabled
+                d.Visible = _G.SupremeHubRunning
                 dotIndex = dotIndex + 1
             end
         end
@@ -933,8 +942,13 @@ local conn; conn = RunService.RenderStepped:Connect(function()
     end
 
     -- Radar & FOV
-    if _G.radarEnabled then pcall(function() updateRadar() end) end
-    fovCircle.Radius=_G.FOV_RADIUS; fovCircle.Position=center; fovCircle.Visible=_G.FOV_VISIBLE
+    if _G.radarEnabled then pcall(function() updateRadar() end) else 
+        radarCircle.Visible = false; radarCenter.Visible = false
+        for _,d in pairs(radarPool) do d.Visible = false end
+    end
+    
+    fovCircle.Radius=_G.FOV_RADIUS; fovCircle.Position=center
+    fovCircle.Visible = _G.FOV_VISIBLE and _G.SupremeHubRunning
 end)
 _G.RunServiceConnection = conn
 
@@ -1171,15 +1185,36 @@ SSystem:AddButton({Name="💾 SALVAR TUDO AGORA", Callback=function() zSave(); O
 SSystem:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
 
 local SPanic = TabCfg:AddSection({Name="🛑 EMERGÊNCIA"})
-SPanic:AddBind({Name="🛑 BOTÃO DE PÂNICO (Remover Menu)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
+SPanic:AddBind({Name="🛑 TECLA DE PÂNICO (Encerrar)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
     _G.SupremeHubRunning = false
     pcall(function() if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end end)
     pcall(function() _G.clearDrawings() end)
-    pcall(function() conn:Disconnect() end)
     if bonecoFrame then pcall(function() bonecoFrame.Parent:Destroy() end) end
     pcall(function() if coreGui:FindFirstChild("SupremeMobileHub") then coreGui.SupremeMobileHub:Destroy() end end)
     pcall(function() OrionLib:Destroy() end)
-    OrionLib:MakeNotification({Name="Alerta", Content="Script encerrado!", Time=5})
+    
+    -- Stealth Console Wipe
+    task.wait(0.2)
+    pcall(function() rconsoleclear() end)
+    for i=1,150 do print(" ") end
+    warn("⚡ SUPREME HUB SECURE LOGOUT")
+    for k,v in pairs(_G) do if k:find("Supreme") or k:find("aimbot") or k:find("esp") or k:find("radar") or k:find("FOV") or k:find("silent") then _G[k] = nil end end
+end})
+
+SPanic:AddButton({Name="🛑 CLIQUE PARA ENCERRAR SCRIPT", Callback=function()
+    _G.SupremeHubRunning = false
+    pcall(function() if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end end)
+    pcall(function() _G.clearDrawings() end)
+    if bonecoFrame then pcall(function() bonecoFrame.Parent:Destroy() end) end
+    pcall(function() if coreGui:FindFirstChild("SupremeMobileHub") then coreGui.PolymerHub:Destroy() end end)
+    pcall(function() OrionLib:Destroy() end)
+    
+    -- Stealth Console Wipe
+    task.wait(0.2)
+    pcall(function() rconsoleclear() end)
+    for i=1,150 do print(" ") end
+    warn("⚡ SUPREME HUB SECURE LOGOUT")
+    for k,v in pairs(_G) do if k:find("Supreme") or k:find("aimbot") or k:find("esp") or k:find("radar") or k:find("FOV") or k:find("silent") then _G[k] = nil end end
 end})
 
 
@@ -1189,7 +1224,7 @@ SVisualTools:AddToggle({Name="🕵️ Streamproof (Anti-OBS)", Default=_G.stream
     _G.streamproofEnabled=V
     local o = findOrionGui()
     if o then o.DisplayOrder = V and 0 or 100 end
-    for _,d in pairs(allDrawings) do d.Visible = not V end
+    for _,d in pairs(allDrawings) do pcall(function() d.StreamProof = V end) end
     zSave() 
 end})
 
