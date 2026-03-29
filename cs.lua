@@ -580,29 +580,36 @@ local conn; conn = RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot
-    if _G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming) then
+    -- ═══════════ TARGET SELECTION (Always Active for Aim/Magic) ═══════════
+    local aimbotEnabled = _G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming)
+    local anyAimActive = aimbotEnabled or _G.silentAimEnabled or _G.magicBulletNPC or _G.magicBulletEnemy
+    
+    if anyAimActive then
         local tgt, model = getClosestTarget()
-        if model then
-            currentTarget = tgt; currentTargetModel = model
-            local part = getTargetPart(model)
-            if part then
-                local aimPos = part.Position
-                if _G.aimPredictionEnabled then
-                    local hroot = model:FindFirstChild("HumanoidRootPart")
-                    if hroot then
-                        local vel = hroot.Velocity
-                        local d = (aimPos - Camera.CFrame.Position).Magnitude
-                        aimPos = aimPos + vel * (d / 1000)
-                    end
+        currentTarget = tgt; currentTargetModel = model
+    else
+        currentTarget = nil; currentTargetModel = nil
+    end
+
+    -- ═══════════ CAMERA MOVEMENT (Aimbot Only) ═══════════
+    if aimbotEnabled and currentTargetModel then
+        local part = getTargetPart(currentTargetModel)
+        if part then
+            local aimPos = part.Position
+            if _G.aimPredictionEnabled then
+                local hroot = currentTargetModel:FindFirstChild("HumanoidRootPart")
+                if hroot then
+                    local vel = hroot.Velocity
+                    local d = (aimPos - Camera.CFrame.Position).Magnitude
+                    aimPos = aimPos + vel * (d / 1000)
                 end
-                local targetCF = CFrame.new(Camera.CFrame.Position, aimPos)
-                if _G.aimbotSmoothness > 1 then
-                    Camera.CFrame = Camera.CFrame:Lerp(targetCF, 1/_G.aimbotSmoothness)
-                else Camera.CFrame = targetCF end
             end
-        else currentTarget=nil; currentTargetModel=nil end
-    else currentTarget=nil; currentTargetModel=nil end
+            local targetCF = CFrame.new(Camera.CFrame.Position, aimPos)
+            if _G.aimbotSmoothness > 1 then
+                Camera.CFrame = Camera.CFrame:Lerp(targetCF, 1/_G.aimbotSmoothness)
+            else Camera.CFrame = targetCF end
+        end
+    end
 
     -- FOV
     fovCircle.Radius=_G.FOV_RADIUS; fovCircle.Position=center; fovCircle.Visible=_G.FOV_VISIBLE
