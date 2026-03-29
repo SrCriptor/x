@@ -18,10 +18,12 @@ local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local currentTarget, aiming = nil, false
+local currentTarget, currentTargetPart = nil, nil
+local aiming = false
 local aimbotKey = Enum.UserInputType.MouseButton2 
 local triggerBotCooldown, lastAntiAimTick = false, tick()
 local nextAimSwitchTime, currentFocusLevel = tick() + 2.0, 1 
+local legitReactionTimer, lastLegitTarget = 0, nil
 
 -- CONFIGURAÇÕES GLOBAIS
 _G.streamerMode = false
@@ -34,6 +36,8 @@ _G.RADAR_SIZE = 150
 _G.MAP_SCALE = 2
 
 -- Aimbot
+_G.aimbotMode = "Rage"
+_G.legitDeadzone = 50
 _G.aimbotAutoEnabled, _G.aimbotManualEnabled = false, false
 _G.silentAimEnabled, _G.silentAimHitChance = false, 100
 _G.aimbotSmoothness = 1
@@ -48,7 +52,7 @@ _G.espName, _G.espHP, _G.espDistance, _G.espWeapon = false, false, false, false
 _G.espMaxDistance = 5000
 
 -- Mods
-_G.antiAimLegitEnabled, _G.noRecoilEnabled, _G.infiniteAmmoEnabled, _G.instantReloadEnabled = false, false, false, false
+_G.antiAimLegitEnabled, _G.noRecoilEnabled, _G.noSpreadEnabled, _G.infiniteAmmoEnabled, _G.instantReloadEnabled = false, false, false, false, false
 _G.hitboxExpander, _G.walkSpeed, _G.jumpPower = 2, 16, 50
 
 -- ==================== NATIVE DRAWING SYSTEM ====================
@@ -229,102 +233,94 @@ local Window = OrionLib:MakeWindow({ Name = "⚡ Supreme Hub | Premium Script �
 
 local function zSave() pcall(function() OrionLib:SaveConfig() end) end
 
-local TabAimbot = Window:MakeTab({ Name = "Aimbot & Magic", Icon = "rbxassetid://4483345998", PremiumOnly = false })
-local TabESP = Window:MakeTab({ Name = "Visuals (ESP)", Icon = "rbxassetid://4483362458", PremiumOnly = false })
-local TabMods = Window:MakeTab({ Name = "Gun & Anti-Aim", Icon = "rbxassetid://4483345998", PremiumOnly = false })
-local TabConfig = Window:MakeTab({ Name = "Settings", Icon = "rbxassetid://4483345998", PremiumOnly = false })
+local TabCombat = Window:MakeTab({ Name = "💥 Combat", Icon = "rbxassetid://4483345998", PremiumOnly = false })
+local TabVisuals = Window:MakeTab({ Name = "👁️ Visuals", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+local TabWeapon = Window:MakeTab({ Name = "🔫 Weapon", Icon = "rbxassetid://4483345998", PremiumOnly = false })
+local TabPlayer = Window:MakeTab({ Name = "👟 Player", Icon = "rbxassetid://4483345998", PremiumOnly = false })
+local TabMisc = Window:MakeTab({ Name = "⚙️ Misc", Icon = "rbxassetid://4483345998", PremiumOnly = false })
+local TabConfig = Window:MakeTab({ Name = "🛡️ Config", Icon = "rbxassetid://4483345998", PremiumOnly = false })
 
--- 🎯 AIMBOT
-local SAimModos = TabAimbot:AddSection({ Name = "🎯 MODOS DE TIRO" })
-SAimModos:AddToggle({ Name = "Aimbot Automático", Default = _G.aimbotAutoEnabled, Save = true, Flag = "AAuto", Callback = function(V) _G.aimbotAutoEnabled = V; if V then _G.silentAimEnabled = false end; zSave() end })
-SAimModos:AddToggle({ Name = "Aimbot Manual (RMB)", Default = _G.aimbotManualEnabled, Save = true, Flag = "AMan", Callback = function(V) _G.aimbotManualEnabled = V; zSave() end })
-SAimModos:AddToggle({ Name = "✨ Silent Aim (Mágico)", Default = _G.silentAimEnabled, Save = true, Flag = "SAim", Callback = function(V) _G.silentAimEnabled = V; if V then _G.aimbotAutoEnabled = false end; zSave() end })
+-- 💥 TAB COMBAT
+local SCombatModos = TabCombat:AddSection({ Name = "🎯 AIMBOT & SILENT AIM" })
+SCombatModos:AddDropdown({ Name = "Modo do Aimbot", Default = _G.aimbotMode, Options = {"Rage", "Legit"}, Save = true, Flag = "AMode", Callback = function(V) _G.aimbotMode = V; zSave() end })
+SCombatModos:AddToggle({ Name = "Aimbot Automático", Default = _G.aimbotAutoEnabled, Save = true, Flag = "AAuto", Callback = function(V) _G.aimbotAutoEnabled = V; if V then _G.silentAimEnabled = false end; zSave() end })
+SCombatModos:AddToggle({ Name = "Aimbot Manual (RMB)", Default = _G.aimbotManualEnabled, Save = true, Flag = "AMan", Callback = function(V) _G.aimbotManualEnabled = V; zSave() end })
+SCombatModos:AddToggle({ Name = "✨ Silent Aim (Mágico)", Default = _G.silentAimEnabled, Save = true, Flag = "SAim", Callback = function(V) _G.silentAimEnabled = V; if V then _G.aimbotAutoEnabled = false end; zSave() end })
 
-local SAimConfigs = TabAimbot:AddSection({ Name = "⚙️ REFINAR MIRA E HITBOX" })
-SAimConfigs:AddButton({ Name = "👤 Abrir Seletor Avançado do Corpo (Boneco)", Callback = function() if bonecoFrame then bonecoFrame.Visible = not bonecoFrame.Visible end end })
-SAimConfigs:AddToggle({ Name = "Wall Check", Default = _G.wallCheckEnabled, Save = true, Flag = "WCheck", Callback = function(V) _G.wallCheckEnabled = V; zSave() end })
-SAimConfigs:AddToggle({ Name = "Aim Prediction (Inércia)", Default = _G.aimPredictionEnabled, Save = true, Flag = "APred", Callback = function(V) _G.aimPredictionEnabled = V; zSave() end })
-SAimConfigs:AddSlider({ Name = "Smoothness Aimbot", Min = 1, Max = 10, Default = _G.aimbotSmoothness, Color = Color3.fromRGB(0, 255, 100), Increment = 0.5, ValueName = "Lerp", Save = true, Flag = "ASmoth", Callback = function(V) _G.aimbotSmoothness = V; zSave() end })
-SAimConfigs:AddSlider({ Name = "Chance Acerto (Silent)", Min = 1, Max = 100, Default = _G.silentAimHitChance, Color = Color3.fromRGB(200, 100, 255), Increment = 1, ValueName = "%", Save = true, Flag = "SHit", Callback = function(V) _G.silentAimHitChance = V; zSave() end })
+local SCombatRefine = TabCombat:AddSection({ Name = "⚙️ AIM REFINEMENTS" })
+SCombatRefine:AddButton({ Name = "👤 Abrir Seletor Avançado do Corpo", Callback = function() if bonecoFrame then bonecoFrame.Visible = not bonecoFrame.Visible end end })
+SCombatRefine:AddToggle({ Name = "Wall Check", Default = _G.wallCheckEnabled, Save = true, Flag = "WCheck", Callback = function(V) _G.wallCheckEnabled = V; zSave() end })
+SCombatRefine:AddToggle({ Name = "Aim Prediction (Inércia)", Default = _G.aimPredictionEnabled, Save = true, Flag = "APred", Callback = function(V) _G.aimPredictionEnabled = V; zSave() end })
+SCombatRefine:AddSlider({ Name = "Smoothness Aimbot", Min = 1, Max = 10, Default = _G.aimbotSmoothness, Color = Color3.fromRGB(0, 255, 100), Increment = 0.5, ValueName = "Lerp", Save = true, Flag = "ASmoth", Callback = function(V) _G.aimbotSmoothness = V; zSave() end })
+SCombatRefine:AddSlider({ Name = "Chance Acerto (Silent)", Min = 1, Max = 100, Default = _G.silentAimHitChance, Color = Color3.fromRGB(200, 100, 255), Increment = 1, ValueName = "%", Save = true, Flag = "SHit", Callback = function(V) _G.silentAimHitChance = V; zSave() end })
 
-local SAimFOV = TabAimbot:AddSection({ Name = "⭕ CAMPO VISUAL (FOV)" })
-SAimFOV:AddToggle({ Name = "Mostrar Círculo FOV", Default = _G.FOV_VISIBLE, Save = true, Flag = "FovV", Callback = function(V) _G.FOV_VISIBLE = V; zSave() end })
-SAimFOV:AddSlider({ Name = "Tamanho Máximo FOV", Min = 10, Max = 600, Default = _G.FOV_RADIUS, Color = Color3.fromRGB(255, 0, 0), Increment = 5, ValueName = "Raio", Save = true, Flag = "FovR", Callback = function(V) _G.FOV_RADIUS = V; zSave() end })
+local SCombatFOV = TabCombat:AddSection({ Name = "⭕ FIELD OF VIEW (FOV)" })
+SCombatFOV:AddToggle({ Name = "Mostrar Círculo FOV", Default = _G.FOV_VISIBLE, Save = true, Flag = "FovV", Callback = function(V) _G.FOV_VISIBLE = V; zSave() end })
+SCombatFOV:AddSlider({ Name = "Tamanho Máximo FOV", Min = 10, Max = 600, Default = _G.FOV_RADIUS, Color = Color3.fromRGB(255, 0, 0), Increment = 5, ValueName = "Raio", Save = true, Flag = "FovR", Callback = function(V) _G.FOV_RADIUS = V; zSave() end })
+SCombatFOV:AddSlider({ Name = "Deadzone Legit (FOV Interno)", Min = 5, Max = 300, Default = _G.legitDeadzone, Color = Color3.fromRGB(0, 200, 255), Increment = 5, ValueName = "Raio", Save = true, Flag = "LegitDz", Callback = function(V) _G.legitDeadzone = V; zSave() end })
 
-local STrigger = TabAimbot:AddSection({ Name = "🔫 TRIGGERBOT" })
-STrigger:AddToggle({ Name = "Ativar TriggerBot", Default = _G.triggerBotEnabled, Save = true, Flag = "TBE", Callback = function(V) _G.triggerBotEnabled = V; zSave() end })
-STrigger:AddSlider({ Name = "Delay (Segundos)", Min = 0, Max = 1, Default = _G.triggerBotDelay, Color = Color3.fromRGB(255, 100, 0), Increment = 0.01, ValueName = "s", Save = true, Flag = "TBDely", Callback = function(V) _G.triggerBotDelay = V; zSave() end })
+local SCombatTrigger = TabCombat:AddSection({ Name = "🔫 TRIGGERBOT" })
+SCombatTrigger:AddToggle({ Name = "Ativar TriggerBot", Default = _G.triggerBotEnabled, Save = true, Flag = "TBE", Callback = function(V) _G.triggerBotEnabled = V; zSave() end })
+SCombatTrigger:AddSlider({ Name = "Delay (Segundos)", Min = 0, Max = 1, Default = _G.triggerBotDelay, Color = Color3.fromRGB(255, 100, 0), Increment = 0.01, ValueName = "s", Save = true, Flag = "TBDely", Callback = function(V) _G.triggerBotDelay = V; zSave() end })
 
--- 👁️ VISUALS / ESP
-local SEspRadar = TabESP:AddSection({ Name = "📡 RADAR / MINIMAPA" })
-SEspRadar:AddToggle({ Name = "Mostrar Minimapa (Hacker Map)", Default = _G.espRadar, Save = true, Flag = "RdrE", Callback = function(V) 
-    _G.espRadar = V; 
-    if radarBg then radarBg.Visible = V and not _G.streamerMode end
-    zSave() 
-end })
-SEspRadar:AddSlider({ Name = "Tamanho do Radar", Min = 100, Max = 300, Default = _G.RADAR_SIZE, Color = Color3.fromRGB(0, 255, 100), Increment = 10, ValueName = "px", Save = true, Flag = "RdrS", Callback = function(V) 
-    _G.RADAR_SIZE = V; 
-    if radarBg then radarBg.Size = UDim2.new(0, V, 0, V); radarBg.Position = UDim2.new(1, -(V + 20), 0, 20) end
-    zSave() 
-end })
-SEspRadar:AddSlider({ Name = "Zoom do Radar (Escala)", Min = 1, Max = 10, Default = _G.MAP_SCALE, Color = Color3.fromRGB(200, 100, 255), Increment = 1, ValueName = "x", Save = true, Flag = "RdrZ", Callback = function(V) 
-    _G.MAP_SCALE = V; 
-    zSave() 
-end })
+-- 👁️ TAB VISUALS (ESP)
+local SVisRadar = TabVisuals:AddSection({ Name = "📡 RADAR / MINIMAPA" })
+SVisRadar:AddToggle({ Name = "Mostrar Minimapa (Hacker Map)", Default = _G.espRadar, Save = true, Flag = "RdrE", Callback = function(V) _G.espRadar = V; if radarBg then radarBg.Visible = V and not _G.streamerMode end; zSave() end })
+SVisRadar:AddSlider({ Name = "Tamanho do Radar", Min = 100, Max = 300, Default = _G.RADAR_SIZE, Color = Color3.fromRGB(0, 255, 100), Increment = 10, ValueName = "px", Save = true, Flag = "RdrS", Callback = function(V) _G.RADAR_SIZE = V; if radarBg then radarBg.Size = UDim2.new(0, V, 0, V); radarBg.Position = UDim2.new(1, -(V + 20), 0, 20) end; zSave() end })
+SVisRadar:AddSlider({ Name = "Zoom do Radar (Escala)", Min = 1, Max = 10, Default = _G.MAP_SCALE, Color = Color3.fromRGB(200, 100, 255), Increment = 1, ValueName = "x", Save = true, Flag = "RdrZ", Callback = function(V) _G.MAP_SCALE = V; zSave() end })
 
-local SEspInimigo = TabESP:AddSection({ Name = "🔴 INIMIGOS" })
-SEspInimigo:AddToggle({ Name = "Caixa 2D", Default = _G.espEnemyBox, Save = true, Flag = "EBox", Callback = function(V) _G.espEnemyBox = V; zSave() end })
-SEspInimigo:AddToggle({ Name = "Aura Colorida (Chams)", Default = _G.espEnemyChams, Save = true, Flag = "EChms", Callback = function(V) _G.espEnemyChams = V; zSave() end })
-SEspInimigo:AddToggle({ Name = "Linha (Tracers)", Default = _G.espEnemyTracers, Save = true, Flag = "ETrc", Callback = function(V) _G.espEnemyTracers = V; zSave() end })
-SEspInimigo:AddToggle({ Name = "Ossos 3D (Skeleton)", Default = _G.espEnemySkeleton, Save = true, Flag = "ESkl", Callback = function(V) _G.espEnemySkeleton = V; zSave() end })
-SEspInimigo:AddToggle({ Name = "Letreiros (Textos)", Default = _G.espEnemyText, Save = true, Flag = "ETxt", Callback = function(V) _G.espEnemyText = V; zSave() end })
+local SVisEnemy = TabVisuals:AddSection({ Name = "🔴 ENEMIES (INIMIGOS)" })
+SVisEnemy:AddToggle({ Name = "Caixa 2D", Default = _G.espEnemyBox, Save = true, Flag = "EBox", Callback = function(V) _G.espEnemyBox = V; zSave() end })
+SVisEnemy:AddToggle({ Name = "Aura Colorida (Chams)", Default = _G.espEnemyChams, Save = true, Flag = "EChms", Callback = function(V) _G.espEnemyChams = V; zSave() end })
+SVisEnemy:AddToggle({ Name = "Linha (Tracers)", Default = _G.espEnemyTracers, Save = true, Flag = "ETrc", Callback = function(V) _G.espEnemyTracers = V; zSave() end })
+SVisEnemy:AddToggle({ Name = "Ossos 3D (Skeleton)", Default = _G.espEnemySkeleton, Save = true, Flag = "ESkl", Callback = function(V) _G.espEnemySkeleton = V; zSave() end })
+SVisEnemy:AddToggle({ Name = "Letreiros (Textos)", Default = _G.espEnemyText, Save = true, Flag = "ETxt", Callback = function(V) _G.espEnemyText = V; zSave() end })
 
-local SEspAliado = TabESP:AddSection({ Name = "🔵 ALIADOS" })
-SEspAliado:AddToggle({ Name = "Caixa 2D", Default = _G.espAllyBox, Save = true, Flag = "ABox", Callback = function(V) _G.espAllyBox = V; zSave() end })
-SEspAliado:AddToggle({ Name = "Aura Colorida (Chams)", Default = _G.espAllyChams, Save = true, Flag = "AChm", Callback = function(V) _G.espAllyChams = V; zSave() end })
-SEspAliado:AddToggle({ Name = "Linha (Tracers)", Default = _G.espAllyTracers, Save = true, Flag = "ATrc", Callback = function(V) _G.espAllyTracers = V; zSave() end })
-SEspAliado:AddToggle({ Name = "Ossos 3D (Skeleton)", Default = _G.espAllySkeleton, Save = true, Flag = "ASkl", Callback = function(V) _G.espAllySkeleton = V; zSave() end })
-SEspAliado:AddToggle({ Name = "Letreiros (Textos)", Default = _G.espAllyText, Save = true, Flag = "ATxt", Callback = function(V) _G.espAllyText = V; zSave() end })
+local SVisAlly = TabVisuals:AddSection({ Name = "🔵 ALLIES (ALIADOS)" })
+SVisAlly:AddToggle({ Name = "Caixa 2D", Default = _G.espAllyBox, Save = true, Flag = "ABox", Callback = function(V) _G.espAllyBox = V; zSave() end })
+SVisAlly:AddToggle({ Name = "Aura Colorida (Chams)", Default = _G.espAllyChams, Save = true, Flag = "AChm", Callback = function(V) _G.espAllyChams = V; zSave() end })
+SVisAlly:AddToggle({ Name = "Linha (Tracers)", Default = _G.espAllyTracers, Save = true, Flag = "ATrc", Callback = function(V) _G.espAllyTracers = V; zSave() end })
+SVisAlly:AddToggle({ Name = "Ossos 3D (Skeleton)", Default = _G.espAllySkeleton, Save = true, Flag = "ASkl", Callback = function(V) _G.espAllySkeleton = V; zSave() end })
+SVisAlly:AddToggle({ Name = "Letreiros (Textos)", Default = _G.espAllyText, Save = true, Flag = "ATxt", Callback = function(V) _G.espAllyText = V; zSave() end })
 
-local SEspTextConfigs = TabESP:AddSection({ Name = "⚙️ FILTROS DOS LETREIROS" })
-SEspTextConfigs:AddToggle({ Name = "Mostrar Nome do Player", Default = _G.espName, Save = true, Flag = "TxNm", Callback = function(V) _G.espName = V; zSave() end })
-SEspTextConfigs:AddToggle({ Name = "Mostrar Vida (HP)", Default = _G.espHP, Save = true, Flag = "TxHP", Callback = function(V) _G.espHP = V; zSave() end })
-SEspTextConfigs:AddToggle({ Name = "Mostrar Distância", Default = _G.espDistance, Save = true, Flag = "TxDist", Callback = function(V) _G.espDistance = V; zSave() end })
-SEspTextConfigs:AddToggle({ Name = "Mostrar Arma Atual", Default = _G.espWeapon, Save = true, Flag = "TxW", Callback = function(V) _G.espWeapon = V; zSave() end })
+local SVisText = TabVisuals:AddSection({ Name = "📝 TEXT FILTERS" })
+SVisText:AddToggle({ Name = "Mostrar Nome do Player", Default = _G.espName, Save = true, Flag = "TxNm", Callback = function(V) _G.espName = V; zSave() end })
+SVisText:AddToggle({ Name = "Mostrar Vida (HP)", Default = _G.espHP, Save = true, Flag = "TxHP", Callback = function(V) _G.espHP = V; zSave() end })
+SVisText:AddToggle({ Name = "Mostrar Distância", Default = _G.espDistance, Save = true, Flag = "TxDist", Callback = function(V) _G.espDistance = V; zSave() end })
+SVisText:AddToggle({ Name = "Mostrar Arma Atual", Default = _G.espWeapon, Save = true, Flag = "TxW", Callback = function(V) _G.espWeapon = V; zSave() end })
 
-local SEspGerais = TabESP:AddSection({ Name = "⚙️ CONFIGURAÇÕES GERAIS DE ESP" })
-SEspGerais:AddSlider({ Name = "Distância Máxima do ESP", Min = 50, Max = 10000, Default = _G.espMaxDistance, Color = Color3.fromRGB(0, 255, 100), Increment = 50, ValueName = "Studs", Save = true, Flag = "EspDist", Callback = function(V) _G.espMaxDistance = V; zSave() end })
+local SVisGlobal = TabVisuals:AddSection({ Name = "⚙️ GLOBAL ESP LIMITS" })
+SVisGlobal:AddSlider({ Name = "Distância Máxima do ESP", Min = 50, Max = 10000, Default = _G.espMaxDistance, Color = Color3.fromRGB(0, 255, 100), Increment = 50, ValueName = "Studs", Save = true, Flag = "EspDist", Callback = function(V) _G.espMaxDistance = V; zSave() end })
 
--- 🔫 MODS
-local SModsLegit, SModsArma, SModsPlayer = TabMods:AddSection({ Name = "👻 ANTI-AIM (DESYNC)" }), TabMods:AddSection({ Name = "🔫 ARMAS E HITBOX" }), TabMods:AddSection({ Name = "👟 PLAYER MODS" })
-SModsLegit:AddToggle({ Name = "Legit Desync (Bugar Velocidade)", Default = _G.antiAimLegitEnabled, Save = true, Flag = "AALg", Callback = function(V) _G.antiAimLegitEnabled = V; zSave() end })
-SModsArma:AddToggle({ Name = "No Recoil", Default = _G.noRecoilEnabled, Save = true, Flag = "NRec", Callback = function(V) _G.noRecoilEnabled = V; zSave() end })
-SModsArma:AddToggle({ Name = "Infinite Ammo / Fast Reload", Default = _G.infiniteAmmoEnabled, Save = true, Flag = "IAmmo", Callback = function(V) _G.infiniteAmmoEnabled = V; _G.instantReloadEnabled = V; zSave() end })
-SModsArma:AddSlider({ Name = "Aumentar Cabeça Global", Min = 2, Max = 15, Default = _G.hitboxExpander, Color = Color3.fromRGB(150, 0, 255), Increment = 1, ValueName = "T", Save = true, Flag = "HEx", Callback = function(V) _G.hitboxExpander = V; zSave() end })
-SModsPlayer:AddSlider({ Name = "WalkSpeed", Min = 16, Max = 250, Default = _G.walkSpeed, Color = Color3.fromRGB(200, 200, 200), Increment = 1, ValueName = "W", Save = true, Flag = "PWS", Callback = function(V) _G.walkSpeed = V; zSave() end })
-SModsPlayer:AddSlider({ Name = "JumpPower", Min = 50, Max = 300, Default = _G.jumpPower, Color = Color3.fromRGB(200, 200, 200), Increment = 1, ValueName = "P", Save = true, Flag = "PJP", Callback = function(V) _G.jumpPower = V; zSave() end })
+-- 🔫 TAB WEAPON
+local SWeaponGun = TabWeapon:AddSection({ Name = "🛠️ GUN MODS" })
+SWeaponGun:AddToggle({ Name = "No Recoil (Remove Camera Shake)", Default = _G.noRecoilEnabled, Save = true, Flag = "NRec", Callback = function(V) _G.noRecoilEnabled = V; zSave() end })
+SWeaponGun:AddToggle({ Name = "No Spread (Remove Bullet Cone)", Default = _G.noSpreadEnabled, Save = true, Flag = "NSprd", Callback = function(V) _G.noSpreadEnabled = V; zSave() end })
+SWeaponGun:AddToggle({ Name = "Infinite Ammo (Munição Infinita)", Default = _G.infiniteAmmoEnabled, Save = true, Flag = "IAmm", Callback = function(V) _G.infiniteAmmoEnabled = V; zSave() end })
+SWeaponGun:AddToggle({ Name = "Fast Reload (Recarga Rápida)", Default = _G.instantReloadEnabled, Save = true, Flag = "IRel", Callback = function(V) _G.instantReloadEnabled = V; zSave() end })
 
--- ⚙️ CONFIG
-local SConfigGerais = TabConfig:AddSection({ Name = "🛡️ Ocultação e Desligamento" })
-SConfigGerais:AddBind({ Name = "👁️ Modo Streamer (Ocultar Desenhos)", Default = Enum.KeyCode.F4, Hold = false, Callback = function() 
-    _G.streamerMode = not _G.streamerMode; 
-    if radarBg then radarBg.Visible = _G.espRadar and not _G.streamerMode end
-end })
+local SWeaponHitbox = TabWeapon:AddSection({ Name = "💀 EXTRA HITBOX" })
+SWeaponHitbox:AddSlider({ Name = "Aumentar Cabeça Global", Min = 2, Max = 15, Default = _G.hitboxExpander, Color = Color3.fromRGB(150, 0, 255), Increment = 1, ValueName = "T", Save = true, Flag = "HEx", Callback = function(V) _G.hitboxExpander = V; zSave() end })
 
+-- 👟 TAB PLAYER
+local SPlayerMove = TabPlayer:AddSection({ Name = "🏃 MOVEMENT" })
+SPlayerMove:AddSlider({ Name = "WalkSpeed", Min = 16, Max = 250, Default = _G.walkSpeed, Color = Color3.fromRGB(200, 200, 200), Increment = 1, ValueName = "W", Save = true, Flag = "PWS", Callback = function(V) _G.walkSpeed = V; zSave() end })
+SPlayerMove:AddSlider({ Name = "JumpPower", Min = 50, Max = 300, Default = _G.jumpPower, Color = Color3.fromRGB(200, 200, 200), Increment = 1, ValueName = "P", Save = true, Flag = "PJP", Callback = function(V) _G.jumpPower = V; zSave() end })
+
+local SPlayerAntiAim = TabPlayer:AddSection({ Name = "👻 ANTI-AIM (DESYNC)" })
+SPlayerAntiAim:AddToggle({ Name = "Legit Desync (Bugar Velocidade)", Default = _G.antiAimLegitEnabled, Save = true, Flag = "AALg", Callback = function(V) _G.antiAimLegitEnabled = V; zSave() end })
+
+-- ⚙️ TAB MISC
+local SMiscUtils = TabMisc:AddSection({ Name = "🛠️ UTILITIES & PERFORMANCE" })
+SMiscUtils:AddBind({ Name = "👁️ Modo Streamer (Ocultar Desenhos)", Default = Enum.KeyCode.F4, Hold = false, Callback = function() _G.streamerMode = not _G.streamerMode; if radarBg then radarBg.Visible = _G.espRadar and not _G.streamerMode end end })
+
+-- 🛡️ TAB CONFIG
+local SConfigGerais = TabConfig:AddSection({ Name = "🛡️ INTERFACE & SCRIPTS" })
 if not isMobile then
-    SConfigGerais:AddBind({ 
-        Name = "⌨️ Tecla para Abrir/Fechar a Interface", 
-        Default = Enum.KeyCode.Home, 
-        Hold = false, 
-        Callback = function() 
-            local o = findOrionGui()
-            if o then o.Enabled = not o.Enabled end 
-        end 
-    })
+    SConfigGerais:AddBind({ Name = "⌨️ Tecla para Abrir/Fechar a Interface", Default = Enum.KeyCode.Home, Hold = false, Callback = function() local o = findOrionGui(); if o then o.Enabled = not o.Enabled end end })
 else
     SConfigGerais:AddButton({ Name = "🔴 Uma Bolinha HUB foi criada para mobile", Callback = function() end })
 end
-
 SConfigGerais:AddButton({ Name = "💾 FORÇAR SALVAMENTO (MANUAL)", Callback = function() zSave(); OrionLib:MakeNotification({Name = "Supreme Hub", Content = "Configurações Globais Salvas!", Image = "rbxassetid://4483345998", Time = 3}) end })
 SConfigGerais:AddBind({ Name = "🛑 BOTÃO DE PÂNICO (Apagar Script Completamente)", Default = Enum.KeyCode.End, Hold = false, Callback = function() _G.SupremeHubRunning = false; if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end; _G.clearDrawings(); if bonecoFrame then bonecoFrame:Destroy() end; local mGui = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui"); if mGui:FindFirstChild("SupremeMobileHub") then mGui.SupremeMobileHub:Destroy() end; OrionLib:Destroy() end })
 
@@ -342,40 +338,93 @@ local function hasLineOfSight(tp)
     return not workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r) or workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r).Instance:IsDescendantOf(tp.Parent) 
 end
 
-local function getClosestEnemy()
+-- 🧠 PRIORIDADE DE HITBOX (SMART)
+local function getPriorityParts(character)
+    local primary = {}
+    local secondary = {}
+    local head = character:FindFirstChild("Head")
+    local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+
+    local isMoving = root and root.Velocity.Magnitude > 5
+    local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local dist = (root and localRoot) and (root.Position - localRoot.Position).Magnitude or 0
+
+    local preferTorso = isMoving or dist > 150
+
+    -- Smart Hitbox Override
+    if preferTorso and root then
+        table.insert(primary, root)
+        if head then table.insert(secondary, head) end
+    else
+        if head then table.insert(primary, head) end
+        if root then table.insert(secondary, root) end
+    end
+
+    -- Inject UI configurations
+    for partName, state in pairs(_G.HitboxStates) do
+        local part = character:FindFirstChild(partName)
+        if part then
+            if state == 1 and not table.find(primary, part) then
+                table.insert(primary, part)
+            elseif state == 2 and not table.find(secondary, part) then
+                table.insert(secondary, part)
+            end
+        end
+    end
+
+    if #primary == 0 and #secondary > 0 then
+        primary = secondary
+    elseif #secondary == 0 and #primary > 0 then
+        secondary = primary
+    end
+
+    return primary, secondary
+end
+
+-- 🎯 NOVO SISTEMA DE TARGET
+local function getClosestEnemyAdvanced()
     local cam = workspace.CurrentCamera
+    if not cam then return nil, nil end
     local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
 
-    local closestPlayer = nil
-    local closestPart = nil
-    local shortestDistance = _G.FOV_RADIUS
+    local bestPlayer = nil
+    local bestPart = nil
+    local shortestDistance = (_G.aimbotMode == "Legit") and _G.legitDeadzone or _G.FOV_RADIUS
 
     for _, player in pairs(game.Players:GetPlayers()) do
         if player == LocalPlayer then continue end
 
         local char = player.Character
-        if not char then continue end
+        if not char or not isAlive(char) then continue end
+        if not isFFA() and isSameTeam(player, LocalPlayer) then continue end
 
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then continue end
+        local partsToCheck = {}
+        if _G.aimbotMode == "Legit" then
+            for _, p in pairs(char:GetChildren()) do
+                if p:IsA("BasePart") then table.insert(partsToCheck, p) end
+            end
+        else
+            local primaryParts, secondaryParts = getPriorityParts(char)
+            partsToCheck = (currentFocusLevel == 1) and primaryParts or secondaryParts
+        end
 
-        -- 🔥 FOCO SIMPLES (igual antes)
-        local part = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-        if not part then continue end
+        for _, part in pairs(partsToCheck) do
+            local screenPos, visible = cam:WorldToViewportPoint(part.Position)
+            if visible then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
 
-        local screenPos, visible = cam:WorldToViewportPoint(part.Position)
-        if not visible then continue end
-
-        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-
-        if dist < shortestDistance then
-            shortestDistance = dist
-            closestPlayer = player
-            closestPart = part
+                if dist < shortestDistance then
+                    if not _G.wallCheckEnabled or hasLineOfSight(part) then
+                        shortestDistance = dist
+                        bestPlayer = player
+                        bestPart = part
+                    end
+                end
+            end
         end
     end
 
-    return closestPlayer, closestPart
+    return bestPlayer, bestPart
 end
 
 -- ==================== SILENT AIM HOOK ====================
@@ -386,7 +435,8 @@ OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
 
     if not checkcaller() and _G.silentAimEnabled and math.random(1, 100) <= _G.silentAimHitChance then
         if m == "FindPartOnRayWithIgnoreList" or m == "FindPartOnRayWithWhitelist" or m == "FindPartOnRay" or m == "Raycast" then
-            local t, ap = getClosestEnemy()
+local t = currentTarget
+local ap = currentTargetPart
             local cam = workspace.CurrentCamera
             if t and ap and cam then
                 local origin = cam.CFrame.Position
@@ -405,7 +455,12 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     if not cam then return end
     local c = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
     
-    if tick() >= nextAimSwitchTime then currentFocusLevel = (currentFocusLevel == 1) and 2 or 1; nextAimSwitchTime = tick() + ((currentFocusLevel == 1) and 1.8 or 0.35) end
+    if tick() >= nextAimSwitchTime then
+        currentFocusLevel = (currentFocusLevel == 1) and 2 or 1
+        nextAimSwitchTime = tick() + ((currentFocusLevel == 1) and 1.8 or 0.35)
+    end
+    
+    currentTarget, currentTargetPart = getClosestEnemyAdvanced()
     
     if not fovFrame or not fovFrame.Parent then
         fovFrame = Instance.new("Frame", supremeDrawSpace)
@@ -454,7 +509,6 @@ fovFrame.ZIndex = 999
 
             if playerDist > _G.espMaxDistance then
                 removeESP(player)
-                if currentTarget == player then currentTarget = nil end
                 continue
             end
 
@@ -583,43 +637,63 @@ fovFrame.ZIndex = 999
             end
         else
             removeESP(player)
-            if player == currentTarget then currentTarget = nil end
         end
     end
         -- AIMBOT
 if (_G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming)) and not _G.silentAimEnabled then
-    local target, aimPart = getClosestEnemy()
+local target = currentTarget
+local aimPart = currentTargetPart
 
-    if target and aimPart then
-        currentTarget = target
+if target and aimPart then
+    if target ~= lastLegitTarget then
+        legitReactionTimer = tick() + (_G.aimbotMode == "Legit" and (math.random(5, 15) / 100) or 0)
+        lastLegitTarget = target
+    end
+
+    if tick() >= legitReactionTimer then
         local aimPosition = aimPart.Position
 
         if _G.aimPredictionEnabled then
             local targetVelocity = aimPart.AssemblyLinearVelocity or Vector3.new(0,0,0)
-            aimPosition = aimPosition + (targetVelocity * _G.aimPredictionForce)
+            local predScale = 1
+            if _G.aimbotMode == "Legit" then
+                local dist = (aimPosition - cam.CFrame.Position).Magnitude
+                predScale = math.clamp(dist / 100, 0.3, 1.5)
+            end
+            aimPosition = aimPosition + (targetVelocity * (_G.aimPredictionForce * predScale))
+        end
+
+        if _G.aimbotMode == "Legit" then
+            local rx = (math.random() - 0.5) * 0.4
+            local ry = (math.random() - 0.5) * 0.4
+            local rz = (math.random() - 0.5) * 0.4
+            aimPosition = aimPosition + Vector3.new(rx, ry, rz)
         end
 
         local targetCFrame = CFrame.new(cam.CFrame.Position, aimPosition)
 
-        if _G.aimbotSmoothness == 1 then 
-            cam.CFrame = targetCFrame
-        else 
-            cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / _G.aimbotSmoothness, 0.01, 1)) 
+        if _G.aimbotMode == "Legit" then
+            local isFiring = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+            local baseSmoothness = _G.aimbotSmoothness * 2.5
+            local currentSmoothness = isFiring and (baseSmoothness * 0.8) or (baseSmoothness * 3.0)
+            cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / currentSmoothness, 0.001, 1))
+        else
+            if _G.aimbotSmoothness <= 1 then 
+                cam.CFrame = targetCFrame
+            else 
+                cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / _G.aimbotSmoothness, 0.01, 1)) 
+            end
         end
-    else 
-        currentTarget = nil 
     end
 else
-    if _G.silentAimEnabled then 
-        currentTarget, _ = getClosestEnemy() 
-    else 
-        currentTarget = nil 
-    end
+    lastLegitTarget = nil
+end
 end
 
 -- 🔫 TRIGGERBOT (CORRIGIDO E MAIS ESTÁVEL)
 if _G.triggerBotEnabled and not triggerBotCooldown then
-    local target, part = getClosestEnemy()
+    local target = currentTarget
+local part = currentTargetPart
 
     if target and part then
         local direction = (part.Position - cam.CFrame.Position).Unit * 1000
@@ -678,7 +752,7 @@ if char then
             end
 
             -- 💥 NO SPREAD
-            if _G.noRecoilEnabled then
+            if _G.noSpreadEnabled then
                 if v:IsA("NumberValue") then
                     if name:find("spread") or name:find("cone") then
                         v.Value = 0
@@ -695,6 +769,7 @@ if _G.noRecoilEnabled then
     local _, y, _ = camCF:ToOrientation()
     cam.CFrame = CFrame.new(camCF.Position) * CFrame.Angles(0, y, 0)
 end
+end)
 
 -- ==================== INPUT ====================
 UserInputService.InputBegan:Connect(function(input, isProcessed) 
@@ -715,6 +790,6 @@ Players.PlayerRemoving:Connect(function(player)
     removeESP(player) 
     if currentTarget == player then 
         currentTarget = nil 
+        currentTargetPart = nil
     end 
 end)
-        
