@@ -12,6 +12,7 @@ local coreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 local LP = Players.LocalPlayer
 local Mouse = LP:GetMouse()
+local lighting = game:GetService("Lighting")
 local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
 _G.SupremeHubRunning = true
 
