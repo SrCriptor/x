@@ -252,7 +252,7 @@ table.insert(allDrawings, fovCircle)
 -- ═══════════ ESP DRAWING SYSTEM ═══════════
 local function regDraw(d) table.insert(allDrawings, d); return d end
 local function createESP()
-    local e = {}
+    local e = {lastTextUpdate = 0}
     -- Box (Cantoneiras / Corners)
     e.corners = {}
     for i=1,8 do e.corners[i] = regDraw(Drawing.new("Line")); e.corners[i].Thickness=2.5; e.corners[i].Visible=false end
@@ -261,9 +261,8 @@ local function createESP()
     e.hpBarBG = regDraw(Drawing.new("Line")); e.hpBarBG.Thickness=4; e.hpBarBG.Color=Color3.new(0,0,0); e.hpBarBG.Visible=false
     -- Tracer
     e.tracer = regDraw(Drawing.new("Line")); e.tracer.Thickness=1; e.tracer.Visible=false
-    -- Text label & Background (Consolidated for Performance)
+    -- Text label (Extreme Performance: Throttled & Outlined)
     e.txt = regDraw(Drawing.new("Text")); e.txt.Size=13; e.txt.Outline=true; e.txt.Center=false; e.txt.Font=3; e.txt.Visible=false
-    e.txtBG = regDraw(Drawing.new("Square")); e.txtBG.Filled=true; e.txtBG.Color=Color3.new(0,0,0); e.txtBG.Transparency=0.5; e.txtBG.Visible=false
     -- Chams (Highlight)
     e.chams = nil
     -- Skeleton
@@ -277,7 +276,7 @@ local function hideESP(e)
     for i=1,8 do e.corners[i].Visible=false end
     e.hpBar.Visible=false; e.hpBarBG.Visible=false
     e.tracer.Visible=false
-    e.txt.Visible=false; e.txtBG.Visible=false
+    e.txt.Visible=false
     for i=1,14 do e.skel[i].Visible=false end
     if e.chams then pcall(function() e.chams:Destroy() end); e.chams=nil end
 end
@@ -412,40 +411,39 @@ local function updateESP(key, char, color, showBox, showChams, showTracers, show
         for i=#bones+1, 14 do if e.skel[i] then e.skel[i].Visible=false end end
     else for i=1,14 do e.skel[i].Visible=false end end
 
-    -- ═══ TEXT LABEL & BACKGROUND (CONSOLIDATED) ═══
+    -- ═══ TEXT LABEL (THROTTLED FOR MAXIMUM PERFORMANCE) ═══
     if showText then
-        local lines = {}
-        local tagT = isTarget and "TARGET" or entityType:upper()
-        table.insert(lines, "[ "..tagT.." ]")
-        
-        if _G.espName then
-            local nm = (typeof(key)=="Instance" and key:IsA("Player")) and (key.DisplayName or key.Name) or (char.Name or "NPC")
-            table.insert(lines, nm)
+        if tick() - e.lastTextUpdate > 0.1 then -- Só atualiza o TEXTO a cada 100ms
+            e.lastTextUpdate = tick()
+            local lines = {}
+            local tagT = isTarget and "TARGET" or entityType:upper()
+            table.insert(lines, "[ "..tagT.." ]")
+            
+            if _G.espName then
+                local nm = (typeof(key)=="Instance" and key:IsA("Player")) and (key.DisplayName or key.Name) or (char.Name or "NPC")
+                table.insert(lines, nm)
+            end
+            
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if _G.espHP and hum then
+                table.insert(lines, "HP: "..math.floor(hum.Health))
+            end
+            
+            if _G.espDistance then table.insert(lines, math.floor(dist3D).."m") end
+            
+            if _G.espWeapon then
+                local tool = char:FindFirstChildWhichIsA("Tool")
+                if tool then table.insert(lines, tool.Name) end
+            end
+            
+            e.txt.Text = table.concat(lines, "\n")
+            e.txt.Color = mainColor
         end
-        
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if _G.espHP and hum then
-            table.insert(lines, "HP: "..math.floor(hum.Health).."/"..math.floor(hum.MaxHealth))
-        end
-        
-        if _G.espDistance then table.insert(lines, math.floor(dist3D).."m") end
-        
-        if _G.espWeapon then
-            local tool = char:FindFirstChildWhichIsA("Tool")
-            if tool then table.insert(lines, tool.Name) end
-        end
-        
-        local content = table.concat(lines, "\n")
-        e.txt.Text = content
-        e.txt.Color = mainColor
+        -- Posição atualiza em todo frame para suavidade
         e.txt.Position = Vector2.new(boxX + boxW + 4, boxY)
-        
-        local bounds = e.txt.TextBounds
-        e.txtBG.Size = Vector2.new(bounds.X + 4, bounds.Y)
-        e.txtBG.Position = Vector2.new(boxX + boxW + 2, boxY)
-        e.txt.Visible = true; e.txtBG.Visible = true
+        e.txt.Visible = true
     else
-        e.txt.Visible = false; e.txtBG.Visible = false
+        e.txt.Visible = false
     end
 end
 
