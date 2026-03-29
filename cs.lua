@@ -1148,7 +1148,7 @@ SSystem:AddButton({Name="💾 SALVAR TUDO AGORA", Callback=function() zSave(); O
 SSystem:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
 
 local SPanic = TabCfg:AddSection({Name="🛑 EMERGÊNCIA"})
-SPanic:AddButton({Name="🛑 BOTÃO DE PÂNICO (FECHAR TUDO)", Callback=function()
+SCfg1:AddBind({Name="🛑 BOTÃO DE PÂNICO (Destruir Tudo)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
     _G.SupremeHubRunning = false
     pcall(function() if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end end)
     pcall(function() _G.clearDrawings() end)
@@ -1157,7 +1157,6 @@ SPanic:AddButton({Name="🛑 BOTÃO DE PÂNICO (FECHAR TUDO)", Callback=function
     pcall(function() OrionLib:Destroy() end)
     OrionLib:MakeNotification({Name="Alerta", Content="Script encerrado!", Time=5})
 end})
-SPanic:AddLabel("⚠️ Tecla END também funciona como Pânico.")
 
 local SVisualTools = TabCfg:AddSection({Name="🎨 FERRAMENTAS EXTRAS"})
 SVisualTools:AddButton({Name="🎯 Resetar Posição Radar", Callback=function() _G.radarPos = Vector2.new(200, 200) end})
