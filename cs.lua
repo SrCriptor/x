@@ -29,9 +29,11 @@ _G.legitDeadzone = 10
 _G.espNPCEnabled = false
 _G.magicBulletNPC = false       -- Silent Aim para NPCs
 _G.magicBulletEnemy = false     -- Silent Aim para Players
-_G.wallPierceEnabled = true    -- Atravessar Parede (Magic Bullet)
-_G.mouseSpoofEnabled = true    -- Spoof Mouse.Hit/Target
-_G.telekillEnabled = false     -- Telekill (Teste)
+_G.wallPierceEnabled = false   -- Opcional (Teleport bullet origin)
+_G.mouseSpoofEnabled = false   -- Opcional (Spoof Mouse.Hit)
+_G.telekillPlayerEnabled = false
+_G.telekillNPCEnabled = false
+_G.telekillDistance = 5        -- Distância para Telekill (2-20)
 _G.espEnemyBox = true; _G.espEnemyChams = true; _G.espEnemyTracers = false
 _G.espEnemySkeleton = false; _G.espEnemyText = true
 _G.espAllyBox = false; _G.espAllyChams = false; _G.espAllyTracers = false
@@ -428,6 +430,27 @@ local function getClosestTarget()
     return best, bestModel
 end
 
+local function getClosest3D(npcOnly)
+    local center = Camera.CFrame.Position
+    local best, bestDist = nil, 1000
+    if npcOnly then
+        for _,npc in pairs(getNPCs()) do
+            if isAlive(npc) then
+                local d = (npc.PrimaryPart.Position - center).Magnitude
+                if d < bestDist then bestDist = d; best = npc end
+            end
+        end
+    else
+        for _,p in pairs(Players:GetPlayers()) do
+            if p~=LP and p.Character and isAlive(p.Character) and isEnemy(p) then
+                local d = (p.Character.PrimaryPart.Position - center).Magnitude
+                if d < bestDist then bestDist = d; best = p.Character end
+            end
+        end
+    end
+    return best
+end
+
 -- ═══════════ RAPID FIRE ═══════════
 local isHoldingFire = false
 local function startRapidFire()
@@ -629,14 +652,17 @@ local conn; conn = RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ═══════════ TELEKILL (Experimental) ═══════════
-    if _G.telekillEnabled and currentTargetModel then
-        local hroot = currentTargetModel:FindFirstChild("HumanoidRootPart") or currentTargetModel:FindFirstChild("Torso")
-        if hroot then
-            pcall(function()
-                hroot.CFrame = Camera.CFrame * CFrame.new(0, 0, -12)
-                hroot.Velocity = Vector3.new(0,0,0) -- evita que ele fuja
-            end)
+    -- ═══════════ TELEKILL 360 (Experimental) ═══════════
+    if _G.telekillPlayerEnabled or _G.telekillNPCEnabled then
+        local tkTarget = getClosest3D(_G.telekillNPCEnabled)
+        if tkTarget then
+            local hroot = tkTarget:FindFirstChild("HumanoidRootPart") or tkTarget:FindFirstChild("Torso")
+            if hroot then
+                pcall(function()
+                    hroot.CFrame = Camera.CFrame * CFrame.new(0, 0, -_G.telekillDistance)
+                    hroot.Velocity = Vector3.new(0,0,0)
+                end)
+            end
         end
     end
 
@@ -755,12 +781,10 @@ local function zSave() pcall(function() OrionLib:SaveConfig() end) end
 -- TAB: COMBAT
 local TabCombat = Window:MakeTab({Name="💥 Combat", Icon="rbxassetid://4483345998", PremiumOnly=false})
 local SCombat1 = TabCombat:AddSection({Name="🎯 AIMBOT & SILENT AIM"})
-SCombat1:AddToggle({Name="Aimbot Automático", Default=_G.aimbotAutoEnabled, Save=true, Flag="AAuto", Callback=function(V) _G.aimbotAutoEnabled=V; if V then _G.silentAimEnabled=false; _G.magicBulletNPC=false; _G.magicBulletEnemy=false end; zSave() end})
+SCombat1:AddToggle({Name="Aimbot Automático", Default=_G.aimbotAutoEnabled, Save=true, Flag="AAuto", Callback=function(V) _G.aimbotAutoEnabled=V; if V then _G.silentAimEnabled=false end; zSave() end})
 SCombat1:AddToggle({Name="Aimbot Manual (RMB)", Default=_G.aimbotManualEnabled, Save=true, Flag="AMan", Callback=function(V) _G.aimbotManualEnabled=V; zSave() end})
-SCombat1:AddToggle({Name="✨ Silent Aim (Antigo)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
-SCombat1:AddToggle({Name="🔮 Magic Bullet (Inimigo)", Default=_G.magicBulletEnemy, Save=true, Flag="MgEnemy", Callback=function(V) _G.magicBulletEnemy=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
-SCombat1:AddToggle({Name="🤖 Magic Bullet (NPC)", Default=_G.magicBulletNPC, Save=true, Flag="MgNPC", Callback=function(V) _G.magicBulletNPC=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
-SCombat1:AddToggle({Name="🛡️ Atravessar Parede (Magic)", Default=_G.wallPierceEnabled, Save=true, Flag="WPierce", Callback=function(V) _G.wallPierceEnabled=V; zSave() end})
+SCombat1:AddToggle({Name="✨ Silent Aim (Original)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
+SCombat1:AddToggle({Name="🧱 Wall Pierce (Atravessar)", Default=_G.wallPierceEnabled, Save=true, Flag="WPierce", Callback=function(V) _G.wallPierceEnabled=V; zSave() end})
 
 local SCombat2 = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
 SCombat2:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
@@ -822,10 +846,12 @@ SPlay1:AddSlider({Name="JumpPower", Min=50, Max=300, Default=_G.jumpPower, Color
 
 -- TAB: EXPERIMENTAL
 local TabExp = Window:MakeTab({Name="🧪 Experimental", Icon="rbxassetid://4483345998", PremiumOnly=false})
-local SExp1 = TabExp:AddSection({Name="🚀 TEST FEATURES (BETA)"})
-SExp1:AddToggle({Name="Telekill (Alvos na sua frente)", Default=_G.telekillEnabled, Save=true, Flag="TK", Callback=function(V) _G.telekillEnabled=V; zSave() end})
+local SExp1 = TabExp:AddSection({Name="🚀 360 TELEKILL (BRUTO)"})
+SExp1:AddToggle({Name="Telekill Players (360°)", Default=_G.telekillPlayerEnabled, Save=true, Flag="TKP", Callback=function(V) _G.telekillPlayerEnabled=V; if V then _G.telekillNPCEnabled=false end; zSave() end})
+SExp1:AddToggle({Name="Telekill NPCs (360°)", Default=_G.telekillNPCEnabled, Save=true, Flag="TKN", Callback=function(V) _G.telekillNPCEnabled=V; if V then _G.telekillPlayerEnabled=false end; zSave() end})
+SExp1:AddSlider({Name="Distância do Telekill", Min=2, Max=20, Default=_G.telekillDistance, Color=Color3.fromRGB(255,150,0), Increment=0.5, ValueName="Studs", Save=true, Flag="TKDist", Callback=function(V) _G.telekillDistance=V; zSave() end})
 SExp1:AddToggle({Name="Mouse Spoofing (Hit Correction)", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
-SExp1:AddLabel("⚠️ Telekill move o corpo do inimigo LOCALMENTE para você testar hit.")
+SExp1:AddLabel("⚠️ 2-5m: Faca | 10-20m: Armas")
 local TabCfg = Window:MakeTab({Name="⚙️ Config", Icon="rbxassetid://4483345998", PremiumOnly=false})
 local SCfg1 = TabCfg:AddSection({Name="🛡️ INTERFACE"})
 if not isMobile then
