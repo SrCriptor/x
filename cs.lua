@@ -262,10 +262,11 @@ local function createESP()
     e.hpBarBG = regDraw(Drawing.new("Line")); e.hpBarBG.Thickness=4; e.hpBarBG.Color=Color3.new(0,0,0); e.hpBarBG.Visible=false
     -- Tracer
     e.tracer = regDraw(Drawing.new("Line")); e.tracer.Thickness=1; e.tracer.Visible=false
-    -- Text label (Extreme Performance: Throttled & Outlined)
-    e.txt = regDraw(Drawing.new("Text")); e.txt.Size=13; e.txt.Outline=true; e.txt.Center=false; e.txt.Font=3; e.txt.Visible=false
-    -- Chams (Highlight)
-    e.chams = nil
+    -- Hacker Style Text Labels (Separate & Throttled)
+    e.txName = regDraw(Drawing.new("Text")); e.txName.Size=14; e.txName.Outline=true; e.txName.Font=3; e.txName.Visible=false
+    e.txHP = regDraw(Drawing.new("Text")); e.txHP.Size=13; e.txHP.Outline=true; e.txHP.Font=3; e.txHP.Visible=false
+    e.txDist = regDraw(Drawing.new("Text")); e.txDist.Size=13; e.txDist.Outline=true; e.txDist.Font=3; e.txDist.Visible=false; e.txDist.Color=Color3.fromRGB(180,180,180)
+    e.txWeapon = regDraw(Drawing.new("Text")); e.txWeapon.Size=13; e.txWeapon.Outline=true; e.txWeapon.Font=3; e.txWeapon.Visible=false; e.txWeapon.Color=Color3.fromRGB(255,165,0)
     -- Skeleton
     e.skel = {}
     for i=1,14 do e.skel[i]=regDraw(Drawing.new("Line")); e.skel[i].Thickness=1; e.skel[i].Transparency=0.5; e.skel[i].Visible=false end
@@ -275,9 +276,8 @@ end
 local function hideESP(e)
     if not e then return end
     for i=1,8 do e.corners[i].Visible=false end
-    e.hpBar.Visible=false; e.hpBarBG.Visible=false
-    e.tracer.Visible=false
-    e.txt.Visible=false
+    e.hpBar.Visible=false; e.hpBarBG.Visible=false; e.tracer.Visible=false
+    e.txName.Visible=false; e.txHP.Visible=false; e.txDist.Visible=false; e.txWeapon.Visible=false
     for i=1,14 do e.skel[i].Visible=false end
     if e.chams then pcall(function() e.chams:Destroy() end); e.chams=nil end
 end
@@ -412,39 +412,33 @@ local function updateESP(key, char, color, showBox, showChams, showTracers, show
         for i=#bones+1, 14 do if e.skel[i] then e.skel[i].Visible=false end end
     else for i=1,14 do e.skel[i].Visible=false end end
 
-    -- ═══ TEXT LABEL (THROTTLED FOR MAXIMUM PERFORMANCE) ═══
+    -- ═══ HACKER STYLE TEXTS (DYNAMIC COLORS & THROTTLED) ═══
     if showText then
-        if tick() - e.lastTextUpdate > 0.1 then -- Só atualiza o TEXTO a cada 100ms
+        if tick() - e.lastTextUpdate > 0.25 then -- Atualiza CONTEÚDO 4x por segundo
             e.lastTextUpdate = tick()
-            local lines = {}
-            local tagT = isTarget and "TARGET" or entityType:upper()
-            table.insert(lines, "[ "..tagT.." ]")
-            
-            if _G.espName then
-                local nm = (typeof(key)=="Instance" and key:IsA("Player")) and (key.DisplayName or key.Name) or (char.Name or "NPC")
-                table.insert(lines, nm)
-            end
+            local nm = (typeof(key)=="Instance" and key:IsA("Player")) and (key.DisplayName or key.Name) or (char.Name or "NPC")
+            e.txName.Text = nm; e.txName.Color = (isTarget and Color3.new(1,1,0) or Color3.new(1,1,1))
             
             local hum = char:FindFirstChildOfClass("Humanoid")
-            if _G.espHP and hum then
-                table.insert(lines, "HP: "..math.floor(hum.Health))
+            if hum then 
+                e.txHP.Text = "HP: "..math.floor(hum.Health); 
+                e.txHP.Color = hpColor(hum.Health/hum.MaxHealth)
             end
             
-            if _G.espDistance then table.insert(lines, math.floor(dist3D).."m") end
+            e.txDist.Text = math.floor(dist3D).."m"
             
-            if _G.espWeapon then
-                local tool = char:FindFirstChildWhichIsA("Tool")
-                if tool then table.insert(lines, tool.Name) end
-            end
-            
-            e.txt.Text = table.concat(lines, "\n")
-            e.txt.Color = mainColor
+            local tool = char:FindFirstChildWhichIsA("Tool")
+            e.txWeapon.Text = tool and tool.Name or "Hands"
         end
-        -- Posição atualiza em todo frame para suavidade
-        e.txt.Position = Vector2.new(boxX + boxW + 4, boxY)
-        e.txt.Visible = true
+        
+        -- Atualiza POSIÇÃO em todo frame (60 FPS suavez)
+        local curY = boxY
+        if _G.espName then e.txName.Position=Vector2.new(boxX+boxW+4, curY); e.txName.Visible=true; curY=curY+14 else e.txName.Visible=false end
+        if _G.espHP then e.txHP.Position=Vector2.new(boxX+boxW+4, curY); e.txHP.Visible=true; curY=curY+13 else e.txHP.Visible=false end
+        if _G.espDistance then e.txDist.Position=Vector2.new(boxX+boxW+4, curY); e.txDist.Visible=true; curY=curY+13 else e.txDist.Visible=false end
+        if _G.espWeapon then e.txWeapon.Position=Vector2.new(boxX+boxW+4, curY); e.txWeapon.Visible=true end
     else
-        e.txt.Visible = false
+        e.txName.Visible=false; e.txHP.Visible=false; e.txDist.Visible=false; e.txWeapon.Visible=false
     end
 end
 
@@ -587,28 +581,37 @@ end)
 UIS.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingRadar = false end end)
 RunService.RenderStepped:Connect(function() if draggingRadar then _G.radarPos = UIS:GetMouseLocation() - dragStart end end)
 
-local radarDots = {}
+-- ═══════════ RADAR DOT POOL (ULTRA-LEVE) ═══════════
+local radarPool = {}
+for i=1,50 do
+    local d = Drawing.new("Circle"); d.Radius=3.5; d.Filled=true; d.Visible=false
+    table.insert(radarPool, d)
+end
+
 local function updateRadar()
     if not _G.radarEnabled then
         radarCircle.Visible = false; radarCenter.Visible = false
-        for _,d in pairs(radarDots) do d.Visible=false end; return
+        for _,d in pairs(radarPool) do d.Visible=false end; return
     end
     
     local pos = _G.radarPos
     radarCircle.Position = pos; radarCircle.Visible = not _G.radarDotsOnly; radarCircle.Transparency = 0.5
     radarCenter.Position = pos; radarCenter.Visible = not _G.radarDotsOnly
 
+    local dotIndex = 1
     local function drawDot(targetPos, color)
+        if dotIndex > 50 then return end
         local rel = (targetPos - Camera.CFrame.Position); local rPos = Vector2.new(rel.X, rel.Z)
         local mag = rPos.Magnitude; if mag > 1000 then return end
         local angle = math.atan2(rPos.Y, rPos.X) + math.rad(Camera.CFrame.Rotation.Y)
         local finalPos = pos + Vector2.new(math.cos(angle)*mag*_G.radarScale, math.sin(angle)*mag*_G.radarScale)
         if (finalPos - pos).Magnitude < 75 or _G.radarDotsOnly then
-            local d = Drawing.new("Circle"); d.Radius=3.5; d.Filled=true; d.Color=color; d.Position=finalPos; d.Visible=not _G.streamproofEnabled; table.insert(radarDots, d)
+            local d = radarPool[dotIndex]; d.Color=color; d.Position=finalPos; d.Visible=not _G.streamproofEnabled
+            dotIndex = dotIndex + 1
         end
     end
 
-    for _,d in pairs(radarDots) do d:Remove() end; radarDots = {}
+    for _,d in pairs(radarPool) do d.Visible=false end
     for _,p in pairs(Players:GetPlayers()) do
         if p~=LP and p.Character and isAlive(p.Character) and isEnemy(p) then drawDot(p.Character.PrimaryPart.Position, Color3.fromRGB(255,0,0)) end
     end
