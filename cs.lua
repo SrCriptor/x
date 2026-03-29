@@ -601,21 +601,44 @@ local function updateRadar()
     local dotIndex = 1
     local function drawDot(targetPos, color)
         if dotIndex > 50 then return end
-        local rel = (targetPos - Camera.CFrame.Position); local rPos = Vector2.new(rel.X, rel.Z)
-        local mag = rPos.Magnitude; if mag > 1000 then return end
-        local angle = math.atan2(rPos.Y, rPos.X) + math.rad(Camera.CFrame.Rotation.Y)
-        local finalPos = pos + Vector2.new(math.cos(angle)*mag*_G.radarScale, math.sin(angle)*mag*_G.radarScale)
+        -- Converte a posição do mundo para o espaço local da câmera (Relativo ao jogador)
+        local rel = Camera.CFrame:PointToObjectSpace(targetPos)
+        -- rel.X é Direita(+)/Esquerda(-), rel.Z é Atrás(+)/Frente(-)
+        -- No radar: Cima é Frente (-Z), Direita é (+X)
+        local rPos = Vector2.new(rel.X, rel.Z)
+        
+        -- Calcula a posição final baseada no zoom e posição central
+        local finalPos = pos + Vector2.new(rPos.X, rPos.Y) * _G.radarScale
+        
+        -- Só mostra se estiver dentro do círculo do radar (75px) ou de qualquer forma se Ghost Mode ativado
         if (finalPos - pos).Magnitude < 75 or _G.radarDotsOnly then
-            local d = radarPool[dotIndex]; d.Color=color; d.Position=finalPos; d.Visible=not _G.streamproofEnabled
-            dotIndex = dotIndex + 1
+            local d = radarPool[dotIndex]
+            if d then
+                d.Color = color
+                d.Position = finalPos
+                d.Visible = not _G.streamproofEnabled
+                dotIndex = dotIndex + 1
+            end
         end
     end
 
     for _,d in pairs(radarPool) do d.Visible=false end
+    
+    -- Inimigos (Vermelho)
     for _,p in pairs(Players:GetPlayers()) do
-        if p~=LP and p.Character and isAlive(p.Character) and isEnemy(p) then drawDot(p.Character.PrimaryPart.Position, Color3.fromRGB(255,0,0)) end
+        if p ~= LP and p.Character and isAlive(p.Character) and isEnemy(p) then 
+            local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character.PrimaryPart
+            if root then drawDot(root.Position, Color3.fromRGB(255,0,0)) end
+        end
     end
-    for _,npc in pairs(getNPCs()) do if isAlive(npc) then drawDot(npc.PrimaryPart.Position, Color3.fromRGB(200,0,255)) end end
+    
+    -- NPCs (Roxo)
+    for _,npc in pairs(getNPCs()) do 
+        if isAlive(npc) then 
+            local root = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+            if root then drawDot(root.Position, Color3.fromRGB(200,0,255)) end 
+        end 
+    end
 end
 
 -- ═══════════ WEAPON MODS (RECURSIVE & LOCKED) ═══════════
@@ -1148,7 +1171,7 @@ SSystem:AddButton({Name="💾 SALVAR TUDO AGORA", Callback=function() zSave(); O
 SSystem:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
 
 local SPanic = TabCfg:AddSection({Name="🛑 EMERGÊNCIA"})
-SCfg1:AddBind({Name="🛑 BOTÃO DE PÂNICO (Remover Menu)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
+SPanic:AddBind({Name="🛑 BOTÃO DE PÂNICO (Remover Menu)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
     _G.SupremeHubRunning = false
     pcall(function() if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end end)
     pcall(function() _G.clearDrawings() end)
