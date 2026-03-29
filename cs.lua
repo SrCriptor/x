@@ -588,7 +588,7 @@ local function applyTheme(themeName)
     OrionLib.Themes[themeName] = theme
     OrionLib.SelectedTheme = themeName
     
-    for type, objects in pairs(OrionLib.ThemeObjects) do
+    for type, objects in pairs(OrionLib.ThemeObjects or {}) do
         for _, obj in pairs(objects) do
             pcall(function()
                 local prop = "BackgroundColor3"
@@ -607,7 +607,7 @@ task.spawn(function()
         if _G.isRGBTheme and _G.SupremeHubRunning then
             local hue = tick() % 5 / 5
             local color = Color3.fromHSV(hue, 1, 1)
-            for type, objects in pairs(OrionLib.ThemeObjects) do
+            for type, objects in pairs(OrionLib.ThemeObjects or {}) do
                 if type == "Stroke" or type == "Text" or type == "Divider" then
                     for _, obj in pairs(objects) do
                         pcall(function()
