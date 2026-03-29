@@ -555,75 +555,6 @@ local function toggleStreamproof()
     end
 end
 
--- ═══════════ THEME SYSTEM ═══════════
-_G.SupremeThemes = {
-    Default = {
-        Main = Color3.fromRGB(25, 25, 25), Second = Color3.fromRGB(32, 32, 32), Stroke = Color3.fromRGB(60, 60, 60),
-        Divider = Color3.fromRGB(60, 60, 60), Text = Color3.fromRGB(240, 240, 240), TextDark = Color3.fromRGB(150, 150, 150)
-    },
-    Matrix = {
-        Main = Color3.fromRGB(5, 5, 5), Second = Color3.fromRGB(10, 15, 10), Stroke = Color3.fromRGB(0, 255, 0),
-        Divider = Color3.fromRGB(0, 100, 0), Text = Color3.fromRGB(0, 255, 0), TextDark = Color3.fromRGB(0, 180, 0)
-    },
-    Cyberpunk = {
-        Main = Color3.fromRGB(20, 10, 25), Second = Color3.fromRGB(30, 20, 40), Stroke = Color3.fromRGB(255, 0, 255),
-        Divider = Color3.fromRGB(0, 255, 255), Text = Color3.fromRGB(255, 255, 255), TextDark = Color3.fromRGB(255, 0, 255)
-    },
-    WatchDogs = {
-        Main = Color3.fromRGB(10, 10, 10), Second = Color3.fromRGB(20, 25, 30), Stroke = Color3.fromRGB(0, 255, 255),
-        Divider = Color3.fromRGB(255, 255, 255), Text = Color3.fromRGB(255, 255, 255), TextDark = Color3.fromRGB(0, 180, 255)
-    },
-    Yellow = {
-        Main = Color3.fromRGB(15, 15, 0), Second = Color3.fromRGB(30, 30, 0), Stroke = Color3.fromRGB(255, 255, 0),
-        Divider = Color3.fromRGB(100, 100, 0), Text = Color3.fromRGB(255, 255, 0), TextDark = Color3.fromRGB(200, 200, 0)
-    }
-}
-
-local function applyTheme(themeName)
-    _G.selectedTheme = themeName
-    _G.isRGBTheme = (themeName == "Neon RGB")
-    if _G.isRGBTheme then return end
-    
-    local theme = _G.SupremeThemes[themeName] or _G.SupremeThemes.Default
-    OrionLib.Themes[themeName] = theme
-    OrionLib.SelectedTheme = themeName
-    
-    for type, objects in pairs(OrionLib.ThemeObjects or {}) do
-        for _, obj in pairs(objects) do
-            pcall(function()
-                local prop = "BackgroundColor3"
-                if obj:IsA("UIStroke") then prop = "Color"
-                elseif obj:IsA("TextLabel") or obj:IsA("TextBox") then prop = "TextColor3"
-                elseif obj:IsA("ImageLabel") or obj:IsA("ImageButton") then prop = "ImageColor3"
-                elseif obj:IsA("ScrollingFrame") then prop = "ScrollBarImageColor3" end
-                obj[prop] = theme[type]
-            end)
-        end
-    end
-end
-
-task.spawn(function()
-    while task.wait(0.05) do
-        if _G.isRGBTheme and _G.SupremeHubRunning then
-            local hue = tick() % 5 / 5
-            local color = Color3.fromHSV(hue, 1, 1)
-            for type, objects in pairs(OrionLib.ThemeObjects or {}) do
-                if type == "Stroke" or type == "Text" or type == "Divider" then
-                    for _, obj in pairs(objects) do
-                        pcall(function()
-                            local prop = "BackgroundColor3"
-                            if obj:IsA("UIStroke") then prop = "Color"
-                            elseif obj:IsA("TextLabel") or obj:IsA("TextBox") then prop = "TextColor3"
-                            elseif obj:IsA("ImageLabel") or obj:IsA("ImageButton") then prop = "ImageColor3" end
-                            obj[prop] = color
-                        end)
-                    end
-                end
-            end
-        end
-    end
-end)
-
 local function teleportToLowPopServer()
     local Http = game:GetService("HttpService")
     local TPS = game:GetService("TeleportService")
@@ -975,7 +906,8 @@ local conn; conn = RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- FOV
+    -- Radar & FOV
+    if _G.radarEnabled then pcall(function() updateRadar() end) end
     fovCircle.Radius=_G.FOV_RADIUS; fovCircle.Position=center; fovCircle.Visible=_G.FOV_VISIBLE
 end)
 _G.RunServiceConnection = conn
@@ -1095,11 +1027,11 @@ SCombat1:AddToggle({Name="Aimbot Manual (RMB)", Default=_G.aimbotManualEnabled, 
 SCombat1:AddToggle({Name="✨ Silent Aim (Original)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
 SCombat1:AddToggle({Name="🎯 Mouse Spoofing", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
 
-local SCLegit = TabCombat:AddSection({Name="🛡️ SUPREME PRO LEGIT (HUMANIZADO)"})
-SCLegit:AddToggle({Name="Ativar Modo LEGIT (PRO Only)", Default=_G.aimbotLegitMode, Save=true, Flag="ALegit", Callback=function(V) _G.aimbotLegitMode=V; zSave() end})
+local SCLegit = TabCombat:AddSection({Name="🛡️ PRO LEGIT (HUMANIZADO)"})
+SCLegit:AddToggle({Name="Ativar Modo Aim LEGIT", Default=_G.aimbotLegitMode, Save=true, Flag="ALegit", Callback=function(V) _G.aimbotLegitMode=V; zSave() end})
 SCLegit:AddSlider({Name="Magnet Stickiness (Raio)", Min=5, Max=100, Default=_G.aimbotStickiness, Color=Color3.fromRGB(0,255,100), Increment=1, ValueName="Pixels", Save=true, Flag="AStick", Callback=function(V) _G.aimbotStickiness=V; zSave() end})
-SCLegit:AddLabel("💡 Segue o seu Seletor de Hitbox (Bonequinho).")
-SCLegit:AddLabel("💡 Modo LEGIT foca o osso mais próximo que você escolheu.")
+SCLegit:AddLabel("💡 Segue o seu Seletor de Hitbox.")
+SCLegit:AddLabel("💡 Modo LEGIT foca a parte do corpo mais próximo que você escolheu.")
 
 local SCRefine = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
 SCRefine:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
@@ -1205,17 +1137,28 @@ SExp3:AddToggle({Name="Mouse Spoofing (Silent Aim Helper)", Default=_G.mouseSpoo
 SExp3:AddLabel("⚠️ Telekill e Hitbox Expander dão ban facilmente.")
 local TabCfg = Window:MakeTab({Name="⚙️ Config", Icon="rbxassetid://4483345998", PremiumOnly=false})
 
-local SCfgTheme = TabCfg:AddSection({Name="🎨 CUSTOMIZAÇÃO VISUAL"})
-SCfgTheme:AddDropdown({Name="Tema da Interface", Default=_G.selectedTheme or "Default", Options={"Default", "Matrix", "Cyberpunk", "WatchDogs", "Yellow", "Neon RGB"}, Save=true, Flag="STheme", Callback=function(V) applyTheme(V); zSave() end})
-
-local SCfg1 = TabCfg:AddSection({Name="🛡️ INTERFACE & SISTEMA"})
+local SSystem = TabCfg:AddSection({Name="🛡️ SISTEMA & UTILITÁRIOS"})
 if not isMobile then
-    SCfg1:AddBind({Name="⌨️ Tecla do Menu (Abrir/Fechar)", Default=Enum.KeyCode.Home, Hold=false, Callback=function() local o=findOrionGui(); if o then o.Enabled=not o.Enabled end end})
-else
-    SCfg1:AddButton({Name="🔴 Botão HUB criado na tela", Callback=function() end})
+    SSystem:AddBind({Name="Tecla do Menu", Default=Enum.KeyCode.Home, Hold=false, Callback=function() local o=findOrionGui(); if o then o.Enabled=not o.Enabled end end})
 end
-SCfg1:AddButton({Name="💾 FORÇAR SALVAMENTO", Callback=function() zSave(); OrionLib:MakeNotification({Name="Supreme Hub", Content="Configurações salvas!", Image="rbxassetid://4483345998", Time=3}) end})
-SCfg1:AddToggle({Name="🕵️ Streamproof (Anti-OBS)", Default=_G.streamproofEnabled, Save=true, Flag="StPrf", Callback=function(V) 
+SSystem:AddButton({Name="💾 SALVAR TUDO AGORA", Callback=function() zSave(); OrionLib:MakeNotification({Name="Supreme Hub", Content="Suas configurações foram salvas!", Time=3}) end})
+SSystem:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
+
+local SPanic = TabCfg:AddSection({Name="🛑 EMERGÊNCIA"})
+SPanic:AddButton({Name="🛑 BOTÃO DE PÂNICO (FECHAR TUDO)", Callback=function()
+    _G.SupremeHubRunning = false
+    pcall(function() if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end end)
+    pcall(function() _G.clearDrawings() end)
+    if bonecoFrame then pcall(function() bonecoFrame.Parent:Destroy() end) end
+    pcall(function() if coreGui:FindFirstChild("SupremeMobileHub") then coreGui.SupremeMobileHub:Destroy() end end)
+    pcall(function() OrionLib:Destroy() end)
+    OrionLib:MakeNotification({Name="Alerta", Content="Script encerrado!", Time=5})
+end})
+SPanic:AddLabel("⚠️ Tecla END também funciona como Pânico.")
+
+local SVisualTools = TabCfg:AddSection({Name="🎨 FERRAMENTAS EXTRAS"})
+SVisualTools:AddButton({Name="🎯 Resetar Posição Radar", Callback=function() _G.radarPos = Vector2.new(200, 200) end})
+SVisualTools:AddToggle({Name="🕵️ Streamproof (Anti-OBS)", Default=_G.streamproofEnabled, Save=true, Flag="StPrf", Callback=function(V) 
     _G.streamproofEnabled=V
     local o = findOrionGui()
     if o then o.DisplayOrder = V and 0 or 100 end
@@ -1223,19 +1166,5 @@ SCfg1:AddToggle({Name="🕵️ Streamproof (Anti-OBS)", Default=_G.streamproofEn
     zSave() 
 end})
 
-local SCfg2 = TabCfg:AddSection({Name="🛑 EMERGÊNCIA & SEGURANÇA"})
-SCfg2:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
-SCfg2:AddBind({Name="🛑 BOTÃO DE PÂNICO (Destruir Tudo)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
-    _G.SupremeHubRunning = false
-    pcall(function() conn:Disconnect() end)
-    pcall(function() _G.clearDrawings() end)
-    if bonecoFrame then pcall(function() bonecoFrame.Parent:Destroy() end) end
-    pcall(function() if coreGui:FindFirstChild("SupremeMobileHub") then coreGui.SupremeMobileHub:Destroy() end end)
-    pcall(function() OrionLib:Destroy() end)
-    OrionLib:MakeNotification({Name="Supreme Hub", Content="Script encerrado com sucesso!", Time=5})
-end})
-SCfg2:AddButton({Name="Reinstalar Menu (Reset)", Callback=function() pcall(function() OrionLib:Destroy() end); task.wait(0.5); loadstring(game:HttpGet("https://raw.githubusercontent.com/ExiT/SupremeHub/main/aimnpc.lua"))() end})
-
-pcall(function() applyTheme(_G.selectedTheme or "Default") end)
 OrionLib:Init()
-print("⚡ Supreme Hub Loaded | All Systems Active")
+print("⚡ Supreme Hub Loaded | Radar & System Active")
