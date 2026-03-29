@@ -27,8 +27,9 @@ _G.FOV_RADIUS = _G.FOV_RADIUS or 65
 _G.FOV_VISIBLE = true
 _G.legitDeadzone = 10
 _G.espNPCEnabled = false
-_G.magicBulletNPC = false       -- Novo: Silent Aim para NPCs
-_G.magicBulletEnemy = false     -- Novo: Silent Aim para Players
+_G.magicBulletNPC = false       -- Silent Aim para NPCs
+_G.magicBulletEnemy = false     -- Silent Aim para Players
+_G.wallPierceEnabled = true    -- Atravessar Parede (Magic Bullet)
 _G.espEnemyBox = true; _G.espEnemyChams = true; _G.espEnemyTracers = false
 _G.espEnemySkeleton = false; _G.espEnemyText = true
 _G.espAllyBox = false; _G.espAllyChams = false; _G.espAllyTracers = false
@@ -209,39 +210,36 @@ table.insert(allDrawings, fovCircle)
 local function regDraw(d) table.insert(allDrawings, d); return d end
 local function createESP()
     local e = {}
-    -- Box (contorno principal)
-    e.box = regDraw(Drawing.new("Square")); e.box.Filled=false; e.box.Thickness=2; e.box.Visible=false
-    -- Box outline (sombra preta por trás para contraste)
-    e.boxOutline = regDraw(Drawing.new("Square")); e.boxOutline.Filled=false; e.boxOutline.Thickness=3.5; e.boxOutline.Color=Color3.new(0,0,0); e.boxOutline.Visible=false
-    -- Health bar (barra lateral esquerda)
-    e.hpBar = regDraw(Drawing.new("Line")); e.hpBar.Thickness=3; e.hpBar.Visible=false
-    e.hpBarBG = regDraw(Drawing.new("Line")); e.hpBarBG.Thickness=5; e.hpBarBG.Color=Color3.new(0,0,0); e.hpBarBG.Visible=false
+    -- Box (Cantoneiras / Corners)
+    e.corners = {}
+    for i=1,8 do e.corners[i] = regDraw(Drawing.new("Line")); e.corners[i].Thickness=2.5; e.corners[i].Visible=false end
+    -- Health bar (Sleek)
+    e.hpBar = regDraw(Drawing.new("Line")); e.hpBar.Thickness=2; e.hpBar.Visible=false
+    e.hpBarBG = regDraw(Drawing.new("Line")); e.hpBarBG.Thickness=4; e.hpBarBG.Color=Color3.new(0,0,0); e.hpBarBG.Visible=false
     -- Tracer
-    e.tracer = regDraw(Drawing.new("Line")); e.tracer.Thickness=1.5; e.tracer.Visible=false
-    e.tracerOutline = regDraw(Drawing.new("Line")); e.tracerOutline.Thickness=3; e.tracerOutline.Color=Color3.new(0,0,0); e.tracerOutline.Visible=false
-    -- Text labels
-    e.nameT = regDraw(Drawing.new("Text")); e.nameT.Size=15; e.nameT.Center=true; e.nameT.Outline=true; e.nameT.Font=2; e.nameT.Visible=false
-    e.tagT = regDraw(Drawing.new("Text")); e.tagT.Size=11; e.tagT.Center=true; e.tagT.Outline=true; e.tagT.Font=2; e.tagT.Visible=false
-    e.hpT = regDraw(Drawing.new("Text")); e.hpT.Size=13; e.hpT.Center=true; e.hpT.Outline=true; e.hpT.Font=2; e.hpT.Visible=false
-    e.distT = regDraw(Drawing.new("Text")); e.distT.Size=12; e.distT.Center=true; e.distT.Outline=true; e.distT.Font=2; e.distT.Visible=false
-    e.weapT = regDraw(Drawing.new("Text")); e.weapT.Size=12; e.weapT.Center=true; e.weapT.Outline=true; e.weapT.Font=2; e.weapT.Visible=false
+    e.tracer = regDraw(Drawing.new("Line")); e.tracer.Thickness=1; e.tracer.Visible=false
+    -- Text labels & Backgrounds
+    local labels = {"name", "tag", "hp", "dist", "weap"}
+    for _, l in pairs(labels) do
+        e[l.."T"] = regDraw(Drawing.new("Text")); e[l.."T"].Size=13; e[l.."T"].Outline=false; e[l.."T"].Font=3; e[l.."T"].Visible=false
+        e[l.."B"] = regDraw(Drawing.new("Square")); e[l.."B"].Filled=true; e[l.."B"].Color=Color3.new(0,0,0); e[l.."B"].Transparency=0.5; e[l.."B"].Visible=false
+    end
     -- Chams (Highlight)
     e.chams = nil
     -- Skeleton
     e.skel = {}
-    for i=1,14 do local l=regDraw(Drawing.new("Line")); l.Thickness=2; l.Visible=false; e.skel[i]=l end
-    e.skelOut = {}
-    for i=1,14 do local l=regDraw(Drawing.new("Line")); l.Thickness=4; l.Color=Color3.new(0,0,0); l.Visible=false; e.skelOut[i]=l end
+    for i=1,14 do e.skel[i]=regDraw(Drawing.new("Line")); e.skel[i].Thickness=1; e.skel[i].Transparency=0.5; e.skel[i].Visible=false end
     return e
 end
 
 local function hideESP(e)
     if not e then return end
-    e.box.Visible=false; e.boxOutline.Visible=false
+    for i=1,8 do e.corners[i].Visible=false end
     e.hpBar.Visible=false; e.hpBarBG.Visible=false
-    e.tracer.Visible=false; e.tracerOutline.Visible=false
-    e.nameT.Visible=false; e.tagT.Visible=false; e.hpT.Visible=false; e.distT.Visible=false; e.weapT.Visible=false
-    for i=1,14 do e.skel[i].Visible=false; e.skelOut[i].Visible=false end
+    e.tracer.Visible=false
+    local labels = {"name", "tag", "hp", "dist", "weap"}
+    for _, l in pairs(labels) do e[l.."T"].Visible=false; e[l.."B"].Visible=false end
+    for i=1,14 do e.skel[i].Visible=false end
     if e.chams then pcall(function() e.chams:Destroy() end); e.chams=nil end
 end
 
@@ -266,75 +264,53 @@ local function updateESP(key, char, color, showBox, showChams, showTracers, show
     local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
     if not head or not root then removeESP(key); return end
     local dist3D = (root.Position - Camera.CFrame.Position).Magnitude
-    if dist3D > _G.espMaxDistance then
-        if espCache[key] then hideESP(espCache[key]) end
-        return
-    end
+    if dist3D > _G.espMaxDistance then if espCache[key] then hideESP(espCache[key]) end; return end
 
     if not espCache[key] then espCache[key] = createESP() end
     local e = espCache[key]
 
-    -- Calcula bounding box na tela usando o CHARACTER INTEIRO (não só head)
     local rootSP = Camera:WorldToViewportPoint(root.Position)
-    local headTop = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1, 0))
-    local feet = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-
-    local topSP, topVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.2, 0))
+    local topSP, topVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.4, 0))
     local botSP, botVis = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-
     if not topVis or not botVis then hideESP(e); return end
 
-    -- Usa centro X do rootPart (não da head) para centralizar melhor
     local centerX = rootSP.X
     local boxH = math.abs(botSP.Y - topSP.Y)
-    local boxW = boxH * 0.6 -- proporção mais realista para um personagem
+    local boxW = boxH * 0.6
     local boxX = centerX - boxW / 2
     local boxY = topSP.Y
-
+    
     local isTarget = (key == currentTarget or char == currentTargetModel)
-    local mainColor = isTarget and Color3.fromRGB(255, 255, 0) or color
+    local mainColor = isTarget and Color3.new(1,1,0) or color
 
-    -- Tag de tipo (texto pequeno acima de tudo)
-    local tagText = ""
-    local tagColor = mainColor
-    if entityType == "npc" then tagText = "⬟ NPC"; tagColor = Color3.fromRGB(200, 0, 255)
-    elseif entityType == "enemy" then tagText = "⚔ ENEMY"; tagColor = Color3.fromRGB(255, 60, 60)
-    elseif entityType == "ally" then tagText = "★ ALLY"; tagColor = Color3.fromRGB(60, 150, 255)
-    end
-    if isTarget then tagText = "🎯 TARGET"; tagColor = Color3.fromRGB(255, 255, 0) end
-
-    -- ═══ BOX ESP ═══
+    -- ═══ CORNER BOX ═══
     if showBox then
-        -- Outline preta por trás
-        e.boxOutline.Position = Vector2.new(boxX, boxY)
-        e.boxOutline.Size = Vector2.new(boxW, boxH)
-        e.boxOutline.Visible = true
-        -- Box colorida
-        e.box.Position = Vector2.new(boxX, boxY)
-        e.box.Size = Vector2.new(boxW, boxH)
-        e.box.Color = mainColor
-        e.box.Thickness = entityType == "npc" and 2.5 or 2
-        e.box.Visible = true
-    else e.box.Visible=false; e.boxOutline.Visible=false end
+        local lineLen = boxW / 4
+        local c = e.corners
+        -- TL
+        c[1].From = Vector2.new(boxX, boxY); c[1].To = Vector2.new(boxX + lineLen, boxY)
+        c[2].From = Vector2.new(boxX, boxY); c[2].To = Vector2.new(boxX, boxY + lineLen)
+        -- TR
+        c[3].From = Vector2.new(boxX + boxW, boxY); c[3].To = Vector2.new(boxX + boxW - lineLen, boxY)
+        c[4].From = Vector2.new(boxX + boxW, boxY); c[4].To = Vector2.new(boxX + boxW, boxY + lineLen)
+        -- BL
+        c[5].From = Vector2.new(boxX, boxY + boxH); c[5].To = Vector2.new(boxX + lineLen, boxY + boxH)
+        c[6].From = Vector2.new(boxX, boxY + boxH); c[6].To = Vector2.new(boxX, boxY + boxH - lineLen)
+        -- BR
+        c[7].From = Vector2.new(boxX + boxW, boxH + boxY); c[7].To = Vector2.new(boxX + boxW - lineLen, boxH + boxY)
+        c[8].From = Vector2.new(boxX + boxW, boxH + boxY); c[8].To = Vector2.new(boxX + boxW, boxH + boxY - lineLen)
+        for i=1,8 do c[i].Color=mainColor; c[i].Visible=true end
+    else for i=1,8 do e.corners[i].Visible=false end end
 
-    -- ═══ HEALTH BAR (barra lateral esquerda do box) ═══
+    -- ═══ HEALTH BAR ═══
     if showBox or showText then
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum and hum.MaxHealth > 0 then
             local pct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-            local barX = boxX - 6
-            local barTopY = boxY
-            local barBotY = boxY + boxH
-            local barFilledY = barBotY - (boxH * pct)
-            -- Background preto
-            e.hpBarBG.From = Vector2.new(barX, barTopY)
-            e.hpBarBG.To = Vector2.new(barX, barBotY)
-            e.hpBarBG.Visible = true
-            -- Barra colorida
-            e.hpBar.From = Vector2.new(barX, barFilledY)
-            e.hpBar.To = Vector2.new(barX, barBotY)
-            e.hpBar.Color = hpColor(pct)
-            e.hpBar.Visible = true
+            local barX = boxX - 5
+            e.hpBarBG.From=Vector2.new(barX, boxY); e.hpBarBG.To=Vector2.new(barX, boxY+boxH); e.hpBarBG.Visible=true
+            e.hpBar.From=Vector2.new(barX, boxY+boxH-(boxH*pct)); e.hpBar.To=Vector2.new(barX, boxY+boxH)
+            e.hpBar.Color=hpColor(pct); e.hpBar.Visible=true
         else e.hpBar.Visible=false; e.hpBarBG.Visible=false end
     else e.hpBar.Visible=false; e.hpBarBG.Visible=false end
 
@@ -344,21 +320,17 @@ local function updateESP(key, char, color, showBox, showChams, showTracers, show
             if e.chams then pcall(function() e.chams:Destroy() end) end
             e.chams = Instance.new("Highlight"); e.chams.Parent = char
         end
-        e.chams.Adornee = char; e.chams.Enabled = true
-        e.chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        e.chams.FillColor = mainColor
-        e.chams.OutlineColor = isTarget and Color3.fromRGB(255,255,100) or mainColor
-        e.chams.FillTransparency = entityType == "npc" and 0.5 or 0.65
-        e.chams.OutlineTransparency = 0.3
+        e.chams.Adornee=char; e.chams.Enabled=true; e.chams.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+        e.chams.FillColor=mainColor; e.chams.OutlineColor=Color3.new(1,1,1)
+        e.chams.FillTransparency=0.75; e.chams.OutlineTransparency=0
     else if e.chams then pcall(function() e.chams:Destroy() end); e.chams=nil end end
 
     -- ═══ TRACERS ═══
     if showTracers then
         local fromPt = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
         local toPt = Vector2.new(centerX, botSP.Y)
-        e.tracerOutline.From=fromPt; e.tracerOutline.To=toPt; e.tracerOutline.Visible=true
         e.tracer.From=fromPt; e.tracer.To=toPt; e.tracer.Color=mainColor; e.tracer.Visible=true
-    else e.tracer.Visible=false; e.tracerOutline.Visible=false end
+    else e.tracer.Visible=false end
 
     -- ═══ SKELETON ═══
     if showSkel then
@@ -369,75 +341,52 @@ local function updateESP(key, char, color, showBox, showChams, showTracers, show
                 local s1,v1 = Camera:WorldToViewportPoint(p1.Position)
                 local s2,v2 = Camera:WorldToViewportPoint(p2.Position)
                 if v1 and v2 then
-                    local from = Vector2.new(s1.X,s1.Y)
-                    local to = Vector2.new(s2.X,s2.Y)
-                    -- Outline preta
-                    e.skelOut[i].From=from; e.skelOut[i].To=to; e.skelOut[i].Visible=true
-                    -- Linha colorida
-                    e.skel[i].From=from; e.skel[i].To=to; e.skel[i].Color=mainColor; e.skel[i].Visible=true
-                else e.skel[i].Visible=false; e.skelOut[i].Visible=false end
-            else
-                if e.skel[i] then e.skel[i].Visible=false end
-                if e.skelOut[i] then e.skelOut[i].Visible=false end
-            end
+                    e.skel[i].From=Vector2.new(s1.X,s1.Y); e.skel[i].To=Vector2.new(s2.X,s2.Y); e.skel[i].Color=mainColor; e.skel[i].Visible=true
+                else e.skel[i].Visible=false end
+            elseif e.skel[i] then e.skel[i].Visible=false end
         end
-        local usedBones = #bones
-        for i=usedBones+1, 14 do
-            e.skel[i].Visible=false; e.skelOut[i].Visible=false
-        end
-    else
-        for i=1,14 do e.skel[i].Visible=false; e.skelOut[i].Visible=false end
-    end
+        for i=#bones+1, 14 do if e.skel[i] then e.skel[i].Visible=false end end
+    else for i=1,14 do e.skel[i].Visible=false end end
 
-    -- ═══ TEXT LABELS (empilhados acima do box) ═══
-    local txtY = boxY - 4
-
-    -- Tag de tipo sempre aparece se showText
+    -- ═══ TEXT LABELS & BACKGROUNDS (RIGHT SIDE) ═══
     if showText then
-        e.tagT.Text = tagText; e.tagT.Position = Vector2.new(centerX, txtY - 14)
-        e.tagT.Color = tagColor; e.tagT.Visible = true
-        txtY = txtY - 28
-    else e.tagT.Visible = false end
+        local rightX = boxX + boxW + 4
+        local currentY = boxY
+        local function drawL(key, text, col)
+            local t, b = e[key.."T"], e[key.."B"]
+            t.Text = text; t.Color = col; t.Position = Vector2.new(rightX + 2, currentY)
+            local tSize = t.TextBounds
+            b.Size = Vector2.new(tSize.X + 4, tSize.Y); b.Position = Vector2.new(rightX, currentY)
+            t.Visible = true; b.Visible = true
+            currentY = currentY + tSize.Y + 2
+        end
 
-    -- Nome
-    if showText and _G.espName then
-        local nm
-        if typeof(key) == "Instance" and key:IsA("Player") then nm = key.DisplayName or key.Name
-        else nm = char.Name or "NPC" end
-        e.nameT.Text = nm; e.nameT.Position = Vector2.new(centerX, txtY)
-        e.nameT.Color = mainColor; e.nameT.Visible = true; txtY -= 16
-    else e.nameT.Visible = false end
-
-    -- HP (texto)
-    if showText and _G.espHP then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            local pct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
-            e.hpT.Text = math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth) .. " (" .. math.floor(pct*100) .. "%)"
-            e.hpT.Position = Vector2.new(centerX, txtY)
-            e.hpT.Color = hpColor(pct)
-            e.hpT.Visible = true; txtY -= 14
-        else e.hpT.Visible = false end
-    else e.hpT.Visible = false end
-
-    -- Distância
-    if showText and _G.espDistance then
-        e.distT.Text = math.floor(dist3D) .. " studs"
-        e.distT.Position = Vector2.new(centerX, txtY)
-        e.distT.Color = Color3.fromRGB(200, 200, 200)
-        e.distT.Visible = true; txtY -= 14
-    else e.distT.Visible = false end
-
-    -- Arma
-    if showText and _G.espWeapon then
-        local tool = char:FindFirstChildWhichIsA("Tool")
-        if tool then
-            e.weapT.Text = "🔫 " .. tool.Name
-            e.weapT.Position = Vector2.new(centerX, txtY)
-            e.weapT.Color = Color3.fromRGB(255, 200, 100)
-            e.weapT.Visible = true
-        else e.weapT.Visible = false end
-    else e.weapT.Visible = false end
+        -- Tag
+        local tagT = isTarget and "TARGET" or entityType:upper()
+        drawL("tag", "[ "..tagT.." ]", mainColor)
+        -- Name
+        if _G.espName then
+            local nm = (typeof(key)=="Instance" and key:IsA("Player")) and (key.DisplayName or key.Name) or (char.Name or "NPC")
+            drawL("name", nm, Color3.new(1,1,1))
+        else e.nameT.Visible=false; e.nameB.Visible=false end
+        -- HP
+        if _G.espHP then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then drawL("hp", "HP: "..math.floor(hum.Health).."/"..math.floor(hum.MaxHealth), hpColor(hum.Health/hum.MaxHealth)) end
+        else e.hpT.Visible=false; e.hpB.Visible=false end
+        -- Dist
+        if _G.espDistance then
+            drawL("dist", math.floor(dist3D).."m", Color3.new(0.8,0.8,0.8))
+        else e.distT.Visible=false; e.distB.Visible=false end
+        -- Weapon
+        if _G.espWeapon then
+            local tool = char:FindFirstChildWhichIsA("Tool")
+            if tool then drawL("weap", tool.Name, Color3.new(1,0.7,0.4)) end
+        else e.weapT.Visible=false; e.weapB.Visible=false end
+    else
+        local labels = {"name", "tag", "hp", "dist", "weap"}
+        for _, l in pairs(labels) do e[l.."T"].Visible=false; e[l.."B"].Visible=false end
+    end
 end
 
 -- ═══════════ TARGETING ═══════════
@@ -457,7 +406,7 @@ local function getClosestTarget()
             if part then
                 local sp,vis = Camera:WorldToViewportPoint(part.Position)
                 local d = (Vector2.new(sp.X,sp.Y)-center).Magnitude
-                if vis and d<=bestDist and hasLOS(part) then bestDist=d; best=p; bestModel=p.Character end
+                if vis and d<=bestDist and (hasLOS(part) or _G.wallPierceEnabled) then bestDist=d; best=p; bestModel=p.Character end
             end
         end
     end
@@ -470,7 +419,7 @@ local function getClosestTarget()
             if part then
                 local sp,vis = Camera:WorldToViewportPoint(part.Position)
                 local d = (Vector2.new(sp.X,sp.Y)-center).Magnitude
-                if vis and d<=bestDist and hasLOS(part) then bestDist=d; best=npc; bestModel=npc end
+                if vis and d<=bestDist and (hasLOS(part) or _G.wallPierceEnabled) then bestDist=d; best=npc; bestModel=npc end
             end
         end
     end
@@ -527,6 +476,10 @@ pcall(function()
                     if method == "Raycast" and self == workspace then
                         local args = {...}
                         local origin = args[1]
+                        -- Se "Atravessar Parede" estiver ON, teleporta origem para o alvo
+                        if _G.wallPierceEnabled then
+                            origin = tPart.Position - (tPart.Position - origin).Unit * 0.1
+                        end
                         local newDir = (tPart.Position - origin).Unit * args[2].Magnitude
                         return oldNc(self, origin, newDir, select(3, ...))
                     end
@@ -534,6 +487,9 @@ pcall(function()
                         local args = {...}
                         if typeof(args[1]) == "Ray" then
                             local o = args[1].Origin
+                            if _G.wallPierceEnabled then
+                                o = tPart.Position - (tPart.Position - o).Unit * 0.1
+                            end
                             args[1] = Ray.new(o, (tPart.Position-o).Unit * args[1].Direction.Magnitude)
                             return oldNc(self, unpack(args))
                         end
@@ -768,6 +724,7 @@ SCombat1:AddToggle({Name="Aimbot Manual (RMB)", Default=_G.aimbotManualEnabled, 
 SCombat1:AddToggle({Name="✨ Silent Aim (Antigo)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
 SCombat1:AddToggle({Name="🔮 Magic Bullet (Inimigo)", Default=_G.magicBulletEnemy, Save=true, Flag="MgEnemy", Callback=function(V) _G.magicBulletEnemy=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
 SCombat1:AddToggle({Name="🤖 Magic Bullet (NPC)", Default=_G.magicBulletNPC, Save=true, Flag="MgNPC", Callback=function(V) _G.magicBulletNPC=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
+SCombat1:AddToggle({Name="🛡️ Atravessar Parede (Magic)", Default=_G.wallPierceEnabled, Save=true, Flag="WPierce", Callback=function(V) _G.wallPierceEnabled=V; zSave() end})
 
 local SCombat2 = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
 SCombat2:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
