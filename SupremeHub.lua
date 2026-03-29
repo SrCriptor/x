@@ -380,7 +380,7 @@ local function getPriorityParts(character)
     return primary, secondary
 end
 
--- 🎯 NOVO SISTEMA DE TARGET (REAL-TIME SEM TIMERS)
+-- 🎯 TARGET SYSTEM (REAL-TIME NO TIMERS)
 local function getClosestEnemyAdvanced()
     local cam = workspace.CurrentCamera
     if not cam then return nil, nil end
@@ -462,14 +462,18 @@ OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
 
     if not checkcaller() and _G.silentAimEnabled and math.random(1, 100) <= _G.silentAimHitChance then
         if m == "FindPartOnRayWithIgnoreList" or m == "FindPartOnRayWithWhitelist" or m == "FindPartOnRay" or m == "Raycast" then
-local t = currentTarget
-local ap = currentTargetPart
-            local cam = workspace.CurrentCamera
-            if t and ap and cam then
-                local origin = cam.CFrame.Position
-                if typeof(args[1]) == "Ray" then args[1] = Ray.new(origin, (ap.Position - origin).Unit * 1000)
-                elseif m == "Raycast" then args[1] = origin; args[2] = (ap.Position - origin).Unit * 1500 end
-                return OldNamecall(self, unpack(args))
+            if currentTarget and currentTargetPart then
+                local cam = workspace.CurrentCamera
+                if cam then
+                    local origin = cam.CFrame.Position
+                    if typeof(args[1]) == "Ray" then 
+                        args[1] = Ray.new(origin, (currentTargetPart.Position - origin).Unit * 1000)
+                    elseif m == "Raycast" then 
+                        args[1] = origin
+                        args[2] = (currentTargetPart.Position - origin).Unit * 1500 
+                    end
+                    return OldNamecall(self, unpack(args))
+                end
             end
         end
     end
@@ -661,151 +665,125 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             removeESP(player)
         end
     end
--- AIMBOT
-if (_G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming)) and not _G.silentAimEnabled then
-    if currentTarget and currentTargetPart then
-        if currentTarget ~= lastLegitTarget then
-        legitReactionTimer = tick() + (_G.aimbotMode == "Legit" and (math.random(5, 15) / 100) or 0)
-        lastLegitTarget = target
-    end
 
-    if tick() >= legitReactionTimer then
-        local aimPosition = currentTargetPart.Position
-
-        if _G.aimPredictionEnabled then
-            local targetVelocity = currentTargetPart.AssemblyLinearVelocity or Vector3.new(0,0,0)
-            local predScale = 1
-            if _G.aimbotMode == "Legit" then
-                local dist = (aimPosition - cam.CFrame.Position).Magnitude
-                predScale = math.clamp(dist / 100, 0.3, 1.5)
+    -- AIMBOT
+    if (_G.aimbotAutoEnabled or (_G.aimbotManualEnabled and aiming)) and not _G.silentAimEnabled then
+        if currentTarget and currentTargetPart then
+            if currentTarget ~= lastLegitTarget then
+                legitReactionTimer = tick() + (_G.aimbotMode == "Legit" and (math.random(5, 15) / 100) or 0)
+                lastLegitTarget = currentTarget
             end
-            aimPosition = aimPosition + (targetVelocity * (_G.aimPredictionForce * predScale))
-        end
 
-        if _G.aimbotMode == "Legit" then
-            local rx = (math.random() - 0.5) * 0.4
-            local ry = (math.random() - 0.5) * 0.4
-            local rz = (math.random() - 0.5) * 0.4
-            aimPosition = aimPosition + Vector3.new(rx, ry, rz)
-        end
+            if tick() >= legitReactionTimer then
+                local aimPosition = currentTargetPart.Position
 
-        local targetCFrame = CFrame.new(cam.CFrame.Position, aimPosition)
+                if _G.aimPredictionEnabled then
+                    local targetVelocity = currentTargetPart.AssemblyLinearVelocity or Vector3.new(0,0,0)
+                    local predScale = 1
+                    if _G.aimbotMode == "Legit" then
+                        local dist = (aimPosition - cam.CFrame.Position).Magnitude
+                        predScale = math.clamp(dist / 100, 0.3, 1.5)
+                    end
+                    aimPosition = aimPosition + (targetVelocity * (_G.aimPredictionForce * predScale))
+                end
 
-        if _G.aimbotMode == "Legit" then
-            local isFiring = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-            local baseSmoothness = _G.aimbotSmoothness * 2.5
-            local currentSmoothness = isFiring and (baseSmoothness * 0.8) or (baseSmoothness * 3.0)
-            cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / currentSmoothness, 0.001, 1))
+                if _G.aimbotMode == "Legit" then
+                    local rx = (math.random() - 0.5) * 0.4
+                    local ry = (math.random() - 0.5) * 0.4
+                    local rz = (math.random() - 0.5) * 0.4
+                    aimPosition = aimPosition + Vector3.new(rx, ry, rz)
+                end
+
+                local targetCFrame = CFrame.new(cam.CFrame.Position, aimPosition)
+
+                if _G.aimbotMode == "Legit" then
+                    local isFiring = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                    local baseSmoothness = _G.aimbotSmoothness * 2.5
+                    local currentSmoothness = isFiring and (baseSmoothness * 0.8) or (baseSmoothness * 3.0)
+                    cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / currentSmoothness, 0.001, 1))
+                else
+                    if _G.aimbotSmoothness <= 1 then 
+                        cam.CFrame = targetCFrame
+                    else 
+                        cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / _G.aimbotSmoothness, 0.01, 1)) 
+                    end
+                end
+            end
         else
-            if _G.aimbotSmoothness <= 1 then 
-                cam.CFrame = targetCFrame
-            else 
-                cam.CFrame = cam.CFrame:Lerp(targetCFrame, math.clamp(1 / _G.aimbotSmoothness, 0.01, 1)) 
+            lastLegitTarget = nil
+        end
+    end
+
+    -- 🔫 TRIGGERBOT
+    if _G.triggerBotEnabled and not triggerBotCooldown then
+        if currentTarget and currentTargetPart then
+            local direction = (currentTargetPart.Position - cam.CFrame.Position).Unit * 1000
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+            local result = workspace:Raycast(cam.CFrame.Position, direction, raycastParams)
+
+            if result and result.Instance and result.Instance:IsDescendantOf(currentTarget.Character) then
+                triggerBotCooldown = true
+
+                task.spawn(function()
+                    mouse1press()
+                    task.wait(0.02)
+                    mouse1release()
+
+                    task.wait(_G.triggerBotDelay)
+                    triggerBotCooldown = false
+                end)
             end
         end
     end
-else
-    lastLegitTarget = nil
-end
-end
 
--- 🔫 TRIGGERBOT (CORRIGIDO E MAIS ESTÁVEL)
-if _G.triggerBotEnabled and not triggerBotCooldown then
-    if currentTarget and currentTargetPart then
-        local direction = (currentTargetPart.Position - cam.CFrame.Position).Unit * 1000
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    -- ==================== WEAPON MODS ====================
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildOfClass("Tool")
 
-        local result = workspace:Raycast(cam.CFrame.Position, direction, raycastParams)
+        if tool then
+            for _, v in pairs(tool:GetDescendants()) do
+                local name = string.lower(v.Name)
 
-        if result and result.Instance and result.Instance:IsDescendantOf(currentTarget.Character) then
-            triggerBotCooldown = true
-
-            task.spawn(function()
-                mouse1press()
-                task.wait(0.02)
-                mouse1release()
-
-                task.wait(_G.triggerBotDelay)
-                triggerBotCooldown = false
-            end)
-        end
-    end
-end
-
--- ==================== WEAPON MODS (UNIFICADO) ====================
-local char = LocalPlayer.Character
-if char then
-    local tool = char:FindFirstChildOfClass("Tool")
-
-    if tool then
-        for _, v in pairs(tool:GetDescendants()) do
-            local name = string.lower(v.Name)
-
-            -- 🔫 INFINITE AMMO
-            if _G.infiniteAmmoEnabled then
-                if v:IsA("IntValue") or v:IsA("NumberValue") then
-                    if name:find("ammo") or name:find("clip") or name:find("mag") then
-                        v.Value = 999
-                    end
-                end
-            end
-
-            -- ⚡ FAST RELOAD
-            if _G.instantReloadEnabled then
-                if v:IsA("NumberValue") then
-                    if name:find("reload") or name:find("cooldown") or name:find("delay") then
-                        v.Value = 0
-                    end
+                if _G.infiniteAmmoEnabled and (v:IsA("IntValue") or v:IsA("NumberValue")) then
+                    if name:find("ammo") or name:find("clip") or name:find("mag") then v.Value = 999 end
                 end
 
-                if v:IsA("BoolValue") then
-                    if name:find("reloading") then
-                        v.Value = false
-                    end
+                if _G.instantReloadEnabled then
+                    if v:IsA("NumberValue") and (name:find("reload") or name:find("cooldown") or name:find("delay")) then v.Value = 0 end
+                    if v:IsA("BoolValue") and name:find("reloading") then v.Value = false end
                 end
-            end
 
-            -- 💥 NO SPREAD
-            if _G.noSpreadEnabled then
-                if v:IsA("NumberValue") then
-                    if name:find("spread") or name:find("cone") then
-                        v.Value = 0
-                    end
+                if _G.noSpreadEnabled and v:IsA("NumberValue") and (name:find("spread") or name:find("cone")) then
+                    v.Value = 0
                 end
             end
         end
     end
-end
 
--- 🎯 NO RECOIL (camera fix)
-if _G.noRecoilEnabled then
-    local camCF = cam.CFrame
-    local _, y, _ = camCF:ToOrientation()
-    cam.CFrame = CFrame.new(camCF.Position) * CFrame.Angles(0, y, 0)
-end
+    -- 🎯 NO RECOIL
+    if _G.noRecoilEnabled then
+        local camCF = cam.CFrame
+        local _, y, _ = camCF:ToOrientation()
+        cam.CFrame = CFrame.new(camCF.Position) * CFrame.Angles(0, y, 0)
+    end
 end)
 
 -- ==================== INPUT ====================
 UserInputService.InputBegan:Connect(function(input, isProcessed) 
     if isProcessed then return end
-    if input.UserInputType == aimbotKey or input.UserInputType == Enum.UserInputType.Touch then 
-        aiming = true 
-    end
+    if input.UserInputType == aimbotKey or input.UserInputType == Enum.UserInputType.Touch then aiming = true end
 end)
 
 UserInputService.InputEnded:Connect(function(input) 
-    if input.UserInputType == aimbotKey or input.UserInputType == Enum.UserInputType.Touch then 
-        aiming = false 
-    end
+    if input.UserInputType == aimbotKey or input.UserInputType == Enum.UserInputType.Touch then aiming = false end
 end)
 
 -- ==================== CLEANUP ====================
 Players.PlayerRemoving:Connect(function(player) 
     removeESP(player) 
-    if currentTarget == player then 
-        currentTarget = nil 
-        currentTargetPart = nil
-    end 
+    if currentTarget == player then currentTarget, currentTargetPart = nil, nil end 
 end)
