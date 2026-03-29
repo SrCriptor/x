@@ -1148,15 +1148,17 @@ SSystem:AddButton({Name="💾 SALVAR TUDO AGORA", Callback=function() zSave(); O
 SSystem:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
 
 local SPanic = TabCfg:AddSection({Name="🛑 EMERGÊNCIA"})
-SCfg1:AddBind({Name="🛑 BOTÃO DE PÂNICO (Destruir Tudo)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
+SCfg1:AddBind({Name="🛑 BOTÃO DE PÂNICO (Remover Menu)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
     _G.SupremeHubRunning = false
     pcall(function() if _G.RunServiceConnection then _G.RunServiceConnection:Disconnect() end end)
     pcall(function() _G.clearDrawings() end)
+    pcall(function() conn:Disconnect() end)
     if bonecoFrame then pcall(function() bonecoFrame.Parent:Destroy() end) end
     pcall(function() if coreGui:FindFirstChild("SupremeMobileHub") then coreGui.SupremeMobileHub:Destroy() end end)
     pcall(function() OrionLib:Destroy() end)
     OrionLib:MakeNotification({Name="Alerta", Content="Script encerrado!", Time=5})
 end})
+
 
 local SVisualTools = TabCfg:AddSection({Name="🎨 FERRAMENTAS EXTRAS"})
 SVisualTools:AddButton({Name="🎯 Resetar Posição Radar", Callback=function() _G.radarPos = Vector2.new(200, 200) end})
