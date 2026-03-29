@@ -325,27 +325,39 @@ SConfigGerais:AddBind({ Name = "🛑 BOTÃO DE PÂNICO (Apagar Script Completame
 
 OrionLib:Init()
 
+-- ==================== ABSTRACTIONS & HELPERS ====================
+local function getHumanoid(char) if not char then return nil end return char:FindFirstChildOfClass("Humanoid") or char:FindFirstChild("Humanoid") end
+local function getRoot(char) if not char then return nil end return char.PrimaryPart or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") end
+local function getHead(char) if not char then return nil end return char:FindFirstChild("Head") or char:FindFirstChild("HeadHitbox") or getRoot(char) end
+local function getHealth(char) local h = getHumanoid(char) if h then return h.Health, h.MaxHealth end local hd = char and char:FindFirstChild("Health") if hd and (hd:IsA("NumberValue") or hd:IsA("IntValue")) then return hd.Value, 100 end return 100, 100 end
+local function getWeapon(char) if not char then return nil end local tool = char:FindFirstChildOfClass("Tool") if tool then return tool end for _, v in pairs(char:GetChildren()) do if v:IsA("Model") and (v.Name:lower():find("gun") or v.Name:lower():find("weapon")) then return v end end return nil end
+local function getTeam(player) if not player then return "None" end if player.Team then return player.Team.Name end if player.TeamColor then return player.TeamColor.Name end local tVal = player:FindFirstChild("Team") or player:FindFirstChild("team") if tVal and (tVal:IsA("StringValue") or tVal:IsA("ObjectValue")) then return tostring(tVal.Value) end return "None" end
+
 -- ==================== CORE FUNCTIONS ====================
-local function isAlive(c) local h = c and c:FindFirstChildOfClass("Humanoid"); return h and h.Health > 0 end
-local function isSameTeam(p1, p2) if not p1 or not p2 then return false end; if p1.Team and p2.Team then return p1.Team == p2.Team end; if p1.TeamColor and p2.TeamColor then return p1.TeamColor == p2.TeamColor end; return false end
-local function isFFA() local t = {}; local c = 0; for _, p in pairs(Players:GetPlayers()) do if p.Team or p.TeamColor then t[p.Team and p.Team.Name or p.TeamColor.Name] = true end end; for _ in pairs(t) do c = c + 1 end; return c < 2 end
+local function isAlive(c) if not c then return false end local h = getHumanoid(c) if h then return h.Health > 0 end return getRoot(c) ~= nil end
+local function isSameTeam(p1, p2) if not p1 or not p2 then return false end local t1, t2 = getTeam(p1), getTeam(p2) if t1 ~= "None" and t2 ~= "None" then return t1 == t2 end return false end
+local function isFFA() local t = {}; local c = 0; for _, p in pairs(Players:GetPlayers()) do local team = getTeam(p) if team ~= "None" then t[team] = true end end; for _ in pairs(t) do c = c + 1 end; return c < 2 end
 
 local function hasLineOfSight(tp) 
     local cam = workspace.CurrentCamera
     if not cam then return false end
-    local r = RaycastParams.new(); r.FilterDescendantsInstances = {LocalPlayer.Character}; r.FilterType = Enum.RaycastFilterType.Blacklist
-    return not workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r) or workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r).Instance:IsDescendantOf(tp.Parent) 
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local r = RaycastParams.new(); r.FilterDescendantsInstances = {char}; r.FilterType = Enum.RaycastFilterType.Blacklist
+    local res = workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r)
+    return not res or res.Instance:IsDescendantOf(tp.Parent) 
 end
 
--- 🧠 PRIORIDADE DE HITBOX (SMART)
+-- 🧠 PRIORIDADE DE HITBOX (SMART RESOLVER)
 local function getPriorityParts(character)
     local primary = {}
     local secondary = {}
-    local head = character:FindFirstChild("Head")
-    local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+    local head = getHead(character)
+    local root = getRoot(character)
 
-    local isMoving = root and root.Velocity.Magnitude > 5
-    local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local vel = root and (root.AssemblyLinearVelocity or root.Velocity) or Vector3.new(0, 0, 0)
+    local isMoving = vel.Magnitude > 5
+    local localRoot = getRoot(LocalPlayer.Character)
     local dist = (root and localRoot) and (root.Position - localRoot.Position).Magnitude or 0
 
     local preferTorso = isMoving or dist > 150
@@ -506,15 +518,20 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     end
 
     if LocalPlayer.Character and isAlive(LocalPlayer.Character) then
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = _G.walkSpeed; hum.JumpPower = _G.jumpPower end
+        local hum = getHumanoid(LocalPlayer.Character)
+        if hum then 
+            pcall(function() hum.WalkSpeed = _G.walkSpeed end)
+            pcall(function() hum.JumpPower = _G.jumpPower end)
+        end
     end
 
-    if _G.antiAimLegitEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local root = LocalPlayer.Character.HumanoidRootPart
-        if tick() - lastAntiAimTick > 0.05 then
-            local ov = root.Velocity; root.Velocity = Vector3.new(math.random(-100, 100), math.random(-50, 50), math.random(-100, 100))
-            task.spawn(function() RunService.RenderStepped:Wait(); root.Velocity = ov end); lastAntiAimTick = tick()
+    if _G.antiAimLegitEnabled and LocalPlayer.Character then
+        local root = getRoot(LocalPlayer.Character)
+        if root and tick() - lastAntiAimTick > 0.05 then
+            local ov = root.AssemblyLinearVelocity or root.Velocity
+            pcall(function() root.Velocity = Vector3.new(math.random(-100, 100), math.random(-50, 50), math.random(-100, 100)) end)
+            task.spawn(function() RunService.RenderStepped:Wait(); pcall(function() root.Velocity = ov end) end)
+            lastAntiAimTick = tick()
         end
     end
 
@@ -524,9 +541,8 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
         local char = player.Character
         if char and isAlive(char) then
             local isAlly = not ffa and isSameTeam(player, LocalPlayer)
-            
-            local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-            local localRoot = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or LocalPlayer.Character:FindFirstChild("Torso") or LocalPlayer.Character:FindFirstChild("UpperTorso"))
+            local targetRoot = getRoot(char)
+            local localRoot = getRoot(LocalPlayer.Character)
             
             local playerDist = math.huge
             if targetRoot and localRoot then
@@ -539,7 +555,7 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             end
 
             if _G.hitboxExpander > 2 and not isAlly then
-                local head = char:FindFirstChild("Head")
+                local head = getHead(char)
                 if head and head:IsA("BasePart") then head.Size = Vector3.new(_G.hitboxExpander, _G.hitboxExpander, _G.hitboxExpander); head.Transparency = 0.5; head.CanCollide = false end
             end
 
@@ -550,12 +566,12 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             local txtEn = isAlly and _G.espAllyText or (not isAlly and _G.espEnemyText)
 
             -- NATIVE BOX 2D
-            if bEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
-                local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                local sPos, on = cam:WorldToViewportPoint(rootPart.Position)
+            if bEn and not _G.streamerMode and targetRoot then
+                local sPos, on = cam:WorldToViewportPoint(targetRoot.Position)
                 local box = boxes[player] or createBox(); boxes[player] = box
                 if on then
-                    local headPos = cam:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or rootPart.Position) + Vector3.new(0, 1.5, 0))
+                    local hd = getHead(char)
+                    local headPos = cam:WorldToViewportPoint((hd and hd.Position or targetRoot.Position) + Vector3.new(0, 1.5, 0))
                     local height = math.abs(headPos.Y - sPos.Y) * 2.2
                     local width = height * 0.55
                     box.Visible = true; box.Size = UDim2.new(0, width, 0, height); box.Position = UDim2.new(0, sPos.X - width / 2, 0, headPos.Y)
@@ -584,24 +600,25 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             else if highlights[player] then highlights[player]:Destroy(); highlights[player] = nil end end
 
             -- NATIVE TEXTOS
-            if txtEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
-                local sPos, on = cam:WorldToViewportPoint((char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position) + Vector3.new(0, 2, 0))
+            if txtEn and not _G.streamerMode and targetRoot then
+                local hd = getHead(char)
+                local sPos, on = cam:WorldToViewportPoint((hd and hd.Position or targetRoot.Position) + Vector3.new(0, 2, 0))
                 local txt = espTexts[player] or createText(); espTexts[player] = txt
                 if on then
                     txt.Visible = true; txt.Position = UDim2.new(0, sPos.X, 0, sPos.Y - 15)
                     txt.TextColor3 = (player == currentTarget and Color3.fromRGB(255, 255, 0)) or (isAlly and Color3.fromRGB(46, 204, 113)) or Color3.fromRGB(255, 255, 255)
                     local info = _G.espName and (player.DisplayName .. "\n") or ""
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if _G.espHP and hum then info = info .. "[" .. math.floor(hum.Health) .. " HP] " end
-                    if _G.espDistance then info = info .. "[" .. math.floor((cam.CFrame.Position - char.HumanoidRootPart.Position).Magnitude) .. "m]\n" else info = info .. (info ~= "" and "\n" or "") end
-                    if _G.espWeapon then local tool = char:FindFirstChildOfClass("Tool"); info = info .. (tool and "["..tool.Name.."]" or "[Mãos]") end
+                    local hp, _ = getHealth(char)
+                    if _G.espHP then info = info .. "[" .. math.floor(hp) .. " HP] " end
+                    if _G.espDistance then info = info .. "[" .. math.floor((cam.CFrame.Position - targetRoot.Position).Magnitude) .. "m]\n" else info = info .. (info ~= "" and "\n" or "") end
+                    if _G.espWeapon then local tool = getWeapon(char); info = info .. (tool and "["..tool.Name.."]" or "[Mãos]") end
                     txt.Text = info
                 else txt.Visible = false end
             else if espTexts[player] then espTexts[player]:Destroy(); espTexts[player] = nil end end
 
             -- NATIVE TRACERS
-            if tEn and not _G.streamerMode and char:FindFirstChild("HumanoidRootPart") then
-                local sPos, on = cam:WorldToViewportPoint(char.HumanoidRootPart.Position)
+            if tEn and not _G.streamerMode and targetRoot then
+                local sPos, on = cam:WorldToViewportPoint(targetRoot.Position)
                 local tracer = tracers[player] or createLine(); tracers[player] = tracer
                 if on then
                     local p1, p2 = Vector2.new(c.X, cam.ViewportSize.Y), Vector2.new(sPos.X, sPos.Y)
@@ -637,9 +654,6 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
             else if skeletons[player] then for _, line in pairs(skeletons[player]) do line:Destroy() end; skeletons[player] = nil end end
 
             -- RADAR MINIMAPA (Universal / Qualquer Jogo)
-            local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-            local localRoot = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or LocalPlayer.Character:FindFirstChild("Torso") or LocalPlayer.Character:FindFirstChild("UpperTorso"))
-
             if _G.espRadar and not _G.streamerMode and targetRoot and localRoot then
                 local blip = radarBlips[player] or createRadarBlip(player)
                 if isAlly then blip.BackgroundColor3 = Color3.fromRGB(46, 204, 113) else blip.BackgroundColor3 = Color3.fromRGB(231, 76, 60) end
@@ -739,10 +753,10 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ==================== WEAPON MODS ====================
+    -- ==================== WEAPON MODS ABSTRACTION ====================
     local char = LocalPlayer.Character
     if char then
-        local tool = char:FindFirstChildOfClass("Tool")
+        local tool = getWeapon(char)
 
         if tool then
             for _, v in pairs(tool:GetDescendants()) do
