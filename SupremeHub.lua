@@ -325,10 +325,22 @@ SConfigGerais:AddBind({ Name = "🛑 BOTÃO DE PÂNICO (Apagar Script Completame
 
 OrionLib:Init()
 
--- ==================== ABSTRACTIONS & HELPERS ====================
+-- ==================== ABSTRACTIONS & HELPERS (UNIVERSAL FPS) ====================
+local function getCharacter(player)
+    if not player then return nil end
+    if player.Character then return player.Character end
+    local pf = workspace:FindFirstChild(player.Name)
+    if pf and pf:IsA("Model") then return pf end
+    local folders = {"Players", "Characters", "Entities", "Models", "Game", "Baddies"}
+    for _, fName in pairs(folders) do
+        local f = workspace:FindFirstChild(fName)
+        if f then local c = f:FindFirstChild(player.Name) if c and c:IsA("Model") then return c end end
+    end
+    return nil
+end
 local function getHumanoid(char) if not char then return nil end return char:FindFirstChildOfClass("Humanoid") or char:FindFirstChild("Humanoid") end
-local function getRoot(char) if not char then return nil end return char.PrimaryPart or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") end
-local function getHead(char) if not char then return nil end return char:FindFirstChild("Head") or char:FindFirstChild("HeadHitbox") or getRoot(char) end
+local function getRoot(char) if not char then return nil end return char.PrimaryPart or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Hitbox") end
+local function getHead(char) if not char then return nil end return char:FindFirstChild("Head") or char:FindFirstChild("HeadHitbox") or char:FindFirstChild("FakeHead") or getRoot(char) end
 local function getHealth(char) local h = getHumanoid(char) if h then return h.Health, h.MaxHealth end local hd = char and char:FindFirstChild("Health") if hd and (hd:IsA("NumberValue") or hd:IsA("IntValue")) then return hd.Value, 100 end return 100, 100 end
 local function getWeapon(char) if not char then return nil end local tool = char:FindFirstChildOfClass("Tool") if tool then return tool end for _, v in pairs(char:GetChildren()) do if v:IsA("Model") and (v.Name:lower():find("gun") or v.Name:lower():find("weapon")) then return v end end return nil end
 local function getTeam(player) if not player then return "None" end if player.Team then return player.Team.Name end if player.TeamColor then return player.TeamColor.Name end local tVal = player:FindFirstChild("Team") or player:FindFirstChild("team") if tVal and (tVal:IsA("StringValue") or tVal:IsA("ObjectValue")) then return tostring(tVal.Value) end return "None" end
@@ -341,9 +353,13 @@ local function isFFA() local t = {}; local c = 0; for _, p in pairs(Players:GetP
 local function hasLineOfSight(tp) 
     local cam = workspace.CurrentCamera
     if not cam then return false end
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local r = RaycastParams.new(); r.FilterDescendantsInstances = {char}; r.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    local ignores = {cam}
+    local localChar = getCharacter(LocalPlayer)
+    if localChar then table.insert(ignores, localChar) end
+    for _, v in pairs(cam:GetChildren()) do table.insert(ignores, v) end
+    
+    local r = RaycastParams.new(); r.FilterDescendantsInstances = ignores; r.FilterType = Enum.RaycastFilterType.Blacklist
     local res = workspace:Raycast(cam.CFrame.Position, (tp.Position - cam.CFrame.Position).Unit * 5000, r)
     return not res or res.Instance:IsDescendantOf(tp.Parent) 
 end
@@ -357,7 +373,7 @@ local function getPriorityParts(character)
 
     local vel = root and (root.AssemblyLinearVelocity or root.Velocity) or Vector3.new(0, 0, 0)
     local isMoving = vel.Magnitude > 5
-    local localRoot = getRoot(LocalPlayer.Character)
+    local localRoot = getRoot(getCharacter(LocalPlayer))
     local dist = (root and localRoot) and (root.Position - localRoot.Position).Magnitude or 0
 
     local preferTorso = isMoving or dist > 150
@@ -405,7 +421,7 @@ local function getClosestEnemyAdvanced()
     for _, player in pairs(game.Players:GetPlayers()) do
         if player == LocalPlayer then continue end
 
-        local char = player.Character
+        local char = getCharacter(player)
         if not char or not isAlive(char) then continue end
         if not isFFA() and isSameTeam(player, LocalPlayer) then continue end
 
@@ -466,15 +482,15 @@ local function getClosestEnemyAdvanced()
     end
 end
 
--- ==================== SILENT AIM HOOK ====================
+-- ==================== SILENT AIM HOOK (UNIVERSAL FPS) ====================
 local OldNamecall
 OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local m = getnamecallmethod()
     local args = {...}
 
     if not checkcaller() and _G.silentAimEnabled and math.random(1, 100) <= _G.silentAimHitChance then
-        if m == "FindPartOnRayWithIgnoreList" or m == "FindPartOnRayWithWhitelist" or m == "FindPartOnRay" or m == "Raycast" then
-            if currentTarget and currentTargetPart then
+        if currentTarget and currentTargetPart then
+            if m == "FindPartOnRayWithIgnoreList" or m == "FindPartOnRayWithWhitelist" or m == "FindPartOnRay" or m == "Raycast" then
                 local cam = workspace.CurrentCamera
                 if cam then
                     local origin = cam.CFrame.Position
@@ -485,6 +501,18 @@ OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                         args[2] = (currentTargetPart.Position - origin).Unit * 1500 
                     end
                     return OldNamecall(self, unpack(args))
+                end
+            elseif m == "FireServer" or m == "InvokeServer" then
+                local n = tostring(self):lower()
+                if n:find("hit") or n:find("damage") or n:find("fire") or n:find("shoot") or n:find("weapon") or n:find("bullet") or n:find("event") then
+                    local modified = false
+                    for i, arg in pairs(args) do
+                        if typeof(arg) == "Instance" and arg:IsA("BasePart") then
+                            args[i] = currentTargetPart
+                            modified = true
+                        end
+                    end
+                    if modified then return OldNamecall(self, unpack(args)) end
                 end
             end
         end
@@ -517,16 +545,17 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
         fovFrame.ZIndex = 999
     end
 
-    if LocalPlayer.Character and isAlive(LocalPlayer.Character) then
-        local hum = getHumanoid(LocalPlayer.Character)
+    local localChar = getCharacter(LocalPlayer)
+    if localChar and isAlive(localChar) then
+        local hum = getHumanoid(localChar)
         if hum then 
             pcall(function() hum.WalkSpeed = _G.walkSpeed end)
             pcall(function() hum.JumpPower = _G.jumpPower end)
         end
     end
 
-    if _G.antiAimLegitEnabled and LocalPlayer.Character then
-        local root = getRoot(LocalPlayer.Character)
+    if _G.antiAimLegitEnabled and localChar then
+        local root = getRoot(localChar)
         if root and tick() - lastAntiAimTick > 0.05 then
             local ov = root.AssemblyLinearVelocity or root.Velocity
             pcall(function() root.Velocity = Vector3.new(math.random(-100, 100), math.random(-50, 50), math.random(-100, 100)) end)
@@ -538,11 +567,11 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     local ffa = isFFA()
     for _, player in pairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
-        local char = player.Character
+        local char = getCharacter(player)
         if char and isAlive(char) then
             local isAlly = not ffa and isSameTeam(player, LocalPlayer)
             local targetRoot = getRoot(char)
-            local localRoot = getRoot(LocalPlayer.Character)
+            local localRoot = getRoot(localChar)
             
             local playerDist = math.huge
             if targetRoot and localRoot then
@@ -733,7 +762,12 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
         if currentTarget and currentTargetPart then
             local direction = (currentTargetPart.Position - cam.CFrame.Position).Unit * 1000
             local raycastParams = RaycastParams.new()
-            raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+            
+            local ignores = {cam}
+            if localChar then table.insert(ignores, localChar) end
+            for _, v in pairs(cam:GetChildren()) do table.insert(ignores, v) end
+            
+            raycastParams.FilterDescendantsInstances = ignores
             raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 
             local result = workspace:Raycast(cam.CFrame.Position, direction, raycastParams)
@@ -754,9 +788,8 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     end
 
     -- ==================== WEAPON MODS ABSTRACTION ====================
-    local char = LocalPlayer.Character
-    if char then
-        local tool = getWeapon(char)
+    if localChar then
+        local tool = getWeapon(localChar)
 
         if tool then
             for _, v in pairs(tool:GetDescendants()) do
