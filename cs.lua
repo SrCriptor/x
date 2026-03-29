@@ -34,6 +34,8 @@ _G.mouseSpoofEnabled = false   -- Opcional (Spoof Mouse.Hit)
 _G.telekillPlayerEnabled = false
 _G.telekillNPCEnabled = false
 _G.telekillDistance = 5        -- Distância para Telekill (2-20)
+_G.stealthModeEnabled = true   -- Ativa Spoofing de Properties
+_G.safeModeEnabled = false     -- Bloqueia Funções de Risco
 _G.espEnemyBox = true; _G.espEnemyChams = true; _G.espEnemyTracers = false
 _G.espEnemySkeleton = false; _G.espEnemyText = true
 _G.espAllyBox = false; _G.espAllyChams = false; _G.espAllyTracers = false
@@ -487,6 +489,31 @@ Mouse.Button2Up:Connect(function() aiming=false end)
 
 -- ═══════════ SILENT AIM HOOK ═══════════
 pcall(function()
+    -- ═══════════ STEALTH & PROPERTY SPOOFING ═══════════
+    local oldIdx; oldIdx = hookmetamethod(game, "__index", newcclosure(function(self, idx)
+        if _G.SupremeHubRunning and _G.stealthModeEnabled and not checkcaller() then
+            local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+            if self == hum then
+                if idx == "WalkSpeed" then return 16 end
+                if idx == "JumpPower" then return 50 end
+            end
+        end
+        return oldIdx(self, idx)
+    end))
+
+    local oldNewIdx; oldNewIdx = hookmetamethod(game, "__newindex", newcclosure(function(self, idx, val)
+        if _G.SupremeHubRunning and _G.stealthModeEnabled and not checkcaller() then
+            local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+            if self == hum then
+                if idx == "WalkSpeed" or idx == "JumpPower" then 
+                    -- Bloqueia o jogo de resetar nossa speed, mas permite o script mudar
+                    if val == 16 or val == 50 or val == 0 then return end 
+                end
+            end
+        end
+        return oldNewIdx(self, idx, val)
+    end))
+
     -- ═══════════ MOUSE SPOOFING (__index) ═══════════
     local currentMouse = LP:GetMouse()
     local oldIdx; oldIdx = hookmetamethod(currentMouse, "__index", newcclosure(function(self, idx)
@@ -561,22 +588,13 @@ local conn; conn = RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Movement
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            if _G.walkSpeed > 16 then hum.WalkSpeed = _G.walkSpeed end
-            if _G.jumpPower > 50 then hum.JumpPower = _G.jumpPower end
-        end
-    end
-
-    -- Hitbox Expander
-    if _G.hitboxExpander > 2 then
-        for _,p in pairs(Players:GetPlayers()) do
-            if p~=LP and p.Character and isEnemy(p) then
-                local h = p.Character:FindFirstChild("Head")
-                if h then pcall(function() h.Size=Vector3.new(_G.hitboxExpander,_G.hitboxExpander,_G.hitboxExpander); h.Transparency=0.7; h.CanCollide=false end) end
-            end
+    -- Movement & Safety
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        if _G.safeModeEnabled then
+            hum.WalkSpeed = 16; hum.JumpPower = 50
+        else
+            hum.WalkSpeed = _G.walkSpeed; hum.JumpPower = _G.jumpPower
         end
     end
 
@@ -594,6 +612,14 @@ local conn; conn = RunService.RenderStepped:Connect(function()
                 if hasAny then
                     updateESP(p, c, Color3.fromRGB(255,0,0), _G.espEnemyBox, _G.espEnemyChams, _G.espEnemyTracers, _G.espEnemySkeleton, _G.espEnemyText, "enemy")
                 else removeESP(p) end
+
+                -- Hitbox Expander (Player)
+                local head = c:FindFirstChild("Head")
+                if head and head:IsA("BasePart") then
+                    if _G.safeModeEnabled then head.Size = Vector3.new(2,1,1)
+                    else head.Size = Vector3.new(_G.hitboxExpander, _G.hitboxExpander, _G.hitboxExpander) end
+                    head.Transparency = 0.5; head.CanCollide = true
+                end
             else
                 hasAny = _G.espAllyBox or _G.espAllyChams or _G.espAllyTracers or _G.espAllySkeleton or _G.espAllyText
                 if hasAny then
@@ -612,6 +638,14 @@ local conn; conn = RunService.RenderStepped:Connect(function()
             if isAlive(npc) then
                 activeNPCs[npc] = true
                 updateESP(npc, npc, Color3.fromRGB(200,0,255), true, true, false, true, true, "npc")
+                
+                -- Hitbox Expander (NPC)
+                local head = npc:FindFirstChild("Head")
+                if head and head:IsA("BasePart") then
+                    if _G.safeModeEnabled then head.Size = Vector3.new(2,1,1) -- Default
+                    else head.Size = Vector3.new(_G.hitboxExpander, _G.hitboxExpander, _G.hitboxExpander) end
+                    head.Transparency = 0.5; head.CanCollide = true
+                end
             else
                 removeESP(npc)
             end
@@ -835,8 +869,12 @@ SWeap1:AddToggle({Name="Infinite Ammo", Default=_G.infiniteAmmoEnabled, Save=tru
 SWeap1:AddToggle({Name="Fast Reload", Default=_G.instantReloadEnabled, Save=true, Flag="IRel", Callback=function(V) _G.instantReloadEnabled=V; zSave() end})
 SWeap1:AddToggle({Name="Rapid Fire (Auto Bullet)", Default=_G.rapidFireEnabled, Save=true, Flag="RFire", Callback=function(V) _G.rapidFireEnabled=V; zSave() end})
 
-local SWeap2 = TabWeap:AddSection({Name="💀 HITBOX EXPANDER"})
-SWeap2:AddSlider({Name="Aumentar Cabeça (Tamanho)", Min=2, Max=15, Default=_G.hitboxExpander, Color=Color3.fromRGB(150,0,255), Increment=1, ValueName="Scale", Save=true, Flag="HEx", Callback=function(V) _G.hitboxExpander=V; zSave() end})
+local SWeap2 = TabWeap:AddSection({Name="💀 HITBOX EXPANDER (🔴 ALTO RISCO)"})
+SWeap2:AddSlider({Name="Aumentar Cabeça (Tamanho)", Min=2, Max=15, Default=_G.hitboxExpander, Color=Color3.fromRGB(150,0,255), Increment=1, ValueName="Scale", Save=true, Flag="HEx", Callback=function(V) 
+    if _G.safeModeEnabled and V > 2 then OrionLib:MakeNotification({Name="Aviso", Content="Safe Mode ativado! Hitbox bloqueada.", Time=2}); return end
+    _G.hitboxExpander=V; zSave() 
+end})
+SWeap2:AddLabel("⚠️ CAUSA #1 DE BANS: Use com moderação!")
 
 -- TAB: PLAYER
 local TabPlayer = Window:MakeTab({Name="👟 Player", Icon="rbxassetid://4483345998", PremiumOnly=false})
@@ -846,12 +884,28 @@ SPlay1:AddSlider({Name="JumpPower", Min=50, Max=300, Default=_G.jumpPower, Color
 
 -- TAB: EXPERIMENTAL
 local TabExp = Window:MakeTab({Name="🧪 Experimental", Icon="rbxassetid://4483345998", PremiumOnly=false})
-local SExp1 = TabExp:AddSection({Name="🚀 360 TELEKILL (BRUTO)"})
-SExp1:AddToggle({Name="Telekill Players (360°)", Default=_G.telekillPlayerEnabled, Save=true, Flag="TKP", Callback=function(V) _G.telekillPlayerEnabled=V; if V then _G.telekillNPCEnabled=false end; zSave() end})
-SExp1:AddToggle({Name="Telekill NPCs (360°)", Default=_G.telekillNPCEnabled, Save=true, Flag="TKN", Callback=function(V) _G.telekillNPCEnabled=V; if V then _G.telekillPlayerEnabled=false end; zSave() end})
+local SExp0 = TabExp:AddSection({Name="🛡️ STEALTH & SAFETY"})
+SExp0:AddToggle({Name="Anti-Detecção (Property Spoof)", Default=_G.stealthModeEnabled, Save=true, Flag="Stlth", Callback=function(V) _G.stealthModeEnabled=V; zSave() end})
+SExp0:AddToggle({Name="Safe Mode (Bloquear Risco)", Default=_G.safeModeEnabled, Save=true, Flag="SafeM", Callback=function(V) 
+    _G.safeModeEnabled=V
+    if V then _G.telekillPlayerEnabled=false; _G.telekillNPCEnabled=false; _G.hitboxExpander=2 end
+    zSave() 
+end})
+
+local SExp1 = TabExp:AddSection({Name="🚀 360 TELEKILL (🔴 ALTO RISCO)"})
+SExp1:AddToggle({Name="Telekill Players (360°)", Default=_G.telekillPlayerEnabled, Save=true, Flag="TKP", Callback=function(V) 
+    if _G.safeModeEnabled and V then OrionLib:MakeNotification({Name="Aviso", Content="Safe Mode ativado! Desative para usar Telekill.", Time=2}); return end
+    _G.telekillPlayerEnabled=V; if V then _G.telekillNPCEnabled=false end; zSave() 
+end})
+SExp1:AddToggle({Name="Telekill NPCs (360°)", Default=_G.telekillNPCEnabled, Save=true, Flag="TKN", Callback=function(V) 
+    if _G.safeModeEnabled and V then OrionLib:MakeNotification({Name="Aviso", Content="Safe Mode ativado! Desative para usar Telekill.", Time=2}); return end
+    _G.telekillNPCEnabled=V; if V then _G.telekillPlayerEnabled=false end; zSave() 
+end})
 SExp1:AddSlider({Name="Distância do Telekill", Min=2, Max=20, Default=_G.telekillDistance, Color=Color3.fromRGB(255,150,0), Increment=0.5, ValueName="Studs", Save=true, Flag="TKDist", Callback=function(V) _G.telekillDistance=V; zSave() end})
-SExp1:AddToggle({Name="Mouse Spoofing (Hit Correction)", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
-SExp1:AddLabel("⚠️ 2-5m: Faca | 10-20m: Armas")
+
+local SExp2 = TabExp:AddSection({Name="⚙️ OTHERS (🟡 MÉDIO RISCO)"})
+SExp2:AddToggle({Name="Mouse Spoofing (Silent Aim Helper)", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
+SExp2:AddLabel("⚠️ Telekill e Hitbox Expander dão ban facilmente.")
 local TabCfg = Window:MakeTab({Name="⚙️ Config", Icon="rbxassetid://4483345998", PremiumOnly=false})
 local SCfg1 = TabCfg:AddSection({Name="🛡️ INTERFACE"})
 if not isMobile then
