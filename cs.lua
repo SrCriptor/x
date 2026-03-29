@@ -18,10 +18,13 @@ _G.SupremeHubRunning = true
 -- ═══════════ FLAGS GLOBAIS ═══════════
 _G.aimbotAutoEnabled = _G.aimbotAutoEnabled or false
 _G.aimbotManualEnabled = _G.aimbotManualEnabled or false
+_G.aimbotLegitMode = false     -- Modo PRO (Humanizado)
+_G.aimbotSmoothness = 1
+_G.aimbotStickiness = 10       -- Raio para "grudar" no LEGIT (10-100)
+_G.aimbotRandomizeTarget = false -- Alvos Aleatórios (Head/Chest)
 _G.silentAimEnabled = _G.silentAimEnabled or false
 _G.wallCheckEnabled = true
 _G.aimPredictionEnabled = false
-_G.aimbotSmoothness = 1
 _G.silentAimHitChance = 100
 _G.FOV_RADIUS = _G.FOV_RADIUS or 65
 _G.FOV_VISIBLE = true
@@ -29,13 +32,22 @@ _G.legitDeadzone = 10
 _G.espNPCEnabled = false
 _G.magicBulletNPC = false       -- Silent Aim para NPCs
 _G.magicBulletEnemy = false     -- Silent Aim para Players
-_G.wallPierceEnabled = false   -- Opcional (Teleport bullet origin)
 _G.mouseSpoofEnabled = false   -- Opcional (Spoof Mouse.Hit)
 _G.telekillPlayerEnabled = false
 _G.telekillNPCEnabled = false
 _G.telekillDistance = 5        -- Distância para Telekill (2-20)
 _G.stealthModeEnabled = true   -- Ativa Spoofing de Properties
 _G.safeModeEnabled = false     -- Bloqueia Funções de Risco
+_G.radarEnabled = false        -- Radar 2D
+_G.radarScale = 0.5           -- Zoom das Bolinhas
+_G.radarDotsOnly = false      -- Mostrar apenas as bolinhas (sem circulo)
+_G.radarPos = Vector2.new(200, 200)
+_G.selectedTheme = "Default"
+_G.isRGBTheme = false
+_G.fullbrightEnabled = _G.fullbrightEnabled or false   -- Iluminação Total
+_G.noFogEnabled = false
+_G.alwaysDayEnabled = false
+_G.streamproofEnabled = false -- Modo Anti-OBS
 _G.espEnemyBox = true; _G.espEnemyChams = true; _G.espEnemyTracers = false
 _G.espEnemySkeleton = false; _G.espEnemyText = true
 _G.espAllyBox = false; _G.espAllyChams = false; _G.espAllyTracers = false
@@ -100,11 +112,11 @@ end
 local function hasLOS(part)
     if not _G.wallCheckEnabled then return true end
     local origin = Camera.CFrame.Position
-    local dir = (part.Position - origin).Unit * 500
+    local diff = (part.Position - origin)
     local rp = RaycastParams.new()
     rp.FilterDescendantsInstances = {LP.Character}
     rp.FilterType = Enum.RaycastFilterType.Blacklist
-    local r = workspace:Raycast(origin, dir, rp)
+    local r = workspace:Raycast(origin, diff, rp)
     return not r or r.Instance:IsDescendantOf(part.Parent)
 end
 
@@ -141,7 +153,27 @@ local PARTS_R15 = {Head={"Head"},Torso={"UpperTorso","LowerTorso"},["Left Arm"]=
 
 local function getTargetPart(char)
     local map = char:FindFirstChild("UpperTorso") and PARTS_R15 or PARTS_R6
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    local mousePos = UIS:GetMouseLocation()
+    
+    -- MODO LEGIT PRO: Seleciona o osso mais próximo do crosshair
+    if _G.aimbotLegitMode then
+        local best, bestD = nil, math.huge
+        for _, pList in pairs(map) do
+            for _, pName in pairs(pList) do
+                local p = char:FindFirstChild(pName)
+                if p then
+                    local sp, vis = Camera:WorldToViewportPoint(p.Position)
+                    if vis then
+                        local d = (Vector2.new(sp.X, sp.Y) - mousePos).Magnitude
+                        if d < bestD then best, bestD = p, d end
+                    end
+                end
+            end
+        end
+        if best then return best end
+    end
+    
+    -- MODO NORMAL: Segue prioridade do Hitbox Selector
     for priority = 1, 2 do
         local best, bestD = nil, math.huge
         for hName, state in pairs(_G.HitboxStates) do
@@ -150,7 +182,10 @@ local function getTargetPart(char)
                     local p = char:FindFirstChild(pName)
                     if p then
                         local sp, vis = Camera:WorldToViewportPoint(p.Position)
-                        if vis then local d=(Vector2.new(sp.X,sp.Y)-center).Magnitude; if d<bestD then best,bestD=p,d end end
+                        if vis then
+                            local d = (Vector2.new(sp.X, sp.Y) - mousePos).Magnitude
+                            if d < bestD then best, bestD = p, d end
+                        end
                     end
                 end
             end
@@ -453,6 +488,210 @@ local function getClosest3D(npcOnly)
     return best
 end
 
+-- ═══════════ LIGHTING & UTILS ═══════════
+local function toggleFullbright(v)
+    _G.fullbrightEnabled = v
+    if not v then return end
+    task.spawn(function()
+        local Lighting = game:GetService("Lighting")
+        while _G.fullbrightEnabled do
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+            Lighting.Brightness = 2
+            Lighting.GlobalShadows = false
+            task.wait(2)
+        end
+    end)
+end
+
+local function toggleNoFog(v)
+    _G.noFogEnabled = v
+    if v then
+        task.spawn(function()
+            local Lighting = game:GetService("Lighting")
+            while _G.noFogEnabled do
+                Lighting.FogEnd = 9e9
+                for _, v in pairs(Lighting:GetChildren()) do
+                    if v:IsA("Atmosphere") then v.Density = 0 end
+                end
+                task.wait(2)
+            end
+        end)
+    end
+end
+
+local function toggleAlwaysDay(v)
+    _G.alwaysDayEnabled = v
+    if v then
+        task.spawn(function()
+            local Lighting = game:GetService("Lighting")
+            while _G.alwaysDayEnabled do
+                Lighting.ClockTime = 14
+                task.wait(2)
+            end
+        end)
+    end
+end
+
+local function toggleStreamproof()
+    local CoreGui = game:GetService("CoreGui")
+    for _, v in pairs(CoreGui:GetChildren()) do
+        if v:IsA("ScreenGui") and v.Name == "SupremeHubUI" then
+            v.DisplayOrder = -999999
+        end
+    end
+end
+
+-- ═══════════ THEME SYSTEM ═══════════
+_G.SupremeThemes = {
+    Default = {
+        Main = Color3.fromRGB(25, 25, 25), Second = Color3.fromRGB(32, 32, 32), Stroke = Color3.fromRGB(60, 60, 60),
+        Divider = Color3.fromRGB(60, 60, 60), Text = Color3.fromRGB(240, 240, 240), TextDark = Color3.fromRGB(150, 150, 150)
+    },
+    Matrix = {
+        Main = Color3.fromRGB(5, 5, 5), Second = Color3.fromRGB(10, 15, 10), Stroke = Color3.fromRGB(0, 255, 0),
+        Divider = Color3.fromRGB(0, 100, 0), Text = Color3.fromRGB(0, 255, 0), TextDark = Color3.fromRGB(0, 180, 0)
+    },
+    Cyberpunk = {
+        Main = Color3.fromRGB(20, 10, 25), Second = Color3.fromRGB(30, 20, 40), Stroke = Color3.fromRGB(255, 0, 255),
+        Divider = Color3.fromRGB(0, 255, 255), Text = Color3.fromRGB(255, 255, 255), TextDark = Color3.fromRGB(255, 0, 255)
+    },
+    WatchDogs = {
+        Main = Color3.fromRGB(10, 10, 10), Second = Color3.fromRGB(20, 25, 30), Stroke = Color3.fromRGB(0, 255, 255),
+        Divider = Color3.fromRGB(255, 255, 255), Text = Color3.fromRGB(255, 255, 255), TextDark = Color3.fromRGB(0, 180, 255)
+    },
+    Yellow = {
+        Main = Color3.fromRGB(15, 15, 0), Second = Color3.fromRGB(30, 30, 0), Stroke = Color3.fromRGB(255, 255, 0),
+        Divider = Color3.fromRGB(100, 100, 0), Text = Color3.fromRGB(255, 255, 0), TextDark = Color3.fromRGB(200, 200, 0)
+    }
+}
+
+local function applyTheme(themeName)
+    _G.selectedTheme = themeName
+    _G.isRGBTheme = (themeName == "Neon RGB")
+    if _G.isRGBTheme then return end
+    
+    local theme = _G.SupremeThemes[themeName] or _G.SupremeThemes.Default
+    OrionLib.Themes[themeName] = theme
+    OrionLib.SelectedTheme = themeName
+    
+    for type, objects in pairs(OrionLib.ThemeObjects) do
+        for _, obj in pairs(objects) do
+            pcall(function()
+                local prop = "BackgroundColor3"
+                if obj:IsA("UIStroke") then prop = "Color"
+                elseif obj:IsA("TextLabel") or obj:IsA("TextBox") then prop = "TextColor3"
+                elseif obj:IsA("ImageLabel") or obj:IsA("ImageButton") then prop = "ImageColor3"
+                elseif obj:IsA("ScrollingFrame") then prop = "ScrollBarImageColor3" end
+                obj[prop] = theme[type]
+            end)
+        end
+    end
+end
+
+task.spawn(function()
+    while task.wait(0.05) do
+        if _G.isRGBTheme and _G.SupremeHubRunning then
+            local hue = tick() % 5 / 5
+            local color = Color3.fromHSV(hue, 1, 1)
+            for type, objects in pairs(OrionLib.ThemeObjects) do
+                if type == "Stroke" or type == "Text" or type == "Divider" then
+                    for _, obj in pairs(objects) do
+                        pcall(function()
+                            local prop = "BackgroundColor3"
+                            if obj:IsA("UIStroke") then prop = "Color"
+                            elseif obj:IsA("TextLabel") or obj:IsA("TextBox") then prop = "TextColor3"
+                            elseif obj:IsA("ImageLabel") or obj:IsA("ImageButton") then prop = "ImageColor3" end
+                            obj[prop] = color
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local function teleportToLowPopServer()
+    local Http = game:GetService("HttpService")
+    local TPS = game:GetService("TeleportService")
+    local Api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+    local s, r = pcall(function() return Http:JSONDecode(game:HttpGet(Api)) end)
+    if s and r.data then
+        for _, srv in pairs(r.data) do
+            if srv.playing > 0 and srv.playing < srv.maxPlayers then
+                TPS:TeleportToPlaceInstance(game.PlaceId, srv.id, LP)
+                break
+            end
+        end
+    end
+end
+
+-- ═══════════ RADAR 2D ═══════════
+local radarCircle = Drawing.new("Circle")
+radarCircle.Thickness = 2; radarCircle.NumSides = 60; radarCircle.Radius = 75; radarCircle.Filled = false; radarCircle.Color = Color3.fromRGB(255,255,255); radarCircle.Visible = false
+local radarCenter = Drawing.new("Circle")
+radarCenter.Radius = 3; radarCenter.Filled = true; radarCenter.Color = Color3.fromRGB(255,255,255); radarCenter.Visible = false
+
+local draggingRadar = false
+local dragStart = Vector2.new(0,0)
+UIS.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and _G.radarEnabled and not _G.radarDotsOnly then
+        local mPos = UIS:GetMouseLocation()
+        if (mPos - _G.radarPos).Magnitude < 75 then draggingRadar = true; dragStart = mPos - _G.radarPos end
+    end
+end)
+UIS.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingRadar = false end end)
+RunService.RenderStepped:Connect(function() if draggingRadar then _G.radarPos = UIS:GetMouseLocation() - dragStart end end)
+
+local radarDots = {}
+local function updateRadar()
+    if not _G.radarEnabled then
+        radarCircle.Visible = false; radarCenter.Visible = false
+        for _,d in pairs(radarDots) do d.Visible=false end; return
+    end
+    
+    local pos = _G.radarPos
+    radarCircle.Position = pos; radarCircle.Visible = not _G.radarDotsOnly; radarCircle.Transparency = 0.5
+    radarCenter.Position = pos; radarCenter.Visible = not _G.radarDotsOnly
+
+    local function drawDot(targetPos, color)
+        local rel = (targetPos - Camera.CFrame.Position); local rPos = Vector2.new(rel.X, rel.Z)
+        local mag = rPos.Magnitude; if mag > 1000 then return end
+        local angle = math.atan2(rPos.Y, rPos.X) + math.rad(Camera.CFrame.Rotation.Y)
+        local finalPos = pos + Vector2.new(math.cos(angle)*mag*_G.radarScale, math.sin(angle)*mag*_G.radarScale)
+        if (finalPos - pos).Magnitude < 75 or _G.radarDotsOnly then
+            local d = Drawing.new("Circle"); d.Radius=3.5; d.Filled=true; d.Color=color; d.Position=finalPos; d.Visible=not _G.streamproofEnabled; table.insert(radarDots, d)
+        end
+    end
+
+    for _,d in pairs(radarDots) do d:Remove() end; radarDots = {}
+    for _,p in pairs(Players:GetPlayers()) do
+        if p~=LP and p.Character and isAlive(p.Character) and isEnemy(p) then drawDot(p.Character.PrimaryPart.Position, Color3.fromRGB(255,0,0)) end
+    end
+    for _,npc in pairs(getNPCs()) do if isAlive(npc) then drawDot(npc.PrimaryPart.Position, Color3.fromRGB(200,0,255)) end end
+end
+
+-- ═══════════ WEAPON MODS (RECURSIVE & LOCKED) ═══════════
+local function weaponScan(tool)
+    if not tool or not _G.SupremeHubRunning then return end
+    for _, obj in pairs(tool:GetDescendants()) do
+        if obj:IsA("NumberValue") or obj:IsA("IntValue") then
+            local n = obj.Name:lower()
+            if _G.noRecoilEnabled and (n:find("recoil") or n:find("kick") or n:find("shake")) then obj.Value = 0 end
+            if _G.noSpreadEnabled and (n:find("spread") or n:find("accuracy") or n:find("minspread")) then obj.Value = 0 end
+            if _G.infiniteAmmoEnabled and (n:find("ammo") or n:find("bullets") or n:find("clip")) then if obj.Value < 99 then obj.Value = 999 end end
+            if _G.rapidFireEnabled and (n:find("firerate") or n:find("cooldown") or n:find("wait")) then obj.Value = 0.01 end
+            if _G.instantReloadEnabled and (n:find("reload")) then obj.Value = 0.01 end
+        end
+    end
+    for k, v in pairs(tool:GetAttributes()) do
+        local n = k:lower()
+        if _G.noRecoilEnabled and (n:find("recoil") or n:find("kick")) then tool:SetAttribute(k, 0) end
+        if _G.noSpreadEnabled and (n:find("spread") or n:find("accuracy")) then tool:SetAttribute(k, 0) end
+        if _G.rapidFireEnabled and (n:find("firerate") or n:find("delay")) then tool:SetAttribute(k, 0.01) end
+    end
+end
+
 -- ═══════════ RAPID FIRE ═══════════
 local isHoldingFire = false
 local function startRapidFire()
@@ -487,37 +726,23 @@ Mouse.Button1Up:Connect(function() isHoldingFire=false end)
 Mouse.Button2Down:Connect(function() aiming=true end)
 Mouse.Button2Up:Connect(function() aiming=false end)
 
--- ═══════════ SILENT AIM HOOK ═══════════
+-- ═══════════ STEALTH & PROPERTY SPOOFING ═══════════
 pcall(function()
-    -- ═══════════ STEALTH & PROPERTY SPOOFING ═══════════
+    -- ═══════════ MULTI-HOOK (INDEX) ═══════════
     local oldIdx; oldIdx = hookmetamethod(game, "__index", newcclosure(function(self, idx)
-        if _G.SupremeHubRunning and _G.stealthModeEnabled and not checkcaller() then
+        if not _G.SupremeHubRunning then return oldIdx(self, idx) end
+        
+        -- Stealth (WalkSpeed/JumpPower)
+        if _G.stealthModeEnabled and not checkcaller() then
             local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
             if self == hum then
                 if idx == "WalkSpeed" then return 16 end
                 if idx == "JumpPower" then return 50 end
             end
         end
-        return oldIdx(self, idx)
-    end))
-
-    local oldNewIdx; oldNewIdx = hookmetamethod(game, "__newindex", newcclosure(function(self, idx, val)
-        if _G.SupremeHubRunning and _G.stealthModeEnabled and not checkcaller() then
-            local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
-            if self == hum then
-                if idx == "WalkSpeed" or idx == "JumpPower" then 
-                    -- Bloqueia o jogo de resetar nossa speed, mas permite o script mudar
-                    if val == 16 or val == 50 or val == 0 then return end 
-                end
-            end
-        end
-        return oldNewIdx(self, idx, val)
-    end))
-
-    -- ═══════════ MOUSE SPOOFING (__index) ═══════════
-    local currentMouse = LP:GetMouse()
-    local oldIdx; oldIdx = hookmetamethod(currentMouse, "__index", newcclosure(function(self, idx)
-        if _G.SupremeHubRunning and _G.mouseSpoofEnabled and (idx == "Hit" or idx == "Target") then
+        
+        -- Mouse Spoofing
+        if _G.mouseSpoofEnabled and (idx == "Hit" or idx == "Target") and self:IsA("Mouse") then
             local isNPC = currentTargetModel and not game:GetService("Players"):GetPlayerFromCharacter(currentTargetModel)
             local silentAllowed = (isNPC and _G.magicBulletNPC) or (not isNPC and (_G.magicBulletEnemy or _G.silentAimEnabled))
             if silentAllowed and currentTargetModel then
@@ -528,39 +753,43 @@ pcall(function()
                 end
             end
         end
+        
         return oldIdx(self, idx)
     end))
 
+    -- ═══════════ STEALTH (NEWINDEX) ═══════════
+    local oldNewIdx; oldNewIdx = hookmetamethod(game, "__newindex", newcclosure(function(self, idx, val)
+        if _G.SupremeHubRunning and _G.stealthModeEnabled and not checkcaller() then
+            local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+            if self == hum then
+                if idx == "WalkSpeed" or idx == "JumpPower" then 
+                    if val == 16 or val == 50 or val == 0 then return end 
+                end
+            end
+        end
+        return oldNewIdx(self, idx, val)
+    end))
+
+    -- ═══════════ SILENT AIM (NAMECALL) ═══════════
     local oldNc; oldNc = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
+        if not _G.SupremeHubRunning then return oldNc(self, ...) end
         
         local isNPC = currentTargetModel and not game:GetService("Players"):GetPlayerFromCharacter(currentTargetModel)
         local silentAllowed = (isNPC and _G.magicBulletNPC) or (not isNPC and (_G.magicBulletEnemy or _G.silentAimEnabled))
         
-        if silentAllowed and currentTargetModel and _G.SupremeHubRunning then
-            if math.random(1,100) <= _G.silentAimHitChance then
-                local tPart = getTargetPart(currentTargetModel)
-                if tPart then
-                    if method == "Raycast" and self == workspace then
-                        local args = {...}
-                        local origin = args[1]
-                        -- Se "Atravessar Parede" estiver ON, teleporta origem para o alvo
-                        if _G.wallPierceEnabled then
-                            origin = tPart.Position - (tPart.Position - origin).Unit * 0.1
-                        end
-                        local newDir = (tPart.Position - origin).Unit * args[2].Magnitude
-                        return oldNc(self, origin, newDir, select(3, ...))
-                    end
-                    if method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" then
-                        local args = {...}
-                        if typeof(args[1]) == "Ray" then
-                            local o = args[1].Origin
-                            if _G.wallPierceEnabled then
-                                o = tPart.Position - (tPart.Position - o).Unit * 0.1
-                            end
-                            args[1] = Ray.new(o, (tPart.Position-o).Unit * args[1].Direction.Magnitude)
-                            return oldNc(self, unpack(args))
-                        end
+        if silentAllowed and currentTargetModel then
+            local tPart = getTargetPart(currentTargetModel)
+            if tPart then
+                if (method == "Raycast" and self == workspace) then
+                    local args = {...}; args[2] = (tPart.Position - args[1]).Unit * args[2].Magnitude
+                    return oldNc(self, unpack(args))
+                end
+                if method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" then
+                    local args = {...}
+                    if typeof(args[1]) == "Ray" then
+                        args[1] = Ray.new(args[1].Origin, (tPart.Position - args[1].Origin).Unit * args[1].Direction.Magnitude)
+                        return oldNc(self, unpack(args))
                     end
                 end
             end
@@ -575,8 +804,8 @@ local conn; conn = RunService.RenderStepped:Connect(function()
     local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     local char = LP.Character
 
-    -- Weapon mods (throttled)
-    if char and tick()-lastWeaponTick > 0.5 then
+    -- Weapon mods
+    if char and tick() - lastWeaponTick > 0.5 then
         lastWeaponTick = tick()
         local tool = char:FindFirstChildWhichIsA("Tool")
         if tool then
@@ -668,21 +897,44 @@ local conn; conn = RunService.RenderStepped:Connect(function()
 
     -- ═══════════ CAMERA MOVEMENT (Aimbot Only) ═══════════
     if aimbotEnabled and currentTargetModel then
-        local part = getTargetPart(currentTargetModel)
-        if part then
-            local aimPos = part.Position
-            if _G.aimPredictionEnabled then
-                local hroot = currentTargetModel:FindFirstChild("HumanoidRootPart")
-                if hroot then
-                    local vel = hroot.Velocity
-                    local d = (aimPos - Camera.CFrame.Position).Magnitude
-                    aimPos = aimPos + vel * (d / 1000)
+        local tPart = getTargetPart(currentTargetModel)
+        if _G.aimbotRandomizeTarget and math.random(1,100) > 70 then
+            tPart = currentTargetModel:FindFirstChild("UpperTorso") or currentTargetModel:FindFirstChild("Torso") or tPart
+        end
+        
+        if tPart then
+            local aimPos = tPart.Position
+            local screenPos, onScreen = Camera:WorldToViewportPoint(aimPos)
+            local mousePos = UIS:GetMouseLocation()
+            local distFromCenter = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+            
+            -- Legit Mode Check: Stickiness
+            local canAim = true
+            if _G.aimbotLegitMode and distFromCenter > _G.aimbotStickiness then canAim = false end
+            
+            if canAim then
+                if _G.aimPredictionEnabled then
+                    local hroot = currentTargetModel:FindFirstChild("HumanoidRootPart")
+                    if hroot then
+                        local vel = hroot.Velocity
+                        local d = (aimPos - Camera.CFrame.Position).Magnitude
+                        aimPos = aimPos + vel * (d / 1000)
+                    end
                 end
+                
+                local targetCF = CFrame.new(Camera.CFrame.Position, aimPos)
+                local smoothness = _G.aimbotSmoothness
+                
+                -- S-Curve Acceleration logic
+                if _G.aimbotLegitMode then
+                    local weight = math.clamp(1 - (distFromCenter / 100), 0.1, 1)
+                    smoothness = smoothness * (1 / weight)
+                end
+                
+                if smoothness > 1 then
+                    Camera.CFrame = Camera.CFrame:Lerp(targetCF, 1/smoothness)
+                else Camera.CFrame = targetCF end
             end
-            local targetCF = CFrame.new(Camera.CFrame.Position, aimPos)
-            if _G.aimbotSmoothness > 1 then
-                Camera.CFrame = Camera.CFrame:Lerp(targetCF, 1/_G.aimbotSmoothness)
-            else Camera.CFrame = targetCF end
         end
     end
 
@@ -697,6 +949,16 @@ local conn; conn = RunService.RenderStepped:Connect(function()
                     hroot.Velocity = Vector3.new(0,0,0)
                 end)
             end
+        end
+    end
+
+    -- ═══════════ ANTI-AIM (Experimental) ═══════════
+    if _G.antiAimEnabled and char and char:FindFirstChild("HumanoidRootPart") then
+        local hrp = char.HumanoidRootPart
+        if _G.antiAimMode == "Blatant" then
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(45), 0)
+        elseif _G.antiAimMode == "Legit" then
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(math.random(-15, 15)), 0)
         end
     end
 
@@ -818,19 +1080,27 @@ local SCombat1 = TabCombat:AddSection({Name="🎯 AIMBOT & SILENT AIM"})
 SCombat1:AddToggle({Name="Aimbot Automático", Default=_G.aimbotAutoEnabled, Save=true, Flag="AAuto", Callback=function(V) _G.aimbotAutoEnabled=V; if V then _G.silentAimEnabled=false end; zSave() end})
 SCombat1:AddToggle({Name="Aimbot Manual (RMB)", Default=_G.aimbotManualEnabled, Save=true, Flag="AMan", Callback=function(V) _G.aimbotManualEnabled=V; zSave() end})
 SCombat1:AddToggle({Name="✨ Silent Aim (Original)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
-SCombat1:AddToggle({Name="🧱 Wall Pierce (Atravessar)", Default=_G.wallPierceEnabled, Save=true, Flag="WPierce", Callback=function(V) _G.wallPierceEnabled=V; zSave() end})
+SCombat1:AddToggle({Name="🎯 Mouse Spoofing", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
 
 local SCombat2 = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
 SCombat2:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
-SCombat2:AddToggle({Name="Wall Check (Visão Direta)", Default=_G.wallCheckEnabled, Save=true, Flag="WCheck", Callback=function(V) _G.wallCheckEnabled=V; zSave() end})
-SCombat2:AddToggle({Name="Aim Prediction (Movimento)", Default=_G.aimPredictionEnabled, Save=true, Flag="APred", Callback=function(V) _G.aimPredictionEnabled=V; zSave() end})
-SCombat2:AddSlider({Name="Smoothness Aimbot", Min=1, Max=10, Default=_G.aimbotSmoothness, Color=Color3.fromRGB(0,255,100), Increment=0.5, ValueName="Lerp", Save=true, Flag="ASmth", Callback=function(V) _G.aimbotSmoothness=V; zSave() end})
-SCombat2:AddSlider({Name="Chance Acerto (Silent)", Min=1, Max=100, Default=_G.silentAimHitChance, Color=Color3.fromRGB(200,100,255), Increment=1, ValueName="%", Save=true, Flag="SHit", Callback=function(V) _G.silentAimHitChance=V; zSave() end})
+local SCombat2 = TabCombat:AddSection({Name="🛡️ SUPREME PRO LEGIT (HUMANIZADO)"})
+SCombat2:AddToggle({Name="Ativar Modo LEGIT (PRO Only)", Default=_G.aimbotLegitMode, Save=true, Flag="ALegit", Callback=function(V) _G.aimbotLegitMode=V; zSave() end})
+SCombat2:AddSlider({Name="Magnet Stickiness (Raio)", Min=5, Max=100, Default=_G.aimbotStickiness, Color=Color3.fromRGB(0,255,100), Increment=1, ValueName="Pixels", Save=true, Flag="AStick", Callback=function(V) _G.aimbotStickiness=V; zSave() end})
+SCombat2:AddToggle({Name="Alvos Aleatórios (Head/Chest)", Default=_G.aimbotRandomizeTarget, Save=true, Flag="ARand", Callback=function(V) _G.aimbotRandomizeTarget=V; zSave() end})
+SCombat2:AddLabel("💡 Modo LEGIT faz a mira grudar apenas quando está perto.")
 
-local SCombat3 = TabCombat:AddSection({Name="⭕ FIELD OF VIEW (FOV)"})
-SCombat3:AddToggle({Name="Mostrar Círculo FOV", Default=_G.FOV_VISIBLE, Save=true, Flag="FovV", Callback=function(V) _G.FOV_VISIBLE=V; zSave() end})
-SCombat3:AddSlider({Name="Tamanho FOV", Min=10, Max=600, Default=_G.FOV_RADIUS, Color=Color3.fromRGB(255,0,0), Increment=5, ValueName="Raio", Save=true, Flag="FovR", Callback=function(V) _G.FOV_RADIUS=V; zSave() end})
-SCombat3:AddSlider({Name="Deadzone Legit", Min=5, Max=300, Default=_G.legitDeadzone, Color=Color3.fromRGB(0,200,255), Increment=5, ValueName="Raio", Save=true, Flag="LegitDz", Callback=function(V) _G.legitDeadzone=V; zSave() end})
+local SCombat3 = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
+SCombat3:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
+SCombat3:AddToggle({Name="Wall Check (Visão Direta)", Default=_G.wallCheckEnabled, Save=true, Flag="WCheck", Callback=function(V) _G.wallCheckEnabled=V; zSave() end})
+SCombat3:AddToggle({Name="Aim Prediction (Movimento)", Default=_G.aimPredictionEnabled, Save=true, Flag="APred", Callback=function(V) _G.aimPredictionEnabled=V; zSave() end})
+SCombat3:AddSlider({Name="Smoothness Aimbot", Min=1, Max=50, Default=_G.aimbotSmoothness, Color=Color3.fromRGB(200,200,0), Increment=0.5, ValueName="Lerp", Save=true, Flag="ASmth", Callback=function(V) _G.aimbotSmoothness=V; zSave() end})
+SCombat3:AddSlider({Name="Chance Acerto (Silent)", Min=1, Max=100, Default=_G.silentAimHitChance, Color=Color3.fromRGB(200,100,255), Increment=1, ValueName="%", Save=true, Flag="SHit", Callback=function(V) _G.silentAimHitChance=V; zSave() end})
+
+local SCombat4 = TabCombat:AddSection({Name="⭕ FIELD OF VIEW (FOV)"})
+SCombat4:AddToggle({Name="Mostrar Círculo FOV", Default=_G.FOV_VISIBLE, Save=true, Flag="FovV", Callback=function(V) _G.FOV_VISIBLE=V; zSave() end})
+SCombat4:AddSlider({Name="Tamanho FOV", Min=10, Max=600, Default=_G.FOV_RADIUS, Color=Color3.fromRGB(255,0,0), Increment=5, ValueName="Raio", Save=true, Flag="FovR", Callback=function(V) _G.FOV_RADIUS=V; zSave() end})
+SCombat4:AddSlider({Name="Deadzone Legit", Min=5, Max=300, Default=_G.legitDeadzone, Color=Color3.fromRGB(0,200,255), Increment=5, ValueName="Raio", Save=true, Flag="LegitDz", Callback=function(V) _G.legitDeadzone=V; zSave() end})
 
 -- TAB: VISUALS
 local TabVis = Window:MakeTab({Name="👁️ Visuals", Icon="rbxassetid://4483362458", PremiumOnly=false})
@@ -849,7 +1119,7 @@ SVis2:AddToggle({Name="Ossos 3D (Skeleton)", Default=_G.espAllySkeleton, Save=tr
 SVis2:AddToggle({Name="Letreiros (Textos)", Default=_G.espAllyText, Save=true, Flag="ATxt", Callback=function(V) _G.espAllyText=V; zSave() end})
 
 local SVis3 = TabVis:AddSection({Name="🟣 NPCs"})
-SVis3:AddToggle({Name="ESP NPC (+ Aimbot NPC)", Default=_G.espNPCEnabled, Save=true, Flag="ENPC", Callback=function(V) _G.espNPCEnabled=V; zSave() end})
+SVis3:AddToggle({Name="ESP NPC", Default=_G.espNPCEnabled, Save=true, Flag="ENPC", Callback=function(V) _G.espNPCEnabled=V; zSave() end})
 
 local SVis4 = TabVis:AddSection({Name="📝 TEXT FILTERS (ESP DATA)"})
 SVis4:AddToggle({Name="Mostrar Nome", Default=_G.espName, Save=true, Flag="TxNm", Callback=function(V) _G.espName=V; zSave() end})
@@ -857,8 +1127,18 @@ SVis4:AddToggle({Name="Mostrar Vida (HP)", Default=_G.espHP, Save=true, Flag="Tx
 SVis4:AddToggle({Name="Mostrar Distância", Default=_G.espDistance, Save=true, Flag="TxDist", Callback=function(V) _G.espDistance=V; zSave() end})
 SVis4:AddToggle({Name="Mostrar Arma Atual", Default=_G.espWeapon, Save=true, Flag="TxW", Callback=function(V) _G.espWeapon=V; zSave() end})
 
-local SVis5 = TabVis:AddSection({Name="⚙️ GLOBAL ESP LIMITS"})
-SVis5:AddSlider({Name="Distância Máxima ESP", Min=50, Max=10000, Default=_G.espMaxDistance, Color=Color3.fromRGB(0,255,100), Increment=50, ValueName="Studs", Save=true, Flag="EspDist", Callback=function(V) _G.espMaxDistance=V; zSave() end})
+local SVis5 = TabVis:AddSection({Name="🛰️ RADAR 2D (MODO PINNING)"})
+SVis5:AddToggle({Name="Ativar Radar 2D", Default=_G.radarEnabled, Save=true, Flag="RadOn", Callback=function(V) _G.radarEnabled=V; zSave() end})
+SVis5:AddToggle({Name="Modo Apenas Pontos (Ghost Mode)", Default=_G.radarDotsOnly, Save=true, Flag="RadGhost", Callback=function(V) _G.radarDotsOnly=V; zSave() end})
+SVis5:AddSlider({Name="Zoom do Radar (Escala)", Min=0.05, Max=2, Default=_G.radarScale, Color=Color3.fromRGB(255,255,255), Increment=0.01, ValueName="Zoom", Save=true, Flag="RadScale", Callback=function(V) _G.radarScale=V; zSave() end})
+SVis5:AddLabel("💡 Arraste o círculo do radar com o mouse!")
+SVis5:AddLabel("💡 'Ghost Mode' serve para alinhar com o mapa do jogo.")
+
+local SVis6 = TabVis:AddSection({Name="🔦 LIGHTING & ATMOSPHERE"})
+SVis6:AddToggle({Name="Fullbright (Tirar Escuridão)", Default=_G.fullbrightEnabled, Save=true, Flag="Frt", Callback=function(V) toggleFullbright(V); zSave() end})
+SVis6:AddToggle({Name="No Fog (Limpar Visão)", Default=_G.noFogEnabled, Save=true, Flag="NFog", Callback=function(V) toggleNoFog(V); zSave() end})
+SVis6:AddToggle({Name="Sempre Dia (Meio-Dia)", Default=_G.alwaysDayEnabled, Save=true, Flag="ADay", Callback=function(V) toggleAlwaysDay(V); zSave() end})
+SVis6:AddSlider({Name="Distância Máxima ESP", Min=50, Max=10000, Default=_G.espMaxDistance, Color=Color3.fromRGB(0,255,100), Increment=50, ValueName="Studs", Save=true, Flag="EspDist", Callback=function(V) _G.espMaxDistance=V; zSave() end})
 
 -- TAB: WEAPON
 local TabWeap = Window:MakeTab({Name="🔫 Weapon", Icon="rbxassetid://4483345998", PremiumOnly=false})
@@ -903,9 +1183,14 @@ SExp1:AddToggle({Name="Telekill NPCs (360°)", Default=_G.telekillNPCEnabled, Sa
 end})
 SExp1:AddSlider({Name="Distância do Telekill", Min=2, Max=20, Default=_G.telekillDistance, Color=Color3.fromRGB(255,150,0), Increment=0.5, ValueName="Studs", Save=true, Flag="TKDist", Callback=function(V) _G.telekillDistance=V; zSave() end})
 
-local SExp2 = TabExp:AddSection({Name="⚙️ OTHERS (🟡 MÉDIO RISCO)"})
-SExp2:AddToggle({Name="Mouse Spoofing (Silent Aim Helper)", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
-SExp2:AddLabel("⚠️ Telekill e Hitbox Expander dão ban facilmente.")
+local SExp2 = TabExp:AddSection({Name="🌀 ANTI-AIM / SPINBOT (PRO)"})
+SExp2:AddToggle({Name="Ativar Anti-Aim", Default=_G.antiAimEnabled, Save=true, Flag="AAOn", Callback=function(V) _G.antiAimEnabled=V; zSave() end})
+SExp2:AddDropdown({Name="Modo Anti-Aim", Default=_G.antiAimMode or "Legit", Options={"Legit", "Blatant"}, Save=true, Flag="AAMode", Callback=function(V) _G.antiAimMode=V; zSave() end})
+SExp2:AddLabel("💡 Legit AA faz você desviar de balas sem girar.")
+
+local SExp3 = TabExp:AddSection({Name="⚙️ OTHERS (🟡 MÉDIO RISCO)"})
+SExp3:AddToggle({Name="Mouse Spoofing (Silent Aim Helper)", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
+SExp3:AddLabel("⚠️ Telekill e Hitbox Expander dão ban facilmente.")
 local TabCfg = Window:MakeTab({Name="⚙️ Config", Icon="rbxassetid://4483345998", PremiumOnly=false})
 local SCfg1 = TabCfg:AddSection({Name="🛡️ INTERFACE"})
 if not isMobile then
@@ -914,6 +1199,15 @@ else
     SCfg1:AddButton({Name="🔴 Botão HUB criado na tela", Callback=function() end})
 end
 SCfg1:AddButton({Name="💾 FORÇAR SALVAMENTO", Callback=function() zSave(); OrionLib:MakeNotification({Name="Supreme Hub", Content="Configurações salvas!", Image="rbxassetid://4483345998", Time=3}) end})
+SCfg1:AddToggle({Name="🕵️ Streamproof (Anti-OBS)", Default=_G.streamproofEnabled, Save=true, Flag="StPrf", Callback=function(V) 
+    _G.streamproofEnabled=V
+    local o = findOrionGui()
+    if o then o.DisplayOrder = V and 0 or 100 end
+    for _,d in pairs(allDrawings) do d.Visible = not V end
+    zSave() 
+end})
+SCfg1:AddDropdown({Name="🎨 Tema da Interface", Default=_G.selectedTheme or "Default", Options={"Default", "Matrix", "Cyberpunk", "WatchDogs", "Yellow", "Neon RGB"}, Save=true, Flag="STheme", Callback=function(V) applyTheme(V); zSave() end})
+SCfg1:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
 SCfg1:AddBind({Name="🛑 BOTÃO DE PÂNICO (Destruir Tudo)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
     _G.SupremeHubRunning = false
     pcall(function() conn:Disconnect() end)
