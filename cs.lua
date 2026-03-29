@@ -30,6 +30,8 @@ _G.espNPCEnabled = false
 _G.magicBulletNPC = false       -- Silent Aim para NPCs
 _G.magicBulletEnemy = false     -- Silent Aim para Players
 _G.wallPierceEnabled = true    -- Atravessar Parede (Magic Bullet)
+_G.mouseSpoofEnabled = true    -- Spoof Mouse.Hit/Target
+_G.telekillEnabled = false     -- Telekill (Teste)
 _G.espEnemyBox = true; _G.espEnemyChams = true; _G.espEnemyTracers = false
 _G.espEnemySkeleton = false; _G.espEnemyText = true
 _G.espAllyBox = false; _G.espAllyChams = false; _G.espAllyTracers = false
@@ -462,7 +464,23 @@ Mouse.Button2Up:Connect(function() aiming=false end)
 
 -- ═══════════ SILENT AIM HOOK ═══════════
 pcall(function()
-    if not hookmetamethod or not getnamecallmethod then return end
+    -- ═══════════ MOUSE SPOOFING (__index) ═══════════
+    local currentMouse = LP:GetMouse()
+    local oldIdx; oldIdx = hookmetamethod(currentMouse, "__index", newcclosure(function(self, idx)
+        if _G.SupremeHubRunning and _G.mouseSpoofEnabled and (idx == "Hit" or idx == "Target") then
+            local isNPC = currentTargetModel and not game:GetService("Players"):GetPlayerFromCharacter(currentTargetModel)
+            local silentAllowed = (isNPC and _G.magicBulletNPC) or (not isNPC and (_G.magicBulletEnemy or _G.silentAimEnabled))
+            if silentAllowed and currentTargetModel then
+                local tPart = getTargetPart(currentTargetModel)
+                if tPart then
+                    if idx == "Hit" then return tPart.CFrame end
+                    if idx == "Target" then return tPart end
+                end
+            end
+        end
+        return oldIdx(self, idx)
+    end))
+
     local oldNc; oldNc = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
         
@@ -608,6 +626,17 @@ local conn; conn = RunService.RenderStepped:Connect(function()
             if _G.aimbotSmoothness > 1 then
                 Camera.CFrame = Camera.CFrame:Lerp(targetCF, 1/_G.aimbotSmoothness)
             else Camera.CFrame = targetCF end
+        end
+    end
+
+    -- ═══════════ TELEKILL (Experimental) ═══════════
+    if _G.telekillEnabled and currentTargetModel then
+        local hroot = currentTargetModel:FindFirstChild("HumanoidRootPart") or currentTargetModel:FindFirstChild("Torso")
+        if hroot then
+            pcall(function()
+                hroot.CFrame = Camera.CFrame * CFrame.new(0, 0, -12)
+                hroot.Velocity = Vector3.new(0,0,0) -- evita que ele fuja
+            end)
         end
     end
 
@@ -791,7 +820,12 @@ local SPlay1 = TabPlayer:AddSection({Name="🏃 MOVEMENT & SPEED"})
 SPlay1:AddSlider({Name="WalkSpeed", Min=16, Max=250, Default=_G.walkSpeed, Color=Color3.fromRGB(200,200,200), Increment=1, ValueName="W", Save=true, Flag="PWS", Callback=function(V) _G.walkSpeed=V; zSave() end})
 SPlay1:AddSlider({Name="JumpPower", Min=50, Max=300, Default=_G.jumpPower, Color=Color3.fromRGB(200,200,200), Increment=1, ValueName="P", Save=true, Flag="PJP", Callback=function(V) _G.jumpPower=V; zSave() end})
 
--- TAB: CONFIG
+-- TAB: EXPERIMENTAL
+local TabExp = Window:MakeTab({Name="🧪 Experimental", Icon="rbxassetid://4483345998", PremiumOnly=false})
+local SExp1 = TabExp:AddSection({Name="🚀 TEST FEATURES (BETA)"})
+SExp1:AddToggle({Name="Telekill (Alvos na sua frente)", Default=_G.telekillEnabled, Save=true, Flag="TK", Callback=function(V) _G.telekillEnabled=V; zSave() end})
+SExp1:AddToggle({Name="Mouse Spoofing (Hit Correction)", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
+SExp1:AddLabel("⚠️ Telekill move o corpo do inimigo LOCALMENTE para você testar hit.")
 local TabCfg = Window:MakeTab({Name="⚙️ Config", Icon="rbxassetid://4483345998", PremiumOnly=false})
 local SCfg1 = TabCfg:AddSection({Name="🛡️ INTERFACE"})
 if not isMobile then
