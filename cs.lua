@@ -155,17 +155,19 @@ local function getTargetPart(char)
     local map = char:FindFirstChild("UpperTorso") and PARTS_R15 or PARTS_R6
     local mousePos = UIS:GetMouseLocation()
     
-    -- MODO LEGIT PRO: Seleciona o osso mais próximo do crosshair
+    -- MODO LEGIT PRO: Seleciona o osso MAIS PRÓXIMO entre os selecionados no Bonequinho
     if _G.aimbotLegitMode then
         local best, bestD = nil, math.huge
-        for _, pList in pairs(map) do
-            for _, pName in pairs(pList) do
-                local p = char:FindFirstChild(pName)
-                if p then
-                    local sp, vis = Camera:WorldToViewportPoint(p.Position)
-                    if vis then
-                        local d = (Vector2.new(sp.X, sp.Y) - mousePos).Magnitude
-                        if d < bestD then best, bestD = p, d end
+        for hName, state in pairs(_G.HitboxStates) do
+            if state > 0 and map[hName] then
+                for _, pName in pairs(map[hName]) do
+                    local p = char:FindFirstChild(pName)
+                    if p then
+                        local sp, vis = Camera:WorldToViewportPoint(p.Position)
+                        if vis then
+                            local d = (Vector2.new(sp.X, sp.Y) - mousePos).Magnitude
+                            if d < bestD then best, bestD = p, d end
+                        end
                     end
                 end
             end
@@ -259,12 +261,9 @@ local function createESP()
     e.hpBarBG = regDraw(Drawing.new("Line")); e.hpBarBG.Thickness=4; e.hpBarBG.Color=Color3.new(0,0,0); e.hpBarBG.Visible=false
     -- Tracer
     e.tracer = regDraw(Drawing.new("Line")); e.tracer.Thickness=1; e.tracer.Visible=false
-    -- Text labels & Backgrounds
-    local labels = {"name", "tag", "hp", "dist", "weap"}
-    for _, l in pairs(labels) do
-        e[l.."T"] = regDraw(Drawing.new("Text")); e[l.."T"].Size=13; e[l.."T"].Outline=false; e[l.."T"].Font=3; e[l.."T"].Visible=false
-        e[l.."B"] = regDraw(Drawing.new("Square")); e[l.."B"].Filled=true; e[l.."B"].Color=Color3.new(0,0,0); e[l.."B"].Transparency=0.5; e[l.."B"].Visible=false
-    end
+    -- Text label & Background (Consolidated for Performance)
+    e.txt = regDraw(Drawing.new("Text")); e.txt.Size=13; e.txt.Outline=true; e.txt.Center=false; e.txt.Font=3; e.txt.Visible=false
+    e.txtBG = regDraw(Drawing.new("Square")); e.txtBG.Filled=true; e.txtBG.Color=Color3.new(0,0,0); e.txtBG.Transparency=0.5; e.txtBG.Visible=false
     -- Chams (Highlight)
     e.chams = nil
     -- Skeleton
@@ -278,8 +277,7 @@ local function hideESP(e)
     for i=1,8 do e.corners[i].Visible=false end
     e.hpBar.Visible=false; e.hpBarBG.Visible=false
     e.tracer.Visible=false
-    local labels = {"name", "tag", "hp", "dist", "weap"}
-    for _, l in pairs(labels) do e[l.."T"].Visible=false; e[l.."B"].Visible=false end
+    e.txt.Visible=false; e.txtBG.Visible=false
     for i=1,14 do e.skel[i].Visible=false end
     if e.chams then pcall(function() e.chams:Destroy() end); e.chams=nil end
 end
@@ -290,6 +288,31 @@ end
 
 local SKEL_R6 = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
 local SKEL_R15 = {{"Head","UpperTorso"},{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},{"UpperTorso","LowerTorso"},{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"}}
+
+-- ═══════════ LIGHTING RESTORE SYSTEM ═══════════
+local originalLighting = {
+    Ambient = lighting.Ambient,
+    OutdoorAmbient = lighting.OutdoorAmbient,
+    ColorShift_Bottom = lighting.ColorShift_Bottom,
+    ColorShift_Top = lighting.ColorShift_Top,
+    Brightness = lighting.Brightness,
+    FogStart = lighting.FogStart,
+    FogEnd = lighting.FogEnd,
+    ClockTime = lighting.ClockTime,
+    GlobalShadows = lighting.GlobalShadows
+}
+
+local function restoreLighting()
+    lighting.Ambient = originalLighting.Ambient
+    lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+    lighting.ColorShift_Bottom = originalLighting.ColorShift_Bottom
+    lighting.ColorShift_Top = originalLighting.ColorShift_Top
+    lighting.Brightness = originalLighting.Brightness
+    lighting.FogStart = originalLighting.FogStart
+    lighting.FogEnd = originalLighting.FogEnd
+    lighting.ClockTime = originalLighting.ClockTime
+    lighting.GlobalShadows = originalLighting.GlobalShadows
+end
 
 -- Cor da HP baseada na porcentagem: verde → amarelo → vermelho
 local function hpColor(pct)
@@ -389,44 +412,40 @@ local function updateESP(key, char, color, showBox, showChams, showTracers, show
         for i=#bones+1, 14 do if e.skel[i] then e.skel[i].Visible=false end end
     else for i=1,14 do e.skel[i].Visible=false end end
 
-    -- ═══ TEXT LABELS & BACKGROUNDS (RIGHT SIDE) ═══
+    -- ═══ TEXT LABEL & BACKGROUND (CONSOLIDATED) ═══
     if showText then
-        local rightX = boxX + boxW + 4
-        local currentY = boxY
-        local function drawL(key, text, col)
-            local t, b = e[key.."T"], e[key.."B"]
-            t.Text = text; t.Color = col; t.Position = Vector2.new(rightX + 2, currentY)
-            local tSize = t.TextBounds
-            b.Size = Vector2.new(tSize.X + 4, tSize.Y); b.Position = Vector2.new(rightX, currentY)
-            t.Visible = true; b.Visible = true
-            currentY = currentY + tSize.Y + 2
-        end
-
-        -- Tag
+        local lines = {}
         local tagT = isTarget and "TARGET" or entityType:upper()
-        drawL("tag", "[ "..tagT.." ]", mainColor)
-        -- Name
+        table.insert(lines, "[ "..tagT.." ]")
+        
         if _G.espName then
             local nm = (typeof(key)=="Instance" and key:IsA("Player")) and (key.DisplayName or key.Name) or (char.Name or "NPC")
-            drawL("name", nm, Color3.new(1,1,1))
-        else e.nameT.Visible=false; e.nameB.Visible=false end
-        -- HP
-        if _G.espHP then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then drawL("hp", "HP: "..math.floor(hum.Health).."/"..math.floor(hum.MaxHealth), hpColor(hum.Health/hum.MaxHealth)) end
-        else e.hpT.Visible=false; e.hpB.Visible=false end
-        -- Dist
-        if _G.espDistance then
-            drawL("dist", math.floor(dist3D).."m", Color3.new(0.8,0.8,0.8))
-        else e.distT.Visible=false; e.distB.Visible=false end
-        -- Weapon
+            table.insert(lines, nm)
+        end
+        
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if _G.espHP and hum then
+            table.insert(lines, "HP: "..math.floor(hum.Health).."/"..math.floor(hum.MaxHealth))
+        end
+        
+        if _G.espDistance then table.insert(lines, math.floor(dist3D).."m") end
+        
         if _G.espWeapon then
             local tool = char:FindFirstChildWhichIsA("Tool")
-            if tool then drawL("weap", tool.Name, Color3.new(1,0.7,0.4)) end
-        else e.weapT.Visible=false; e.weapB.Visible=false end
+            if tool then table.insert(lines, tool.Name) end
+        end
+        
+        local content = table.concat(lines, "\n")
+        e.txt.Text = content
+        e.txt.Color = mainColor
+        e.txt.Position = Vector2.new(boxX + boxW + 4, boxY)
+        
+        local bounds = e.txt.TextBounds
+        e.txtBG.Size = Vector2.new(bounds.X + 4, bounds.Y)
+        e.txtBG.Position = Vector2.new(boxX + boxW + 2, boxY)
+        e.txt.Visible = true; e.txtBG.Visible = true
     else
-        local labels = {"name", "tag", "hp", "dist", "weap"}
-        for _, l in pairs(labels) do e[l.."T"].Visible=false; e[l.."B"].Visible=false end
+        e.txt.Visible = false; e.txtBG.Visible = false
     end
 end
 
@@ -491,46 +510,41 @@ end
 -- ═══════════ LIGHTING & UTILS ═══════════
 local function toggleFullbright(v)
     _G.fullbrightEnabled = v
-    if not v then return end
+    if not v then restoreLighting(); return end
     task.spawn(function()
-        local Lighting = game:GetService("Lighting")
-        while _G.fullbrightEnabled do
-            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-            Lighting.Brightness = 2
-            Lighting.GlobalShadows = false
-            task.wait(2)
+        while _G.fullbrightEnabled and _G.SupremeHubRunning do
+            lighting.Ambient = Color3.fromRGB(200, 200, 200)
+            lighting.OutdoorAmbient = Color3.fromRGB(200, 200, 200)
+            lighting.Brightness = 2
+            lighting.GlobalShadows = false
+            task.wait(1.5)
         end
     end)
 end
 
 local function toggleNoFog(v)
     _G.noFogEnabled = v
-    if v then
-        task.spawn(function()
-            local Lighting = game:GetService("Lighting")
-            while _G.noFogEnabled do
-                Lighting.FogEnd = 9e9
-                for _, v in pairs(Lighting:GetChildren()) do
-                    if v:IsA("Atmosphere") then v.Density = 0 end
-                end
-                task.wait(2)
+    if not v then restoreLighting(); return end
+    task.spawn(function()
+        while _G.noFogEnabled and _G.SupremeHubRunning do
+            lighting.FogEnd = 9e9
+            for _, v in pairs(lighting:GetChildren()) do
+                if v:IsA("Atmosphere") then v.Density = 0 end
             end
-        end)
-    end
+            task.wait(1.5)
+        end
+    end)
 end
 
 local function toggleAlwaysDay(v)
     _G.alwaysDayEnabled = v
-    if v then
-        task.spawn(function()
-            local Lighting = game:GetService("Lighting")
-            while _G.alwaysDayEnabled do
-                Lighting.ClockTime = 14
-                task.wait(2)
-            end
-        end)
-    end
+    if not v then restoreLighting(); return end
+    task.spawn(function()
+        while _G.alwaysDayEnabled and _G.SupremeHubRunning do
+            lighting.ClockTime = 14
+            task.wait(1.5)
+        end
+    end)
 end
 
 local function toggleStreamproof()
@@ -1082,19 +1096,18 @@ SCombat1:AddToggle({Name="Aimbot Manual (RMB)", Default=_G.aimbotManualEnabled, 
 SCombat1:AddToggle({Name="✨ Silent Aim (Original)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
 SCombat1:AddToggle({Name="🎯 Mouse Spoofing", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
 
-local SCombat2 = TabCombat:AddSection({Name="🛡️ SUPREME PRO LEGIT (HUMANIZADO)"})
-SCombat2:AddToggle({Name="Ativar Modo LEGIT (PRO Only)", Default=_G.aimbotLegitMode, Save=true, Flag="ALegit", Callback=function(V) _G.aimbotLegitMode=V; zSave() end})
-SCombat2:AddSlider({Name="Magnet Stickiness (Raio)", Min=5, Max=100, Default=_G.aimbotStickiness, Color=Color3.fromRGB(0,255,100), Increment=1, ValueName="Pixels", Save=true, Flag="AStick", Callback=function(V) _G.aimbotStickiness=V; zSave() end})
-SCombat2:AddToggle({Name="Alvos Aleatórios (Head/Chest)", Default=_G.aimbotRandomizeTarget, Save=true, Flag="ARand", Callback=function(V) _G.aimbotRandomizeTarget=V; zSave() end})
-SCombat2:AddLabel("💡 Modo LEGIT faz a mira grudar apenas quando está perto.")
+local SCLegit = TabCombat:AddSection({Name="🛡️ SUPREME PRO LEGIT (HUMANIZADO)"})
+SCLegit:AddToggle({Name="Ativar Modo LEGIT (PRO Only)", Default=_G.aimbotLegitMode, Save=true, Flag="ALegit", Callback=function(V) _G.aimbotLegitMode=V; zSave() end})
+SCLegit:AddSlider({Name="Magnet Stickiness (Raio)", Min=5, Max=100, Default=_G.aimbotStickiness, Color=Color3.fromRGB(0,255,100), Increment=1, ValueName="Pixels", Save=true, Flag="AStick", Callback=function(V) _G.aimbotStickiness=V; zSave() end})
+SCLegit:AddLabel("💡 Segue o seu Seletor de Hitbox (Bonequinho).")
+SCLegit:AddLabel("💡 Modo LEGIT foca o osso mais próximo que você escolheu.")
 
-local SCombat3 = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
-SCombat3:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
-
-SCombat3:AddToggle({Name="Wall Check (Visão Direta)", Default=_G.wallCheckEnabled, Save=true, Flag="WCheck", Callback=function(V) _G.wallCheckEnabled=V; zSave() end})
-SCombat3:AddToggle({Name="Aim Prediction (Movimento)", Default=_G.aimPredictionEnabled, Save=true, Flag="APred", Callback=function(V) _G.aimPredictionEnabled=V; zSave() end})
-SCombat3:AddSlider({Name="Smoothness Aimbot", Min=1, Max=50, Default=_G.aimbotSmoothness, Color=Color3.fromRGB(200,200,0), Increment=0.5, ValueName="Lerp", Save=true, Flag="ASmth", Callback=function(V) _G.aimbotSmoothness=V; zSave() end})
-SCombat3:AddSlider({Name="Chance Acerto (Silent)", Min=1, Max=100, Default=_G.silentAimHitChance, Color=Color3.fromRGB(200,100,255), Increment=1, ValueName="%", Save=true, Flag="SHit", Callback=function(V) _G.silentAimHitChance=V; zSave() end})
+local SCRefine = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
+SCRefine:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
+SCRefine:AddToggle({Name="Wall Check (Visão Direta)", Default=_G.wallCheckEnabled, Save=true, Flag="WCheck", Callback=function(V) _G.wallCheckEnabled=V; zSave() end})
+SCRefine:AddToggle({Name="Aim Prediction (Movimento)", Default=_G.aimPredictionEnabled, Save=true, Flag="APred", Callback=function(V) _G.aimPredictionEnabled=V; zSave() end})
+SCRefine:AddSlider({Name="Smoothness Aimbot", Min=1, Max=50, Default=_G.aimbotSmoothness, Color=Color3.fromRGB(200,200,0), Increment=0.5, ValueName="Lerp", Save=true, Flag="ASmth", Callback=function(V) _G.aimbotSmoothness=V; zSave() end})
+SCRefine:AddSlider({Name="Chance Acerto (Silent)", Min=1, Max=100, Default=_G.silentAimHitChance, Color=Color3.fromRGB(200,100,255), Increment=1, ValueName="%", Save=true, Flag="SHit", Callback=function(V) _G.silentAimHitChance=V; zSave() end})
 
 local SCombat4 = TabCombat:AddSection({Name="⭕ FIELD OF VIEW (FOV)"})
 SCombat4:AddToggle({Name="Mostrar Círculo FOV", Default=_G.FOV_VISIBLE, Save=true, Flag="FovV", Callback=function(V) _G.FOV_VISIBLE=V; zSave() end})
@@ -1192,10 +1205,11 @@ local SExp3 = TabExp:AddSection({Name="⚙️ OTHERS (🟡 MÉDIO RISCO)"})
 SExp3:AddToggle({Name="Mouse Spoofing (Silent Aim Helper)", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
 SExp3:AddLabel("⚠️ Telekill e Hitbox Expander dão ban facilmente.")
 local TabCfg = Window:MakeTab({Name="⚙️ Config", Icon="rbxassetid://4483345998", PremiumOnly=false})
+
 local SCfgTheme = TabCfg:AddSection({Name="🎨 CUSTOMIZAÇÃO VISUAL"})
 SCfgTheme:AddDropdown({Name="Tema da Interface", Default=_G.selectedTheme or "Default", Options={"Default", "Matrix", "Cyberpunk", "WatchDogs", "Yellow", "Neon RGB"}, Save=true, Flag="STheme", Callback=function(V) applyTheme(V); zSave() end})
 
-local SCfg1 = TabCfg:AddSection({Name="🛡️ INTERFACE"})
+local SCfg1 = TabCfg:AddSection({Name="🛡️ INTERFACE & SISTEMA"})
 if not isMobile then
     SCfg1:AddBind({Name="⌨️ Tecla do Menu (Abrir/Fechar)", Default=Enum.KeyCode.Home, Hold=false, Callback=function() local o=findOrionGui(); if o then o.Enabled=not o.Enabled end end})
 else
@@ -1209,15 +1223,19 @@ SCfg1:AddToggle({Name="🕵️ Streamproof (Anti-OBS)", Default=_G.streamproofEn
     for _,d in pairs(allDrawings) do d.Visible = not V end
     zSave() 
 end})
-SCfg1:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
-SCfg1:AddBind({Name="🛑 BOTÃO DE PÂNICO (Destruir Tudo)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
+
+local SCfg2 = TabCfg:AddSection({Name="🛑 EMERGÊNCIA & SEGURANÇA"})
+SCfg2:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
+SCfg2:AddBind({Name="🛑 BOTÃO DE PÂNICO (Destruir Tudo)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
     _G.SupremeHubRunning = false
     pcall(function() conn:Disconnect() end)
     pcall(function() _G.clearDrawings() end)
     if bonecoFrame then pcall(function() bonecoFrame.Parent:Destroy() end) end
     pcall(function() if coreGui:FindFirstChild("SupremeMobileHub") then coreGui.SupremeMobileHub:Destroy() end end)
     pcall(function() OrionLib:Destroy() end)
+    OrionLib:MakeNotification({Name="Supreme Hub", Content="Script encerrado com sucesso!", Time=5})
 end})
+SCfg2:AddButton({Name="Reinstalar Menu (Reset)", Callback=function() pcall(function() OrionLib:Destroy() end); task.wait(0.5); loadstring(game:HttpGet("https://raw.githubusercontent.com/ExiT/SupremeHub/main/aimnpc.lua"))() end})
 
 pcall(function() applyTheme(_G.selectedTheme or "Default") end)
 OrionLib:Init()
