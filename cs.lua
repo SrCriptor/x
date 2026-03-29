@@ -1082,8 +1082,6 @@ SCombat1:AddToggle({Name="Aimbot Manual (RMB)", Default=_G.aimbotManualEnabled, 
 SCombat1:AddToggle({Name="✨ Silent Aim (Original)", Default=_G.silentAimEnabled, Save=true, Flag="SAim", Callback=function(V) _G.silentAimEnabled=V; if V then _G.aimbotAutoEnabled=false end; zSave() end})
 SCombat1:AddToggle({Name="🎯 Mouse Spoofing", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
 
-local SCombat2 = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
-SCombat2:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
 local SCombat2 = TabCombat:AddSection({Name="🛡️ SUPREME PRO LEGIT (HUMANIZADO)"})
 SCombat2:AddToggle({Name="Ativar Modo LEGIT (PRO Only)", Default=_G.aimbotLegitMode, Save=true, Flag="ALegit", Callback=function(V) _G.aimbotLegitMode=V; zSave() end})
 SCombat2:AddSlider({Name="Magnet Stickiness (Raio)", Min=5, Max=100, Default=_G.aimbotStickiness, Color=Color3.fromRGB(0,255,100), Increment=1, ValueName="Pixels", Save=true, Flag="AStick", Callback=function(V) _G.aimbotStickiness=V; zSave() end})
@@ -1092,6 +1090,7 @@ SCombat2:AddLabel("💡 Modo LEGIT faz a mira grudar apenas quando está perto."
 
 local SCombat3 = TabCombat:AddSection({Name="⚙️ AIM REFINEMENTS"})
 SCombat3:AddButton({Name="👤 Abrir Seletor de Hitbox", Callback=function() if bonecoFrame then bonecoFrame.Visible=not bonecoFrame.Visible end end})
+
 SCombat3:AddToggle({Name="Wall Check (Visão Direta)", Default=_G.wallCheckEnabled, Save=true, Flag="WCheck", Callback=function(V) _G.wallCheckEnabled=V; zSave() end})
 SCombat3:AddToggle({Name="Aim Prediction (Movimento)", Default=_G.aimPredictionEnabled, Save=true, Flag="APred", Callback=function(V) _G.aimPredictionEnabled=V; zSave() end})
 SCombat3:AddSlider({Name="Smoothness Aimbot", Min=1, Max=50, Default=_G.aimbotSmoothness, Color=Color3.fromRGB(200,200,0), Increment=0.5, ValueName="Lerp", Save=true, Flag="ASmth", Callback=function(V) _G.aimbotSmoothness=V; zSave() end})
@@ -1104,41 +1103,42 @@ SCombat4:AddSlider({Name="Deadzone Legit", Min=5, Max=300, Default=_G.legitDeadz
 
 -- TAB: VISUALS
 local TabVis = Window:MakeTab({Name="👁️ Visuals", Icon="rbxassetid://4483362458", PremiumOnly=false})
-local SVis1 = TabVis:AddSection({Name="🔴 ENEMIES (INIMIGOS)"})
-SVis1:AddToggle({Name="Caixa 2D", Default=_G.espEnemyBox, Save=true, Flag="EBox", Callback=function(V) _G.espEnemyBox=V; zSave() end})
-SVis1:AddToggle({Name="Aura Colorida (Chams)", Default=_G.espEnemyChams, Save=true, Flag="EChm", Callback=function(V) _G.espEnemyChams=V; zSave() end})
-SVis1:AddToggle({Name="Linha (Tracers)", Default=_G.espEnemyTracers, Save=true, Flag="ETrc", Callback=function(V) _G.espEnemyTracers=V; zSave() end})
-SVis1:AddToggle({Name="Ossos 3D (Skeleton)", Default=_G.espEnemySkeleton, Save=true, Flag="ESkl", Callback=function(V) _G.espEnemySkeleton=V; zSave() end})
-SVis1:AddToggle({Name="Letreiros (Textos)", Default=_G.espEnemyText, Save=true, Flag="ETxt", Callback=function(V) _G.espEnemyText=V; zSave() end})
 
-local SVis2 = TabVis:AddSection({Name="🔵 ALLIES (ALIADOS)"})
-SVis2:AddToggle({Name="Caixa 2D", Default=_G.espAllyBox, Save=true, Flag="ABox", Callback=function(V) _G.espAllyBox=V; zSave() end})
-SVis2:AddToggle({Name="Aura Colorida (Chams)", Default=_G.espAllyChams, Save=true, Flag="AChm", Callback=function(V) _G.espAllyChams=V; zSave() end})
-SVis2:AddToggle({Name="Linha (Tracers)", Default=_G.espAllyTracers, Save=true, Flag="ATrc", Callback=function(V) _G.espAllyTracers=V; zSave() end})
-SVis2:AddToggle({Name="Ossos 3D (Skeleton)", Default=_G.espAllySkeleton, Save=true, Flag="ASkl", Callback=function(V) _G.espAllySkeleton=V; zSave() end})
-SVis2:AddToggle({Name="Letreiros (Textos)", Default=_G.espAllyText, Save=true, Flag="ATxt", Callback=function(V) _G.espAllyText=V; zSave() end})
+local SVis1 = TabVis:AddSection({Name="🔦 LIGHTING & ATMOSPHERE"})
+SVis1:AddToggle({Name="Fullbright (Tirar Escuridão)", Default=_G.fullbrightEnabled, Save=true, Flag="Frt", Callback=function(V) toggleFullbright(V); zSave() end})
+SVis1:AddToggle({Name="No Fog (Limpar Visão)", Default=_G.noFogEnabled, Save=true, Flag="NFog", Callback=function(V) toggleNoFog(V); zSave() end})
+SVis1:AddToggle({Name="Sempre Dia (Meio-Dia)", Default=_G.alwaysDayEnabled, Save=true, Flag="ADay", Callback=function(V) toggleAlwaysDay(V); zSave() end})
+SVis1:AddSlider({Name="Distância Máxima ESP", Min=50, Max=10000, Default=_G.espMaxDistance, Color=Color3.fromRGB(0,255,100), Increment=50, ValueName="Studs", Save=true, Flag="EspDist", Callback=function(V) _G.espMaxDistance=V; zSave() end})
 
-local SVis3 = TabVis:AddSection({Name="🟣 NPCs"})
-SVis3:AddToggle({Name="ESP NPC", Default=_G.espNPCEnabled, Save=true, Flag="ENPC", Callback=function(V) _G.espNPCEnabled=V; zSave() end})
+local SVis2 = TabVis:AddSection({Name="🛰️ RADAR 2D (MODO PINNING)"})
+SVis2:AddToggle({Name="Ativar Radar 2D", Default=_G.radarEnabled, Save=true, Flag="RadOn", Callback=function(V) _G.radarEnabled=V; zSave() end})
+SVis2:AddToggle({Name="Modo Apenas Pontos (Ghost Mode)", Default=_G.radarDotsOnly, Save=true, Flag="RadGhost", Callback=function(V) _G.radarDotsOnly=V; zSave() end})
+SVis2:AddSlider({Name="Zoom do Radar (Escala)", Min=0.05, Max=2, Default=_G.radarScale, Color=Color3.fromRGB(255,255,255), Increment=0.01, ValueName="Zoom", Save=true, Flag="RadScale", Callback=function(V) _G.radarScale=V; zSave() end})
+SVis2:AddLabel("💡 Arraste o círculo do radar com o mouse!")
+SVis2:AddLabel("💡 'Ghost Mode' serve para alinhar com o mapa do jogo.")
 
-local SVis4 = TabVis:AddSection({Name="📝 TEXT FILTERS (ESP DATA)"})
-SVis4:AddToggle({Name="Mostrar Nome", Default=_G.espName, Save=true, Flag="TxNm", Callback=function(V) _G.espName=V; zSave() end})
-SVis4:AddToggle({Name="Mostrar Vida (HP)", Default=_G.espHP, Save=true, Flag="TxHP", Callback=function(V) _G.espHP=V; zSave() end})
-SVis4:AddToggle({Name="Mostrar Distância", Default=_G.espDistance, Save=true, Flag="TxDist", Callback=function(V) _G.espDistance=V; zSave() end})
-SVis4:AddToggle({Name="Mostrar Arma Atual", Default=_G.espWeapon, Save=true, Flag="TxW", Callback=function(V) _G.espWeapon=V; zSave() end})
+local SVis3 = TabVis:AddSection({Name="🔴 ENEMIES (INIMIGOS)"})
+SVis3:AddToggle({Name="Caixa 2D", Default=_G.espEnemyBox, Save=true, Flag="EBox", Callback=function(V) _G.espEnemyBox=V; zSave() end})
+SVis3:AddToggle({Name="Aura Colorida (Chams)", Default=_G.espEnemyChams, Save=true, Flag="EChm", Callback=function(V) _G.espEnemyChams=V; zSave() end})
+SVis3:AddToggle({Name="Linha (Tracers)", Default=_G.espEnemyTracers, Save=true, Flag="ETrc", Callback=function(V) _G.espEnemyTracers=V; zSave() end})
+SVis3:AddToggle({Name="Ossos 3D (Skeleton)", Default=_G.espEnemySkeleton, Save=true, Flag="ESkl", Callback=function(V) _G.espEnemySkeleton=V; zSave() end})
+SVis3:AddToggle({Name="Letreiros (Textos)", Default=_G.espEnemyText, Save=true, Flag="ETxt", Callback=function(V) _G.espEnemyText=V; zSave() end})
 
-local SVis5 = TabVis:AddSection({Name="🛰️ RADAR 2D (MODO PINNING)"})
-SVis5:AddToggle({Name="Ativar Radar 2D", Default=_G.radarEnabled, Save=true, Flag="RadOn", Callback=function(V) _G.radarEnabled=V; zSave() end})
-SVis5:AddToggle({Name="Modo Apenas Pontos (Ghost Mode)", Default=_G.radarDotsOnly, Save=true, Flag="RadGhost", Callback=function(V) _G.radarDotsOnly=V; zSave() end})
-SVis5:AddSlider({Name="Zoom do Radar (Escala)", Min=0.05, Max=2, Default=_G.radarScale, Color=Color3.fromRGB(255,255,255), Increment=0.01, ValueName="Zoom", Save=true, Flag="RadScale", Callback=function(V) _G.radarScale=V; zSave() end})
-SVis5:AddLabel("💡 Arraste o círculo do radar com o mouse!")
-SVis5:AddLabel("💡 'Ghost Mode' serve para alinhar com o mapa do jogo.")
+local SVis4 = TabVis:AddSection({Name="🔵 ALLIES (ALIADOS)"})
+SVis4:AddToggle({Name="Caixa 2D", Default=_G.espAllyBox, Save=true, Flag="ABox", Callback=function(V) _G.espAllyBox=V; zSave() end})
+SVis4:AddToggle({Name="Aura Colorida (Chams)", Default=_G.espAllyChams, Save=true, Flag="AChm", Callback=function(V) _G.espAllyChams=V; zSave() end})
+SVis4:AddToggle({Name="Linha (Tracers)", Default=_G.espAllyTracers, Save=true, Flag="ATrc", Callback=function(V) _G.espAllyTracers=V; zSave() end})
+SVis4:AddToggle({Name="Ossos 3D (Skeleton)", Default=_G.espAllySkeleton, Save=true, Flag="ASkl", Callback=function(V) _G.espAllySkeleton=V; zSave() end})
+SVis4:AddToggle({Name="Letreiros (Textos)", Default=_G.espAllyText, Save=true, Flag="ATxt", Callback=function(V) _G.espAllyText=V; zSave() end})
 
-local SVis6 = TabVis:AddSection({Name="🔦 LIGHTING & ATMOSPHERE"})
-SVis6:AddToggle({Name="Fullbright (Tirar Escuridão)", Default=_G.fullbrightEnabled, Save=true, Flag="Frt", Callback=function(V) toggleFullbright(V); zSave() end})
-SVis6:AddToggle({Name="No Fog (Limpar Visão)", Default=_G.noFogEnabled, Save=true, Flag="NFog", Callback=function(V) toggleNoFog(V); zSave() end})
-SVis6:AddToggle({Name="Sempre Dia (Meio-Dia)", Default=_G.alwaysDayEnabled, Save=true, Flag="ADay", Callback=function(V) toggleAlwaysDay(V); zSave() end})
-SVis6:AddSlider({Name="Distância Máxima ESP", Min=50, Max=10000, Default=_G.espMaxDistance, Color=Color3.fromRGB(0,255,100), Increment=50, ValueName="Studs", Save=true, Flag="EspDist", Callback=function(V) _G.espMaxDistance=V; zSave() end})
+local SVis5 = TabVis:AddSection({Name="🟣 NPCs"})
+SVis5:AddToggle({Name="ESP NPC", Default=_G.espNPCEnabled, Save=true, Flag="ENPC", Callback=function(V) _G.espNPCEnabled=V; zSave() end})
+
+local SVis6 = TabVis:AddSection({Name="📝 TEXT FILTERS (ESP DATA)"})
+SVis6:AddToggle({Name="Mostrar Nome", Default=_G.espName, Save=true, Flag="TxNm", Callback=function(V) _G.espName=V; zSave() end})
+SVis6:AddToggle({Name="Mostrar Vida (HP)", Default=_G.espHP, Save=true, Flag="TxHP", Callback=function(V) _G.espHP=V; zSave() end})
+SVis6:AddToggle({Name="Mostrar Distância", Default=_G.espDistance, Save=true, Flag="TxDist", Callback=function(V) _G.espDistance=V; zSave() end})
+SVis6:AddToggle({Name="Mostrar Arma Atual", Default=_G.espWeapon, Save=true, Flag="TxW", Callback=function(V) _G.espWeapon=V; zSave() end})
 
 -- TAB: WEAPON
 local TabWeap = Window:MakeTab({Name="🔫 Weapon", Icon="rbxassetid://4483345998", PremiumOnly=false})
@@ -1192,6 +1192,9 @@ local SExp3 = TabExp:AddSection({Name="⚙️ OTHERS (🟡 MÉDIO RISCO)"})
 SExp3:AddToggle({Name="Mouse Spoofing (Silent Aim Helper)", Default=_G.mouseSpoofEnabled, Save=true, Flag="MSpoof", Callback=function(V) _G.mouseSpoofEnabled=V; zSave() end})
 SExp3:AddLabel("⚠️ Telekill e Hitbox Expander dão ban facilmente.")
 local TabCfg = Window:MakeTab({Name="⚙️ Config", Icon="rbxassetid://4483345998", PremiumOnly=false})
+local SCfgTheme = TabCfg:AddSection({Name="🎨 CUSTOMIZAÇÃO VISUAL"})
+SCfgTheme:AddDropdown({Name="Tema da Interface", Default=_G.selectedTheme or "Default", Options={"Default", "Matrix", "Cyberpunk", "WatchDogs", "Yellow", "Neon RGB"}, Save=true, Flag="STheme", Callback=function(V) applyTheme(V); zSave() end})
+
 local SCfg1 = TabCfg:AddSection({Name="🛡️ INTERFACE"})
 if not isMobile then
     SCfg1:AddBind({Name="⌨️ Tecla do Menu (Abrir/Fechar)", Default=Enum.KeyCode.Home, Hold=false, Callback=function() local o=findOrionGui(); if o then o.Enabled=not o.Enabled end end})
@@ -1206,7 +1209,6 @@ SCfg1:AddToggle({Name="🕵️ Streamproof (Anti-OBS)", Default=_G.streamproofEn
     for _,d in pairs(allDrawings) do d.Visible = not V end
     zSave() 
 end})
-SCfg1:AddDropdown({Name="🎨 Tema da Interface", Default=_G.selectedTheme or "Default", Options={"Default", "Matrix", "Cyberpunk", "WatchDogs", "Yellow", "Neon RGB"}, Save=true, Flag="STheme", Callback=function(V) applyTheme(V); zSave() end})
 SCfg1:AddButton({Name="🔄 Server Hopper (Low Pop)", Callback=function() teleportToLowPopServer() end})
 SCfg1:AddBind({Name="🛑 BOTÃO DE PÂNICO (Destruir Tudo)", Default=Enum.KeyCode.End, Hold=false, Callback=function()
     _G.SupremeHubRunning = false
@@ -1217,5 +1219,6 @@ SCfg1:AddBind({Name="🛑 BOTÃO DE PÂNICO (Destruir Tudo)", Default=Enum.KeyCo
     pcall(function() OrionLib:Destroy() end)
 end})
 
+pcall(function() applyTheme(_G.selectedTheme or "Default") end)
 OrionLib:Init()
 print("⚡ Supreme Hub Loaded | All Systems Active")
