@@ -22,7 +22,6 @@ local currentTarget, currentTargetPart = nil, nil
 local aiming = false
 local aimbotKey = Enum.UserInputType.MouseButton2 
 local triggerBotCooldown, lastAntiAimTick = false, tick()
-local nextAimSwitchTime, currentFocusLevel = tick() + 2.0, 1 
 local legitReactionTimer, lastLegitTarget = 0, nil
 
 -- CONFIGURAÇÕES GLOBAIS
@@ -381,15 +380,15 @@ local function getPriorityParts(character)
     return primary, secondary
 end
 
--- 🎯 NOVO SISTEMA DE TARGET
+-- 🎯 NOVO SISTEMA DE TARGET (REAL-TIME SEM TIMERS)
 local function getClosestEnemyAdvanced()
     local cam = workspace.CurrentCamera
     if not cam then return nil, nil end
     local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
 
-    local bestPlayer = nil
-    local bestPart = nil
-    local shortestDistance = (_G.aimbotMode == "Legit") and _G.legitDeadzone or _G.FOV_RADIUS
+    local bestPlayerPrimary, bestPartPrimary, shortestPrimary = nil, nil, _G.FOV_RADIUS
+    local bestPlayerSecondary, bestPartSecondary, shortestSecondary = nil, nil, _G.FOV_RADIUS
+    local bestPlayerLegit, bestPartLegit, shortestLegit = nil, nil, _G.legitDeadzone
 
     for _, player in pairs(game.Players:GetPlayers()) do
         if player == LocalPlayer then continue end
@@ -398,33 +397,61 @@ local function getClosestEnemyAdvanced()
         if not char or not isAlive(char) then continue end
         if not isFFA() and isSameTeam(player, LocalPlayer) then continue end
 
-        local partsToCheck = {}
         if _G.aimbotMode == "Legit" then
-            for _, p in pairs(char:GetChildren()) do
-                if p:IsA("BasePart") then table.insert(partsToCheck, p) end
+            for _, part in pairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    local screenPos, visible = cam:WorldToViewportPoint(part.Position)
+                    if visible then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                        if dist < shortestLegit then
+                            if not _G.wallCheckEnabled or hasLineOfSight(part) then
+                                shortestLegit = dist
+                                bestPlayerLegit = player
+                                bestPartLegit = part
+                            end
+                        end
+                    end
+                end
             end
         else
             local primaryParts, secondaryParts = getPriorityParts(char)
-            partsToCheck = (currentFocusLevel == 1) and primaryParts or secondaryParts
-        end
+            
+            for _, part in pairs(primaryParts) do
+                local screenPos, visible = cam:WorldToViewportPoint(part.Position)
+                if visible then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist < shortestPrimary then
+                        if not _G.wallCheckEnabled or hasLineOfSight(part) then
+                            shortestPrimary = dist
+                            bestPlayerPrimary = player
+                            bestPartPrimary = part
+                        end
+                    end
+                end
+            end
 
-        for _, part in pairs(partsToCheck) do
-            local screenPos, visible = cam:WorldToViewportPoint(part.Position)
-            if visible then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-
-                if dist < shortestDistance then
-                    if not _G.wallCheckEnabled or hasLineOfSight(part) then
-                        shortestDistance = dist
-                        bestPlayer = player
-                        bestPart = part
+            for _, part in pairs(secondaryParts) do
+                local screenPos, visible = cam:WorldToViewportPoint(part.Position)
+                if visible then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist < shortestSecondary then
+                        if not _G.wallCheckEnabled or hasLineOfSight(part) then
+                            shortestSecondary = dist
+                            bestPlayerSecondary = player
+                            bestPartSecondary = part
+                        end
                     end
                 end
             end
         end
     end
 
-    return bestPlayer, bestPart
+    if _G.aimbotMode == "Legit" then
+        return bestPlayerLegit, bestPartLegit
+    else
+        if bestPartPrimary then return bestPlayerPrimary, bestPartPrimary end
+        return bestPlayerSecondary, bestPartSecondary
+    end
 end
 
 -- ==================== SILENT AIM HOOK ====================
@@ -454,11 +481,6 @@ _G.RunServiceConnection = RunService.RenderStepped:Connect(function()
     local cam = workspace.CurrentCamera
     if not cam then return end
     local c = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
-    
-    if tick() >= nextAimSwitchTime then
-        currentFocusLevel = (currentFocusLevel == 1) and 2 or 1
-        nextAimSwitchTime = tick() + ((currentFocusLevel == 1) and 1.8 or 0.35)
-    end
     
     currentTarget, currentTargetPart = getClosestEnemyAdvanced()
     
