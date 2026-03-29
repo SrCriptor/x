@@ -135,48 +135,40 @@ local function hasLOS(part)
     return not r or r.Instance:IsDescendantOf(part.Parent)
 end
 
--- ═══════════ NPC DETECTION (SMART & OPTIMIZED) ═══════════
-local ENEMY_KW = {"zombie","infected","enemy","monster","mutant","soldier","mob","ghoul","undead"}
-local FRIENDLY_KW = {"quest","shop","trader","merchant","guide","interaction","doctor","banker","scavenger","safezone"}
+-- ═══════════ NPC DETECTION (AGGRESSIVE & SMART) ═══════════
+local ENEMY_KW = {"zombie","zumbi","infected","enemy","monster","mutant","soldier","mob","ghoul","undead","skeleton","elite","boss","beast"}
+local FRIENDLY_KW = {"quest","shop","store","trader","merchant","guide","interaction","doctor","banker","scavenger","safezone","vendedor","comprar"}
 
-local isZombieGame = false -- Flag para detectar se o jogo é focado em zumbis
+local isZombieGame = false
 
 local function isLikelyHostile(obj)
     local n = obj.Name:lower()
     for _, k in pairs(FRIENDLY_KW) do if n:find(k) then return false end end
     
-    -- Smart Indicators: Hostile NPCs usually don't have interaction prompts
-    if obj:FindFirstChildWhichIsA("ProximityPrompt", true) then return false end
-    
-    -- Check BillboardGuis for friendly text
-    for _, bg in pairs(obj:GetDescendants()) do
-        if bg:IsA("BillboardGui") then
-            for _, tl in pairs(bg:GetDescendants()) do
-                if tl:IsA("TextLabel") or tl:IsA("TextBox") then
-                    local t = tl.Text:lower()
-                    for _, k in pairs(FRIENDLY_KW) do if t:find(k) then return false end end
-                end
-            end
-        end
+    -- Specific Exclusions: Only exclude interaction prompts IF they are clearly for commerce/quests
+    local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then 
+        local pn = prompt.ObjectText:lower()..prompt.ActionText:lower()
+        for _, k in pairs(FRIENDLY_KW) do if pn:find(k) then return false end end
     end
     
-    -- Se detectamos que é um "Zombie Game", restringimos aos keywords de inimigo
+    -- Se for um jogo de zumbis, priorizamos zumbis mas não ignoramos outros se não forem "friendly"
     if isZombieGame then
         for _, k in pairs(ENEMY_KW) do if n:find(k) then return true end end
-        return false
+        -- Se não tiver keyword de inimigo mas também não for friendly, em jogo de zumbi, checamos se tem humanoid
+        local hum = obj:FindFirstChildOfClass("Humanoid")
+        return hum ~= nil
     end
     
-    -- Em outros jogos, qualquer NPC sem indicadores "friendly" é alvo
     return true
 end
 
 local cachedNPCs, lastNPCScan = {}, 0
 local function getNPCs()
-    if tick() - lastNPCScan < 3 then return cachedNPCs end
+    if tick() - lastNPCScan < 2 then return cachedNPCs end
     lastNPCScan = tick()
     
     local npcs = {}
-    local potentialHostiles = {}
     local playerChars = {}
     for _,p in pairs(Players:GetPlayers()) do if p.Character then playerChars[p.Character]=true end end
     local myPos = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and LP.Character.HumanoidRootPart.Position
@@ -184,29 +176,33 @@ local function getNPCs()
     isZombieGame = false
     
     local function scan(parent, depth)
-        if depth > 3 then return end
-        for _, o in pairs(parent:GetChildren()) do
-            if #npcs >= 30 then break end
+        if depth > 4 then return end
+        local children = parent:GetChildren()
+        for _, o in pairs(children) do
+            if #npcs >= 50 then break end
             
             if o:IsA("Model") and o ~= LP.Character and not playerChars[o] then
                 local hum = o:FindFirstChildOfClass("Humanoid")
                 if hum and hum.Health > 0 then
                     local n = o.Name:lower()
-                    -- Detecção de tipo de jogo
-                    for _, k in pairs(ENEMY_KW) do if n:find(k) then isZombieGame = true end end
+                    -- Identifica se é jogo de zumbi por qualquer entidade ou pasta
+                    for _, k in pairs(ENEMY_KW) do if n:find(k) then isZombieGame = true; break end end
                     
                     if isLikelyHostile(o) then
-                        if myPos then
-                            local root = o:FindFirstChild("HumanoidRootPart") or o:FindFirstChild("Head") or o.PrimaryPart
-                            if root and (root.Position - myPos).Magnitude <= _G.espMaxDistance then
-                                table.insert(npcs, o)
-                            end
-                        else table.insert(npcs, o) end
+                        local root = o:FindFirstChild("HumanoidRootPart") or o:FindFirstChild("Head") or o.PrimaryPart
+                        if root then
+                            if myPos then
+                                if (root.Position - myPos).Magnitude <= _G.espMaxDistance then
+                                    table.insert(npcs, o)
+                                end
+                            else table.insert(npcs, o) end
+                        end
                     end
-                end
-            elseif (o:IsA("Folder") or o:IsA("Model")) and (#npcs < 30) then
+                elseif depth < 4 then scan(o, depth + 1) end -- Scan inside models for humanoids (some games nest them)
+            elseif o:IsA("Folder") and depth < 4 then
                 local n = o.Name:lower()
-                if n:find("zombie") or n:find("enemy") or n:find("npc") or n:find("mob") or n:find("monster") then
+                -- Sempre scan folders a menos que sejam explicitamente "Map" ou "Static"
+                if not n:find("map") and not n:find("static") and not n:find("environment") then
                     if n:find("zombie") or n:find("enemy") then isZombieGame = true end
                     scan(o, depth + 1)
                 end
