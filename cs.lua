@@ -135,33 +135,86 @@ local function hasLOS(part)
     return not r or r.Instance:IsDescendantOf(part.Parent)
 end
 
--- ═══════════ NPC DETECTION (OTIMIZADO) ═══════════
-local cachedNPCs, lastNPCScan = {}, 0
-local function getNPCs()
-    if tick() - lastNPCScan < 5 then return cachedNPCs end
-    lastNPCScan = tick()
+-- ═══════════ NPC DETECTION (SMART & OPTIMIZED) ═══════════
+local ENEMY_KW = {"zombie","infected","enemy","monster","mutant","soldier","mob","ghoul","undead"}
+local FRIENDLY_KW = {"quest","shop","trader","merchant","guide","interaction","doctor","banker","scavenger","safezone"}
+
+local isZombieGame = false -- Flag para detectar se o jogo é focado em zumbis
+
+local function isLikelyHostile(obj)
+    local n = obj.Name:lower()
+    for _, k in pairs(FRIENDLY_KW) do if n:find(k) then return false end end
     
-    local npcs = {}
-    local playerChars = {}
-    for _,p in pairs(Players:GetPlayers()) do if p.Character then playerChars[p.Character]=true end end
+    -- Smart Indicators: Hostile NPCs usually don't have interaction prompts
+    if obj:FindFirstChildWhichIsA("ProximityPrompt", true) then return false end
     
-    local myPos = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and LP.Character.HumanoidRootPart.Position
-    
-    -- Optimized scan: Loop through Workspace children instead of all descendants
-    for _, o in pairs(workspace:GetChildren()) do
-        if #npcs >= 15 then break end
-        if o:IsA("Model") and o ~= LP.Character and not playerChars[o] then
-            local hum = o:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                if myPos then
-                    local root = o:FindFirstChild("HumanoidRootPart") or o:FindFirstChild("Head")
-                    if root and (root.Position - myPos).Magnitude <= _G.espMaxDistance then
-                        table.insert(npcs, o)
-                    end
-                else table.insert(npcs, o) end
+    -- Check BillboardGuis for friendly text
+    for _, bg in pairs(obj:GetDescendants()) do
+        if bg:IsA("BillboardGui") then
+            for _, tl in pairs(bg:GetDescendants()) do
+                if tl:IsA("TextLabel") or tl:IsA("TextBox") then
+                    local t = tl.Text:lower()
+                    for _, k in pairs(FRIENDLY_KW) do if t:find(k) then return false end end
+                end
             end
         end
     end
+    
+    -- Se detectamos que é um "Zombie Game", restringimos aos keywords de inimigo
+    if isZombieGame then
+        for _, k in pairs(ENEMY_KW) do if n:find(k) then return true end end
+        return false
+    end
+    
+    -- Em outros jogos, qualquer NPC sem indicadores "friendly" é alvo
+    return true
+end
+
+local cachedNPCs, lastNPCScan = {}, 0
+local function getNPCs()
+    if tick() - lastNPCScan < 3 then return cachedNPCs end
+    lastNPCScan = tick()
+    
+    local npcs = {}
+    local potentialHostiles = {}
+    local playerChars = {}
+    for _,p in pairs(Players:GetPlayers()) do if p.Character then playerChars[p.Character]=true end end
+    local myPos = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and LP.Character.HumanoidRootPart.Position
+    
+    isZombieGame = false
+    
+    local function scan(parent, depth)
+        if depth > 3 then return end
+        for _, o in pairs(parent:GetChildren()) do
+            if #npcs >= 30 then break end
+            
+            if o:IsA("Model") and o ~= LP.Character and not playerChars[o] then
+                local hum = o:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    local n = o.Name:lower()
+                    -- Detecção de tipo de jogo
+                    for _, k in pairs(ENEMY_KW) do if n:find(k) then isZombieGame = true end end
+                    
+                    if isLikelyHostile(o) then
+                        if myPos then
+                            local root = o:FindFirstChild("HumanoidRootPart") or o:FindFirstChild("Head") or o.PrimaryPart
+                            if root and (root.Position - myPos).Magnitude <= _G.espMaxDistance then
+                                table.insert(npcs, o)
+                            end
+                        else table.insert(npcs, o) end
+                    end
+                end
+            elseif (o:IsA("Folder") or o:IsA("Model")) and (#npcs < 30) then
+                local n = o.Name:lower()
+                if n:find("zombie") or n:find("enemy") or n:find("npc") or n:find("mob") or n:find("monster") then
+                    if n:find("zombie") or n:find("enemy") then isZombieGame = true end
+                    scan(o, depth + 1)
+                end
+            end
+        end
+    end
+    
+    scan(workspace, 0)
     cachedNPCs = npcs; return npcs
 end
 
@@ -454,8 +507,19 @@ local function getClosestTarget()
         end
     end
     
-    if _G.espNPCEnabled or _G.silentAimEnabled then
-        for _,npc in pairs(getNPCs()) do
+    if _G.espNPCEnabled or _G.silentAimEnabled or _G.telekillNPCEnabled then
+        local npcs = getNPCs()
+        -- Prioridade: Se houver Zumbis/Inimigos, foca apenas neles primeiro
+        local hostiles = {}
+        for _, n in pairs(npcs) do
+            local ln = n.Name:lower()
+            local isH = false
+            for _, k in pairs(ENEMY_KW) do if ln:find(k) then isH = true; break end end
+            if isH then table.insert(hostiles, n) end
+        end
+        
+        local targetsToScan = #hostiles > 0 and hostiles or npcs
+        for _,npc in pairs(targetsToScan) do
             if not isAlive(npc) then continue end
             local part = getTargetPart(npc)
             if part then
@@ -469,20 +533,36 @@ local function getClosestTarget()
 end
 
 local function getClosest3D(npcOnly)
-    local center = Camera.CFrame.Position
+    local center = (LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")) and LP.Character.HumanoidRootPart.Position or Camera.CFrame.Position
     local best, bestDist = nil, 1000
     if npcOnly then
-        for _,npc in pairs(getNPCs()) do
+        local npcs = getNPCs()
+        local hostiles = {}
+        for _, n in pairs(npcs) do
+            local ln = n.Name:lower()
+            local isH = false
+            for _, k in pairs(ENEMY_KW) do if ln:find(k) then isH = true; break end end
+            if isH then table.insert(hostiles, n) end
+        end
+        
+        local targetsToScan = #hostiles > 0 and hostiles or npcs
+        for _,npc in pairs(targetsToScan) do
             if isAlive(npc) then
-                local d = (npc.PrimaryPart.Position - center).Magnitude
-                if d < bestDist then bestDist = d; best = npc end
+                local root = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart or npc:FindFirstChild("Head")
+                if root then
+                    local d = (root.Position - center).Magnitude
+                    if d < bestDist then bestDist = d; best = npc end
+                end
             end
         end
     else
         for _,p in pairs(Players:GetPlayers()) do
             if p~=LP and p.Character and isAlive(p.Character) and isEnemy(p) then
-                local d = (p.Character.PrimaryPart.Position - center).Magnitude
-                if d < bestDist then bestDist = d; best = p.Character end
+                local hroot = p.Character:FindFirstChild("HumanoidRootPart") or p.Character.PrimaryPart
+                if hroot then
+                    local d = (hroot.Position - center).Magnitude
+                    if d < bestDist then bestDist = d; best = p.Character end
+                end
             end
         end
     end
