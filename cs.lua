@@ -136,8 +136,8 @@ local function hasLOS(part)
 end
 
 -- ═══════════ NPC DETECTION (AGGRESSIVE & SMART) ═══════════
-local ENEMY_KW = {"zombie","zumbi","infected","enemy","monster","mutant","soldier","mob","ghoul","undead","skeleton","elite","boss","beast","bomba"}
-local FRIENDLY_KW = {"quest","shop","store","trader","merchant","guide","interaction","doctor","banker","scavenger","safezone","vendedor","comprar","itens","ver","selecionar","inventario","perfil"}
+local ENEMY_KW = {"zombie","zumbi","infected","enemy","monster","mutant","soldier","mob","ghoul","undead","skeleton","elite","boss","beast"}
+local FRIENDLY_KW = {"quest","shop","store","trader","merchant","guide","interaction","doctor","banker","scavenger","safezone","vendedor","comprar"}
 
 local isZombieGame = false
 
@@ -145,18 +145,19 @@ local function isLikelyHostile(obj)
     local n = obj.Name:lower()
     for _, k in pairs(FRIENDLY_KW) do if n:find(k) then return false end end
     
-    -- Se for um jogo de zumbis, PRIORIDADE MÁXIMA PARA ZUMBIS
-    if isZombieGame then
-        for _, k in pairs(ENEMY_KW) do if n:find(k) then return true end end
-        -- Se não tiver keyword de inimigo, ignoramos para o ESP ficar limpo
-        return false
-    end
-    
     -- Specific Exclusions: Only exclude interaction prompts IF they are clearly for commerce/quests
     local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
     if prompt then 
-        local pn = (prompt.ObjectText:lower()..prompt.ActionText:lower())
+        local pn = prompt.ObjectText:lower()..prompt.ActionText:lower()
         for _, k in pairs(FRIENDLY_KW) do if pn:find(k) then return false end end
+    end
+    
+    -- Se for um jogo de zumbis, priorizamos zumbis mas não ignoramos outros se não forem "friendly"
+    if isZombieGame then
+        for _, k in pairs(ENEMY_KW) do if n:find(k) then return true end end
+        -- Se não tiver keyword de inimigo mas também não for friendly, em jogo de zumbi, checamos se tem humanoid
+        local hum = obj:FindFirstChildOfClass("Humanoid")
+        return hum ~= nil
     end
     
     return true
@@ -962,16 +963,14 @@ local conn; conn = RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ═══════════ TELEKILL 360 (DANO OTIMIZADO) ═══════════
+    -- ═══════════ TELEKILL 360 (Experimental) ═══════════
     if _G.telekillPlayerEnabled or _G.telekillNPCEnabled then
         local tkTarget = getClosest3D(_G.telekillNPCEnabled)
-        if tkTarget and char and char:FindFirstChild("HumanoidRootPart") then
+        if tkTarget then
             local hroot = tkTarget:FindFirstChild("HumanoidRootPart") or tkTarget:FindFirstChild("Torso")
             if hroot then
                 pcall(function()
-                    -- Teleporta para o seu peito (Char HRP) em vez da Câmera para registrar dano melhor
-                    local myHRP = char.HumanoidRootPart
-                    hroot.CFrame = myHRP.CFrame * CFrame.new(0, 0, -_G.telekillDistance)
+                    hroot.CFrame = Camera.CFrame * CFrame.new(0, 0, -_G.telekillDistance)
                     hroot.Velocity = Vector3.new(0,0,0)
                 end)
             end
